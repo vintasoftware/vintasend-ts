@@ -1,0 +1,13 @@
+{
+	"name": "vintasend",
+  "version": "0.1.0",
+	"scripts": {
+		"lint": "biome check .",
+		"format": "biome format .",
+		"check": "biome check --apply ."
+	},
+	"devDependencies": {
+		"@biomejs/biome": "1.9.4",
+		"@types/node": "^22.13.1"
+	}
+}
