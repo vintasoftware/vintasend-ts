@@ -24,7 +24,7 @@ export class NotificationService<
       NotificationIdType,
       UserIdType
     >[],
-    private backend: BaseNotificationBackend<AvailableContexts>,
+    private backend: BaseNotificationBackend<AvailableContexts, NotificationIdType, UserIdType>,
     private logger: BaseLogger,
     private queueService?: BaseNotificationQueueService<NotificationIdType>,
   ) {}
