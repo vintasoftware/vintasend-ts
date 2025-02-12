@@ -9,25 +9,33 @@ import {
   type ContextGenerator,
   NotificationContextRegistry,
 } from './notification-context-registry';
-import type { JsonObject, JsonValue } from '../types/json-values';
+import type { JsonObject } from '../types/json-values';
 
-export class NotificationService<AvailableContexts extends Record<string, ContextGenerator>> {
+export class NotificationService<
+  AvailableContexts extends Record<string, ContextGenerator>,
+  NotificationIdType extends Identifier = Identifier,
+  UserIdType extends Identifier = Identifier,
+> {
   constructor(
     private adapters: BaseNotificationAdapter<
-      BaseNotificationTemplateRenderer<AvailableContexts>,
-      BaseNotificationBackend<AvailableContexts>,
-      AvailableContexts
+      BaseNotificationTemplateRenderer<AvailableContexts, NotificationIdType, UserIdType>,
+      BaseNotificationBackend<AvailableContexts, NotificationIdType, UserIdType>,
+      AvailableContexts,
+      NotificationIdType,
+      UserIdType
     >[],
     private backend: BaseNotificationBackend<AvailableContexts>,
     private logger: BaseLogger,
-    private queueService?: BaseNotificationQueueService,
+    private queueService?: BaseNotificationQueueService<NotificationIdType>,
   ) {}
 
-  registerQueueService(queueService: BaseNotificationQueueService): void {
+  registerQueueService(queueService: BaseNotificationQueueService<NotificationIdType>): void {
     this.queueService = queueService;
   }
 
-  async send(notification: Notification<AvailableContexts>): Promise<void> {
+  async send(
+    notification: Notification<AvailableContexts, NotificationIdType, UserIdType>,
+  ): Promise<void> {
     const adaptersOfType = this.adapters.filter(
       (adapter) => adapter.notificationType === notification.notificationType,
     );
@@ -85,9 +93,9 @@ export class NotificationService<AvailableContexts extends Record<string, Contex
   }
 
   async createNotification(
-    notification: Omit<Notification<AvailableContexts>, 'id'>,
-  ): Promise<Notification<AvailableContexts>> {
-    const createdNotification = await this.backend.persistNotification(notification);
+    notification: Omit<Notification<AvailableContexts, NotificationIdType, UserIdType>, 'id'>,
+  ): Promise<Notification<AvailableContexts, NotificationIdType, UserIdType>> {
+    const createdNotification = await this.backend.persistNotification(notification) as Notification<AvailableContexts, NotificationIdType, UserIdType>;
 
     if (notification.sendAfter && notification.sendAfter > new Date()) {
       this.send(createdNotification);
@@ -98,28 +106,26 @@ export class NotificationService<AvailableContexts extends Record<string, Contex
 
   async updateNotification(
     notificationId: Identifier,
-    notification: Partial<Omit<Notification<AvailableContexts>, 'id'>>,
-  ): Promise<Notification<AvailableContexts>> {
+    notification: Partial<
+      Omit<Notification<AvailableContexts, NotificationIdType, UserIdType>, 'id'>
+    >,
+  ) {
     return this.backend.persistNotificationUpdate(notificationId, notification);
   }
 
-  async getAllFutureNotifications(): Promise<Notification<AvailableContexts>[]> {
+  async getAllFutureNotifications() {
     return this.backend.getAllFutureNotifications();
   }
 
-  async getAllFutureNotificationsFromUser(
-    userId: Identifier,
-  ): Promise<Notification<AvailableContexts>[]> {
+  async getAllFutureNotificationsFromUser(userId: NotificationIdType) {
     return this.backend.getAllFutureNotificationsFromUser(userId);
   }
 
-  async getFutureNotificationsFromUser(
-    userId: Identifier,
-  ): Promise<Notification<AvailableContexts>[]> {
+  async getFutureNotificationsFromUser(userId: NotificationIdType) {
     return this.backend.getFutureNotificationsFromUser(userId);
   }
 
-  async getFutureNotifications(): Promise<Notification<AvailableContexts>[]> {
+  async getFutureNotifications() {
     return this.backend.getFutureNotifications();
   }
 
@@ -132,33 +138,34 @@ export class NotificationService<AvailableContexts extends Record<string, Contex
 
   async sendPendingNotifications(): Promise<void> {
     const pendingNotifications = await this.backend.getAllPendingNotifications();
-    await Promise.all(pendingNotifications.map((notification) => this.send(notification)));
+    await Promise.all(
+      pendingNotifications.map((notification) =>
+        this.send(notification as Notification<AvailableContexts, NotificationIdType, UserIdType>),
+      ),
+    );
   }
 
-  async getPendingNotifications(): Promise<Notification<AvailableContexts>[]> {
+  async getPendingNotifications() {
     return this.backend.getPendingNotifications();
   }
 
-  async getNotification(
-    notificationId: Identifier,
-    forUpdate: boolean,
-  ): Promise<Notification<AvailableContexts> | null> {
+  async getNotification(notificationId: NotificationIdType, forUpdate: boolean) {
     return this.backend.getNotification(notificationId, forUpdate);
   }
 
-  async markRead(notificationId: Identifier): Promise<Notification<AvailableContexts>> {
+  async markRead(notificationId: NotificationIdType) {
     return this.backend.markSentAsRead(notificationId);
   }
 
-  async getInAppUnread(userId: Identifier): Promise<Notification<AvailableContexts>[]> {
+  async getInAppUnread(userId: NotificationIdType) {
     return this.backend.filterAllInAppUnreadNotifications(userId);
   }
 
-  async cancelNotification(notificationId: Identifier): Promise<void> {
+  async cancelNotification(notificationId: NotificationIdType): Promise<void> {
     return this.backend.cancelNotification(notificationId);
   }
 
-  async delayedSend(notificationId: Identifier): Promise<void> {
+  async delayedSend(notificationId: NotificationIdType): Promise<void> {
     const notification = await this.getNotification(notificationId, false);
 
     if (!notification) {
@@ -189,7 +196,7 @@ export class NotificationService<AvailableContexts extends Record<string, Contex
 
     for (const adapter of enqueueNotificationsAdapters) {
       try {
-        await adapter.send(notification, context);
+        await adapter.send(notification as Notification<AvailableContexts, NotificationIdType, UserIdType>, context);
       } catch (sendError) {
         this.logger.error(
           `Error sending notification ${notification.id} with adapter ${adapter.constructor.name}: ${sendError}`,

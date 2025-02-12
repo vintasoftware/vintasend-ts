@@ -4,11 +4,14 @@ import type { BaseNotificationBackend } from '../notification-backends/base-noti
 import type { BaseNotificationTemplateRenderer } from '../notification-template-renderers/base-notification-template-renderer';
 import type { ContextGenerator } from '../notification-context-registry';
 import type { JsonValue } from '../../types/json-values';
+import type { Identifier } from '../../types/identifier';
 
 export interface BaseNotificationAdapter<
   TemplateRenderer extends BaseNotificationTemplateRenderer<AvailableContexts>,
   Backend extends BaseNotificationBackend<AvailableContexts>,
-  AvailableContexts extends Record<string, ContextGenerator>
+  AvailableContexts extends Record<string, ContextGenerator>,
+  NotificationIdType extends Identifier = Identifier,
+  UserIdType extends Identifier = Identifier,
 > {
   notificationType: NotificationType;
   key: string;
@@ -16,5 +19,8 @@ export interface BaseNotificationAdapter<
   backend: Backend;
   enqueueNotifications: boolean;
 
-  send(notification: Notification<AvailableContexts>, context: JsonValue): Promise<void>;
+  send(
+    notification: Notification<AvailableContexts, NotificationIdType, UserIdType>,
+    context: JsonValue,
+  ): Promise<void>;
 }
