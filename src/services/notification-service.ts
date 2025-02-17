@@ -11,6 +11,11 @@ import {
 } from './notification-context-registry';
 import type { JsonObject } from '../types/json-values';
 
+
+type NotificationServiceOptions = {
+  raiseErrorOnFailedSend: boolean;
+};
+
 export class NotificationService<
   AvailableContexts extends Record<string, ContextGenerator>,
   NotificationIdType extends Identifier = Identifier,
@@ -27,6 +32,9 @@ export class NotificationService<
     private backend: BaseNotificationBackend<AvailableContexts, NotificationIdType, UserIdType>,
     private logger: BaseLogger,
     private queueService?: BaseNotificationQueueService<NotificationIdType>,
+    private options: NotificationServiceOptions = {
+      raiseErrorOnFailedSend: false,
+    },
   ) {}
 
   registerQueueService(queueService: BaseNotificationQueueService<NotificationIdType>): void {
@@ -40,12 +48,27 @@ export class NotificationService<
       (adapter) => adapter.notificationType === notification.notificationType,
     );
     if (adaptersOfType.length === 0) {
-      throw new Error(`No adapter found for notification type ${notification.notificationType}`);
+      this.logger.error(`No adapter found for notification type ${notification.notificationType}`);
+      if (this.options.raiseErrorOnFailedSend) {
+        throw new Error(`No adapter found for notification type ${notification.notificationType}`);
+      }
+      return;
     }
-    const context = await this.getNotificationContext(
-      notification.contextName,
-      notification.contextParameters,
-    );
+
+    let context: JsonObject | null = null;
+    try {
+      context = await this.getNotificationContext(
+        notification.contextName,
+        notification.contextParameters,
+      );
+      this.logger.info(`Generated context for notification ${notification.id}`);
+    } catch (contextError) {
+      this.logger.error(`Error getting context for notification ${notification.id}: ${contextError}`);
+      if (this.options.raiseErrorOnFailedSend) {
+        throw contextError;
+      }
+      return;
+    }
 
     if (!notification.id) {
       throw new Error("Notification wan't created in the database. Please create it first");
@@ -54,21 +77,27 @@ export class NotificationService<
     for (const adapter of adaptersOfType) {
       if (adapter.enqueueNotifications) {
         if (!this.queueService) {
-          throw new Error('Distributed adapter found but no queue service provided');
+          this.logger.error('Distributed adapter found but no queue service provided');
+          continue;
         }
         try {
-          return await this.queueService.enqueueNotification(notification.id);
+          this.logger.info(`Enqueuing notification ${notification.id} with adapter ${adapter.key}`);
+          await this.queueService.enqueueNotification(notification.id);
+          this.logger.info(`Enqueued notification ${notification.id} with adapter ${adapter.key} successfully`);
+          continue;
         } catch (enqueueError) {
-          this.logger.error(`Error enqueuing notification ${notification.id}: ${enqueueError}`);
-          throw enqueueError;
+          this.logger.error(`Error enqueuing notification ${notification.id}: ${enqueueError} with adapter ${adapter.key}`);
+          continue;
         }
       }
 
       try {
+        this.logger.info(`Sending notification ${notification.id} with adapter ${adapter.key}`);
         await adapter.send(notification, context);
+        this.logger.info(`Sent notification ${notification.id} with adapter ${adapter.key} successfully`);
       } catch (sendError) {
         this.logger.error(
-          `Error sending notification ${notification.id} with adapter ${adapter.constructor.name}: ${sendError}`,
+          `Error sending notification ${notification.id} with adapter ${adapter.key}: ${sendError}`,
         );
         try {
           await this.backend.markPendingAsFailed(notification.id);
@@ -77,7 +106,7 @@ export class NotificationService<
             `Error marking notification ${notification.id} as failed: ${markFailedError}`,
           );
         }
-        throw sendError;
+        continue;
       }
 
       try {
@@ -95,10 +124,14 @@ export class NotificationService<
   async createNotification(
     notification: Omit<Notification<AvailableContexts, NotificationIdType, UserIdType>, 'id'>,
   ): Promise<Notification<AvailableContexts, NotificationIdType, UserIdType>> {
-    const createdNotification = await this.backend.persistNotification(notification) as Notification<AvailableContexts, NotificationIdType, UserIdType>;
+    const createdNotification = await this.backend.persistNotification(notification);
+    this.logger.error(`Notification ${createdNotification.id} created`);
 
-    if (notification.sendAfter && notification.sendAfter > new Date()) {
+    if (notification.sendAfter && notification.sendAfter <= new Date()) {
+      this.logger.info(`Notification ${createdNotification.id} sent immediately because sendAfter is in the past`);
       this.send(createdNotification);
+    } else {
+      this.logger.info(`Notification ${createdNotification.id} scheduled for ${notification.sendAfter}`);
     }
 
     return createdNotification;
@@ -110,7 +143,9 @@ export class NotificationService<
       Omit<Notification<AvailableContexts, NotificationIdType, UserIdType>, 'id'>
     >,
   ) {
-    return this.backend.persistNotificationUpdate(notificationId, notification);
+    const updatedNotification = this.backend.persistNotificationUpdate(notificationId, notification);
+    this.logger.info(`Notification ${notificationId} updated`);
+    return updatedNotification;
   }
 
   async getAllFutureNotifications() {
@@ -154,7 +189,9 @@ export class NotificationService<
   }
 
   async markRead(notificationId: NotificationIdType) {
-    return this.backend.markSentAsRead(notificationId);
+    const notification = this.backend.markSentAsRead(notificationId);
+    this.logger.info(`Notification ${notificationId} marked as read`);
+    return notification;
   }
 
   async getInAppUnread(userId: NotificationIdType) {
@@ -162,7 +199,8 @@ export class NotificationService<
   }
 
   async cancelNotification(notificationId: NotificationIdType): Promise<void> {
-    return this.backend.cancelNotification(notificationId);
+    await this.backend.cancelNotification(notificationId);
+    this.logger.info(`Notification ${notificationId} cancelled`);
   }
 
   async delayedSend(notificationId: NotificationIdType): Promise<void> {
@@ -170,7 +208,10 @@ export class NotificationService<
 
     if (!notification) {
       this.logger.error(`Notification ${notificationId} not found`);
-      throw new Error(`Notification ${notificationId} not found`);
+      if (this.options.raiseErrorOnFailedSend) {
+        throw new Error(`Notification ${notificationId} not found`);
+      }
+      return;
     }
 
     const enqueueNotificationsAdapters = this.adapters.filter(
@@ -178,11 +219,11 @@ export class NotificationService<
     );
 
     if (enqueueNotificationsAdapters.length === 0) {
-      throw new Error('Delayed send is not supported if there are no distributed adapters');
-    }
-
-    if (!this.queueService) {
-      throw new Error('Distributed adapter found but no queue service provided');
+      this.logger.error('Delayed send is not supported if there are no distributed adapters');
+      if (this.options.raiseErrorOnFailedSend) {
+        throw new Error('Delayed send is not supported if there are no distributed adapters');
+      }
+      return;
     }
 
     const context = await this.getNotificationContext(
@@ -191,7 +232,11 @@ export class NotificationService<
     );
 
     if (!notification.id) {
-      throw new Error("Notification wan't created in the database. Please create it first");
+      this.logger.error(`Notification wasn't created in the database. Please create it first`);
+      if (this.options.raiseErrorOnFailedSend) {
+        throw new Error("Notification wasn't created in the database. Please create it first");
+      }
+      return;
     }
 
     for (const adapter of enqueueNotificationsAdapters) {
@@ -199,7 +244,7 @@ export class NotificationService<
         await adapter.send(notification as Notification<AvailableContexts, NotificationIdType, UserIdType>, context);
       } catch (sendError) {
         this.logger.error(
-          `Error sending notification ${notification.id} with adapter ${adapter.constructor.name}: ${sendError}`,
+          `Error sending notification ${notification.id} with adapter ${adapter.key}: ${sendError}`,
         );
         try {
           await this.backend.markPendingAsFailed(notification.id);
@@ -208,7 +253,6 @@ export class NotificationService<
             `Error marking notification ${notification.id} as failed: ${markFailedError}`,
           );
         }
-        throw sendError;
       }
 
       try {
