@@ -1,13 +1,22 @@
 {
-	"name": "vintasend",
-  "version": "0.1.4",
-	"scripts": {
-		"lint": "biome check .",
-		"format": "biome format .",
-		"check": "biome check --apply ."
-	},
-	"devDependencies": {
-		"@biomejs/biome": "1.9.4",
-		"@types/node": "^22.13.1"
-	}
+  "name": "vintasend",
+  "version": "0.1.6",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "author": "Hugo Bessa",
+  "license": "MIT",
+  "scripts": {
+    "lint": "biome check .",
+    "format": "biome format .",
+    "check": "biome check --apply .",
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "@types/node": "^22.13.1",
+    "typescript": "^5.8.2"
+  }
 }
