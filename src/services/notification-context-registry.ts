@@ -38,10 +38,16 @@ export class NotificationContextRegistry<T extends Record<string, ContextGenerat
   }
 
   public async getContext<K extends keyof T>(key: K, parameters: Parameters<T[K]['generate']>[0]) {
-    if (this.contexts[key].generate instanceof Promise) {
-      return this.contexts[key].generate(parameters);
+    const contextGenerator = this.contexts[key];
+    if (!contextGenerator) {
+      throw new Error(`Context generator not found for context: ${key as string}`);
     }
-    return Promise.resolve(this.contexts[key].generate(parameters));
+
+    const result = contextGenerator.generate(parameters);
+    if (result instanceof Promise) {
+      return await result;
+    }
+    return result;
   }
 
   public getAvailableContexts(): (keyof T)[] {

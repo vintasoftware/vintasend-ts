@@ -40,6 +40,14 @@ describe('NotificationContextRegistry', () => {
     );
   });
 
+  it('should throw error for invalid context name', async () => {
+    const registry = NotificationContextRegistry.initialize(mockContexts);
+    // @ts-ignore - testing invalid context name
+    await expect(registry.getContext('invalid', {})).rejects.toThrow(
+      'Context generator not found for context: invalid'
+    );
+  });
+
   it('should return context for synchronous generator', async () => {
     const registry = NotificationContextRegistry.initialize(mockContexts);
     const context = await registry.getContext('user', { userId: '123' });
