@@ -33,6 +33,10 @@ export class NotificationContextRegistry<T extends Record<string, ContextGenerat
     return NotificationContextRegistry.instance as NotificationContextRegistry<T>;
   }
 
+  public static resetInstance(): void {
+    NotificationContextRegistry.instance = null;
+  }
+
   public async getContext<K extends keyof T>(key: K, parameters: Parameters<T[K]['generate']>[0]) {
     if (this.contexts[key].generate instanceof Promise) {
       return this.contexts[key].generate(parameters);

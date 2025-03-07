@@ -55,21 +55,6 @@ export class NotificationService<
       return;
     }
 
-    let context: JsonObject | null = null;
-    try {
-      context = await this.getNotificationContext(
-        notification.contextName,
-        notification.contextParameters,
-      );
-      this.logger.info(`Generated context for notification ${notification.id}`);
-    } catch (contextError) {
-      this.logger.error(`Error getting context for notification ${notification.id}: ${contextError}`);
-      if (this.options.raiseErrorOnFailedSend) {
-        throw contextError;
-      }
-      return;
-    }
-
     if (!notification.id) {
       throw new Error("Notification wan't created in the database. Please create it first");
     }
@@ -89,6 +74,21 @@ export class NotificationService<
           this.logger.error(`Error enqueuing notification ${notification.id}: ${enqueueError} with adapter ${adapter.key}`);
           continue;
         }
+      }
+
+      let context: JsonObject | null = null;
+      try {
+        context = await this.getNotificationContext(
+          notification.contextName,
+          notification.contextParameters,
+        );
+        this.logger.info(`Generated context for notification ${notification.id}`);
+      } catch (contextError) {
+        this.logger.error(`Error getting context for notification ${notification.id}: ${contextError}`);
+        if (this.options.raiseErrorOnFailedSend) {
+          throw contextError;
+        }
+        return;
       }
 
       try {
@@ -168,7 +168,8 @@ export class NotificationService<
     contextName: keyof AvailableContexts,
     parameters: Parameters<AvailableContexts[keyof AvailableContexts]['generate']>[0],
   ): Promise<JsonObject | null> {
-    return NotificationContextRegistry.getInstance().getContext(contextName as string, parameters);
+    const contextRegistry = NotificationContextRegistry.getInstance();
+    return contextRegistry.getContext(contextName as string, parameters);
   }
 
   async sendPendingNotifications(): Promise<void> {
@@ -184,7 +185,7 @@ export class NotificationService<
     return this.backend.getPendingNotifications();
   }
 
-  async getNotification(notificationId: NotificationIdType, forUpdate: boolean) {
+  async getNotification(notificationId: NotificationIdType, forUpdate = false) {
     return this.backend.getNotification(notificationId, forUpdate);
   }
 
@@ -272,15 +273,15 @@ export class NotificationServiceSingleton {
   private static instance: NotificationService<any>;
 
   static getInstance<AvailableContexts extends Record<string, ContextGenerator>>(
-    ...args: ConstructorParameters<typeof NotificationService>
+    ...args: ConstructorParameters<typeof NotificationService> | []
   ): NotificationService<AvailableContexts> {
     if (!NotificationServiceSingleton.instance) {
-      if (!args) {
+      if (!args || args.length === 0) {
         throw new Error(
           'NotificationServiceSingleton is not initialized. Please call getInstance with the required arguments',
         );
       }
-      NotificationServiceSingleton.instance = new NotificationService(args[0], args[1], args[2]);
+      NotificationServiceSingleton.instance = new NotificationService(...args);
     }
 
     return NotificationServiceSingleton.instance;

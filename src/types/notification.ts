@@ -22,7 +22,7 @@ export type NotificationInput<
   extraParams: InputJsonValue | null;
 };
 
-type DatabaseNotification<
+export type DatabaseNotification<
   AvailableContexts extends Record<string, ContextGenerator>,
   NotificatioIdType extends Identifier = Identifier,
   UserIdType extends Identifier = Identifier
