@@ -117,7 +117,13 @@ export class NotificationService<
         );
       }
 
-      await this.backend.storeContextUsed(notification.id, context ?? {});
+      try {
+        await this.backend.storeContextUsed(notification.id, context ?? {});
+      } catch (storeContextError) {
+        this.logger.error(
+          `Error storing context for notification ${notification.id}: ${storeContextError}`,
+        );
+      }
     }
   }
 
@@ -167,7 +173,7 @@ export class NotificationService<
   async getNotificationContext(
     contextName: keyof AvailableContexts,
     parameters: Parameters<AvailableContexts[keyof AvailableContexts]['generate']>[0],
-  ): Promise<JsonObject | null> {
+  ): Promise<JsonObject> {
     const contextRegistry = NotificationContextRegistry.getInstance();
     return contextRegistry.getContext(contextName as string, parameters);
   }
@@ -232,14 +238,6 @@ export class NotificationService<
       notification.contextParameters,
     );
 
-    if (!notification.id) {
-      this.logger.error(`Notification wasn't created in the database. Please create it first`);
-      if (this.options.raiseErrorOnFailedSend) {
-        throw new Error("Notification wasn't created in the database. Please create it first");
-      }
-      return;
-    }
-
     for (const adapter of enqueueNotificationsAdapters) {
       try {
         await adapter.send(notification as Notification<AvailableContexts, NotificationIdType, UserIdType>, context);
@@ -263,6 +261,15 @@ export class NotificationService<
           `Error marking notification ${notification.id} as sent: ${markSentError}`,
         );
       }
+
+    }
+
+    try {
+      await this.backend.storeContextUsed(notification.id, context);
+    } catch (storeContextError) {
+      this.logger.error(
+        `Error storing context for notification ${notification.id}: ${storeContextError}`,
+      );
     }
   }
 }

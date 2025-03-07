@@ -65,7 +65,7 @@ describe('NotificationService', () => {
   // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   let service: NotificationService<any>;
   // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-  let mockNotification: Notification<any, any, any> = {
+  let mockNotification: DatabaseNotification<any, any, any> = {
     id: '123',
     notificationType: 'EMAIL' as const,
     contextName: 'testContext',
@@ -160,6 +160,82 @@ describe('NotificationService', () => {
       expect(mockQueueService.enqueueNotification).toHaveBeenCalledWith(mockNotification.id);
       expect(mockAdapter.send).not.toHaveBeenCalled();
     });
+
+    it('should handle errors when marking as sent', async () => {
+      notificationContextgenerators.testContext.generate.mockResolvedValue({});
+      mockBackend.markPendingAsSent.mockRejectedValue(new Error('Database error'));
+
+      await service.send(mockNotification);
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error marking notification 123 as sent')
+      );
+    });
+
+    it('should handle missing queue service for distributed adapter', async () => {
+      const serviceWithDistributedAdapter = new NotificationService(
+        [{ ...mockAdapter, enqueueNotifications: true }],
+        mockBackend,
+        mockLogger
+      );
+
+      await serviceWithDistributedAdapter.send(mockNotification);
+
+      expect(mockLogger.error).toHaveBeenCalledWith('Distributed adapter found but no queue service provided');
+      expect(mockAdapter.send).not.toHaveBeenCalled();
+    });
+
+    it('should handle queue service enqueue error', async () => {
+      const serviceWithQueue = new NotificationService(
+        [{ ...mockAdapter, enqueueNotifications: true }],
+        mockBackend,
+        mockLogger,
+        mockQueueService
+      );
+
+      mockQueueService.enqueueNotification.mockRejectedValue(new Error('Queue error'));
+
+      await serviceWithQueue.send(mockNotification);
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error enqueuing notification')
+      );
+    });
+
+    it('should handle error storing context', async () => {
+      notificationContextgenerators.testContext.generate.mockResolvedValue({});
+      mockBackend.storeContextUsed.mockRejectedValue(new Error('Storage error'));
+
+      await service.send(mockNotification);
+
+      expect(mockAdapter.send).toHaveBeenCalled();
+      expect(mockBackend.storeContextUsed).toHaveBeenCalledWith(mockNotification.id, {});
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error storing context for notification')
+      );
+    });
+
+    it('should handle failed storage of context and continue execution', async () => {
+      notificationContextgenerators.testContext.generate.mockResolvedValue({});
+      mockBackend.storeContextUsed.mockRejectedValue(new Error('Failed to store context'));
+
+      await service.send(mockNotification);
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error storing context for notification')
+      );
+      // Should still complete the send operation
+      expect(mockAdapter.send).toHaveBeenCalled();
+      expect(mockBackend.markPendingAsSent).toHaveBeenCalled();
+    });
+
+    it('should store null context as empty object', async () => {
+      notificationContextgenerators.testContext.generate.mockResolvedValue(null);
+
+      await service.send(mockNotification);
+
+      expect(mockBackend.storeContextUsed).toHaveBeenCalledWith(mockNotification.id, {});
+    });
   });
 
   describe('createNotification', () => {
@@ -224,6 +300,14 @@ describe('NotificationService', () => {
       expect(service.send).not.toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(`Notification 123 scheduled for ${futureDate}`);
     });
+
+    it('should log error when notification is created', async () => {
+      mockBackend.persistNotification.mockResolvedValue({ ...mockNewNotification, id: '123' });
+
+      await service.createNotification(mockNewNotification);
+
+      expect(mockLogger.error).toHaveBeenCalledWith('Notification 123 created');
+    });
   });
 
   describe('delayed send', () => {
@@ -273,20 +357,80 @@ describe('NotificationService', () => {
       );
     });
 
-    it('should handle notification without ID', async () => {
-      const notificationWithoutId = { ...mockNotification, id: undefined };
-      mockBackend.getNotification.mockResolvedValue(notificationWithoutId);
-
-      const serviceWithDistributedAdapter = new NotificationService(
-        [{ ...mockAdapter, enqueueNotifications: true }],
+    it('should fail when there are no distributed adapters with raiseErrorOnFailedSend enabled', async () => {
+      mockBackend.getNotification.mockResolvedValue(mockNotification);
+      const serviceWithError = new NotificationService(
+        [mockAdapter],
         mockBackend,
-        mockLogger
+        mockLogger,
+        undefined,
+        { raiseErrorOnFailedSend: true }
       );
 
-      await serviceWithDistributedAdapter.delayedSend('123');
+      await expect(serviceWithError.delayedSend('123')).rejects.toThrow(
+        new Error('Delayed send is not supported if there are no distributed adapters')
+      );
+    });
+
+    it('should handle error when marking notification as sent in delayedSend', async () => {
+      const distributedAdapter = { ...mockAdapter, enqueueNotifications: true };
+      const serviceWithQueue = new NotificationService(
+        [distributedAdapter],
+        mockBackend,
+        mockLogger,
+        mockQueueService
+      );
+
+      mockBackend.getNotification.mockResolvedValue(mockNotification);
+      notificationContextgenerators.testContext.generate.mockResolvedValue({});
+      mockBackend.markPendingAsSent.mockRejectedValue(new Error('Failed to mark as sent'));
+
+      await serviceWithQueue.delayedSend('123');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        "Notification wasn't created in the database. Please create it first"
+        expect.stringContaining('Error marking notification 123 as sent')
+      );
+      expect(distributedAdapter.send).toHaveBeenCalled();
+    });
+
+    it('should handle send error and mark as failed in delayedSend', async () => {
+      const distributedAdapter = { ...mockAdapter, enqueueNotifications: true };
+      const serviceWithQueue = new NotificationService(
+        [distributedAdapter],
+        mockBackend,
+        mockLogger,
+        mockQueueService
+      );
+
+      mockBackend.getNotification.mockResolvedValue(mockNotification);
+      notificationContextgenerators.testContext.generate.mockResolvedValue({});
+      distributedAdapter.send.mockRejectedValue(new Error('Send failed'));
+
+      await serviceWithQueue.delayedSend('123');
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error sending notification 123')
+      );
+      expect(mockBackend.markPendingAsFailed).toHaveBeenCalled();
+    });
+
+    it('should handle error when marking as failed in delayedSend', async () => {
+      const distributedAdapter = { ...mockAdapter, enqueueNotifications: true };
+      const serviceWithQueue = new NotificationService(
+        [distributedAdapter],
+        mockBackend,
+        mockLogger,
+        mockQueueService
+      );
+
+      mockBackend.getNotification.mockResolvedValue(mockNotification);
+      distributedAdapter.send.mockRejectedValue(new Error('Send failed'));
+      mockBackend.markPendingAsFailed.mockRejectedValue(new Error('Failed to mark as failed'));
+
+      await serviceWithQueue.delayedSend('123');
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error marking notification 123 as failed')
       );
     });
   });
@@ -307,7 +451,7 @@ describe('NotificationService', () => {
         id: '123',
         ...updates
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-      } as unknown as Notification<any, any, any>);
+      } as unknown as DatabaseNotification<any, any, any>);
 
       const result = await service.updateNotification('123', updates);
 
@@ -350,6 +494,37 @@ describe('NotificationService', () => {
       const result = await service.getNotificationContext('testContext', { param: 'value' });
       expect(result).toEqual(mockContext);
     });
+
+    it('should handle context registry access error', async () => {
+      NotificationContextRegistry.resetInstance(); // Force getInstance to fail
+
+      await expect(service.getNotificationContext('testContext', { param: 'value' }))
+        .rejects.toThrow('NotificationContextRegistry not initialized');
+    });
+
+    it('should handle null context generation', async () => {
+      notificationContextgenerators.testContext.generate.mockResolvedValue(null);
+
+      const result = await service.getNotificationContext('testContext', { param: 'value' });
+
+      expect(result).toBeNull();
+    });
+
+    it('should handle error when context registry is not initialized', async () => {
+      NotificationContextRegistry.resetInstance();
+
+      await expect(async () => {
+        await service.getNotificationContext('testContext', {});
+      }).rejects.toThrow();
+    });
+
+    it('should throw when context registry is not properly initialized', async () => {
+      NotificationContextRegistry.resetInstance();
+      // Don't initialize the registry
+
+      await expect(service.getNotificationContext('testContext', {}))
+        .rejects.toThrow('NotificationContextRegistry not initialized');
+    });
   });
 
   describe('pending notifications', () => {
@@ -374,6 +549,93 @@ describe('NotificationService', () => {
       mockBackend.getPendingNotifications.mockResolvedValue([]);
       await service.getPendingNotifications();
       expect(mockBackend.getPendingNotifications).toHaveBeenCalled();
+    });
+
+    it('should handle failed notifications in sendPendingNotifications', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      const mockPendingNotifications: DatabaseNotification<any, any, any>[] = [
+        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any, any, any>,
+        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any, any, any>
+      ];
+      mockBackend.getAllPendingNotifications.mockResolvedValue(mockPendingNotifications);
+      notificationContextgenerators.testContext.generate.mockRejectedValue(new Error('Context error'));
+
+      await service.sendPendingNotifications();
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error getting context for notification')
+      );
+      expect(mockAdapter.send).not.toHaveBeenCalled();
+    });
+
+    it('should log success for each pending notification sent', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      const mockPendingNotifications: DatabaseNotification<any, any, any>[] = [
+        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any, any, any>,
+        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any, any, any>
+      ];
+      mockBackend.getAllPendingNotifications.mockResolvedValue(mockPendingNotifications);
+      notificationContextgenerators.testContext.generate.mockResolvedValue({});
+
+      await service.sendPendingNotifications();
+
+      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Generated context for notification 1'));
+      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Generated context for notification 2'));
+    });
+
+    it('should handle notification send failure in sendPendingNotifications', async () => {
+      const mockError = new Error('Send failed');
+      mockAdapter.send.mockRejectedValue(mockError);
+      mockBackend.getAllPendingNotifications.mockResolvedValue([mockNotification]);
+      notificationContextgenerators.testContext.generate.mockResolvedValue({});
+
+      await service.sendPendingNotifications();
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining(`Error sending notification ${mockNotification.id}`)
+      );
+    });
+
+    it('should continue processing other notifications after failure', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      const notifications: DatabaseNotification<any, any, any>[] = [
+        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any, any, any>,
+        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any, any, any>
+      ];
+      mockBackend.getAllPendingNotifications.mockResolvedValue(notifications);
+      notificationContextgenerators.testContext.generate.mockResolvedValue({});
+      mockAdapter.send.mockRejectedValueOnce(new Error('First send failed'))
+                     .mockResolvedValueOnce();
+
+      await service.sendPendingNotifications();
+
+      expect(mockAdapter.send).toHaveBeenCalledTimes(2);
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error sending notification 1')
+      );
+    });
+
+    it('should log info for each notification context generation', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      const mockPendingNotifications: DatabaseNotification<any, any, any>[] = [
+        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any, any, any>,
+        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any, any, any>
+      ];
+      mockBackend.getAllPendingNotifications.mockResolvedValue(mockPendingNotifications);
+      notificationContextgenerators.testContext.generate.mockResolvedValue({});
+
+      await service.sendPendingNotifications();
+
+      expect(mockLogger.info).toHaveBeenCalledWith('Generated context for notification 1');
+      expect(mockLogger.info).toHaveBeenCalledWith('Generated context for notification 2');
     });
   });
 
@@ -429,12 +691,41 @@ describe('NotificationService', () => {
         'Notification nonexistent not found'
       );
     });
+
+    it('should log error when notification not found in delayed send with raiseErrorOnFailedSend disabled', async () => {
+      mockBackend.getNotification.mockResolvedValue(null);
+      // biome-ignore lint/complexity/useLiteralKeys: <explanation>
+      serviceWithError["options"]["raiseErrorOnFailedSend"] = false;
+
+      await serviceWithError.delayedSend('nonexistent')
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Notification nonexistent not found'
+      );
+    });
+  });
+
+  describe('notification context errors', () => {
+    it('should handle context errors with raiseErrorOnFailedSend enabled', async () => {
+      const serviceWithError = new NotificationService(
+        [mockAdapter],
+        mockBackend,
+        mockLogger,
+        undefined,
+        { raiseErrorOnFailedSend: true }
+      );
+
+      const error = new Error('Context generation failed');
+      notificationContextgenerators.testContext.generate.mockRejectedValue(error);
+
+      await expect(serviceWithError.send(mockNotification)).rejects.toThrow(error);
+    });
   });
 
   describe('notification retrieval', () => {
     it('should get a single notification', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-      const mockNotif = { ...mockAdapter, id: '123', title: 'Test' } as unknown as Notification<any, any, any>;
+      const mockNotif = { ...mockAdapter, id: '123', title: 'Test' } as unknown as DatabaseNotification<any, any, any>;
       mockBackend.getNotification.mockResolvedValue(mockNotif);
 
       const result = await service.getNotification('123');
