@@ -16,7 +16,7 @@ export abstract class BaseNotificationAdapter<
   backend: BaseNotificationBackend<AvailableContexts, NotificationIdType, UserIdType> | null = null;
 
   constructor(
-    private templateRenderer: TemplateRenderer,
+    protected templateRenderer: TemplateRenderer,
     public readonly notificationType: NotificationType,
     public readonly enqueueNotifications: boolean,
   ) {};
