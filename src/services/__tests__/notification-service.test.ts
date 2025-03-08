@@ -35,14 +35,16 @@ const mockTemplateRenderer: jest.Mocked<BaseEmailTemplateRenderer<any, any, any>
 };
 
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any, any, any, any>> = {
+const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any, any, any>> = {
   notificationType: 'EMAIL',
   key: 'test-adapter',
   enqueueNotifications: false,
   send: jest.fn(),
+  injectBackend: jest.fn(),
   backend: mockBackend,
   templateRenderer: mockTemplateRenderer,
-};
+// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+} as any;
 
 const mockLogger: jest.Mocked<BaseLogger> = {
   info: jest.fn(),
@@ -149,7 +151,8 @@ describe('NotificationService', () => {
 
     it('should handle queue service integration with enqueue adapter', async () => {
       const serviceWithQueue = new NotificationService(
-        [{ ...mockAdapter, enqueueNotifications: true }],
+        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        [{ ...mockAdapter, enqueueNotifications: true } as any],
         mockBackend,
         mockLogger,
         mockQueueService
@@ -174,7 +177,8 @@ describe('NotificationService', () => {
 
     it('should handle missing queue service for distributed adapter', async () => {
       const serviceWithDistributedAdapter = new NotificationService(
-        [{ ...mockAdapter, enqueueNotifications: true }],
+        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        [{ ...mockAdapter, enqueueNotifications: true } as any],
         mockBackend,
         mockLogger
       );
@@ -187,7 +191,8 @@ describe('NotificationService', () => {
 
     it('should handle queue service enqueue error', async () => {
       const serviceWithQueue = new NotificationService(
-        [{ ...mockAdapter, enqueueNotifications: true }],
+        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        [{ ...mockAdapter, enqueueNotifications: true } as any],
         mockBackend,
         mockLogger,
         mockQueueService
@@ -330,7 +335,8 @@ describe('NotificationService', () => {
     };
 
     it('should handle delayed send with distributed adapter', async () => {
-      const distributedAdapter = { ...mockAdapter, enqueueNotifications: true };
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      const distributedAdapter = { ...mockAdapter, enqueueNotifications: true } as any;
       const serviceWithQueue = new NotificationService(
         [distributedAdapter],
         mockBackend,
@@ -373,7 +379,8 @@ describe('NotificationService', () => {
     });
 
     it('should handle error when marking notification as sent in delayedSend', async () => {
-      const distributedAdapter = { ...mockAdapter, enqueueNotifications: true };
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      const distributedAdapter = { ...mockAdapter, enqueueNotifications: true } as any;
       const serviceWithQueue = new NotificationService(
         [distributedAdapter],
         mockBackend,
@@ -394,7 +401,8 @@ describe('NotificationService', () => {
     });
 
     it('should handle send error and mark as failed in delayedSend', async () => {
-      const distributedAdapter = { ...mockAdapter, enqueueNotifications: true };
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      const distributedAdapter = { ...mockAdapter, enqueueNotifications: true } as any;
       const serviceWithQueue = new NotificationService(
         [distributedAdapter],
         mockBackend,
@@ -415,7 +423,8 @@ describe('NotificationService', () => {
     });
 
     it('should handle error when marking as failed in delayedSend', async () => {
-      const distributedAdapter = { ...mockAdapter, enqueueNotifications: true };
+      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      const distributedAdapter = { ...mockAdapter, enqueueNotifications: true } as any;
       const serviceWithQueue = new NotificationService(
         [distributedAdapter],
         mockBackend,

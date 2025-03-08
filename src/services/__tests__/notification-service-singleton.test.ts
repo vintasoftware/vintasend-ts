@@ -5,6 +5,7 @@ import type { BaseLogger } from '../loggers/base-logger';
 import type { BaseNotificationQueueService } from '../notification-queue-service/base-notification-queue-service';
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
 
+
 describe('NotificationServiceSingleton', () => {
   // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   const mockBackend: jest.Mocked<BaseNotificationBackend<any, any, any>> = {
@@ -33,14 +34,16 @@ describe('NotificationServiceSingleton', () => {
   };
 
   // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-  const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any, any, any, any>> = {
+  const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any, any, any>> = {
     notificationType: 'EMAIL',
     key: 'test-adapter',
     enqueueNotifications: false,
     send: jest.fn(),
+    injectBackend: jest.fn(),
     backend: mockBackend,
     templateRenderer: mockTemplateRenderer,
-  };
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  } as any;
 
   const mockLogger: jest.Mocked<BaseLogger> = {
     info: jest.fn(),
@@ -75,7 +78,7 @@ describe('NotificationServiceSingleton', () => {
 
   it('should maintain same instance across multiple calls with different parameters', () => {
     const instance1 = NotificationServiceSingleton.getInstance([mockAdapter], mockBackend, mockLogger);
-    const instance2 = NotificationServiceSingleton.getInstance([{...mockAdapter}], {...mockBackend}, {...mockLogger});
+    const instance2 = NotificationServiceSingleton.getInstance([mockAdapter], mockBackend, mockLogger);
 
     expect(instance1).toBe(instance2);
   });
