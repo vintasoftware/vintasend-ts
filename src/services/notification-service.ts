@@ -24,7 +24,6 @@ export class NotificationService<
   constructor(
     private adapters: BaseNotificationAdapter<
       BaseNotificationTemplateRenderer<AvailableContexts, NotificationIdType, UserIdType>,
-      BaseNotificationBackend<AvailableContexts, NotificationIdType, UserIdType>,
       AvailableContexts,
       NotificationIdType,
       UserIdType
@@ -35,7 +34,11 @@ export class NotificationService<
     private options: NotificationServiceOptions = {
       raiseErrorOnFailedSend: false,
     },
-  ) {}
+  ) {
+    for (const adapter of adapters) {
+      adapter.injectBackend(backend);
+    }
+  }
 
   registerQueueService(queueService: BaseNotificationQueueService<NotificationIdType>): void {
     this.queueService = queueService;

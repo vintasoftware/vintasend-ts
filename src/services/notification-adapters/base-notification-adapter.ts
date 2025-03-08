@@ -6,21 +6,34 @@ import type { ContextGenerator } from '../notification-context-registry';
 import type { JsonValue } from '../../types/json-values';
 import type { Identifier } from '../../types/identifier';
 
-export interface BaseNotificationAdapter<
+export abstract class BaseNotificationAdapter<
   TemplateRenderer extends BaseNotificationTemplateRenderer<AvailableContexts>,
-  Backend extends BaseNotificationBackend<AvailableContexts>,
   AvailableContexts extends Record<string, ContextGenerator>,
   NotificationIdType extends Identifier = Identifier,
   UserIdType extends Identifier = Identifier,
 > {
-  notificationType: NotificationType;
-  key: string;
-  templateRenderer: TemplateRenderer;
-  backend: Backend;
-  enqueueNotifications: boolean;
+  key: string | null = null;
+  backend: BaseNotificationBackend<AvailableContexts, NotificationIdType, UserIdType> | null = null;
+
+  constructor(
+    private templateRenderer: TemplateRenderer,
+    public readonly notificationType: NotificationType,
+    public readonly enqueueNotifications: boolean,
+  ) {};
 
   send(
     notification: Notification<AvailableContexts, NotificationIdType, UserIdType>,
     context: JsonValue,
-  ): Promise<void>;
+  ): Promise<void> {
+    if (this.backend === null) {
+      throw new Error('Backend not injected');
+    }
+    return Promise.resolve();
+  };
+
+  injectBackend(
+    backend: BaseNotificationBackend<AvailableContexts, NotificationIdType, UserIdType>,
+  ): void {
+    this.backend = backend;
+  };
 }
