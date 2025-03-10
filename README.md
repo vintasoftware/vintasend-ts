@@ -160,6 +160,10 @@ yarn test
 
 Feel free to open issues and submit pull requests.
 
+### Creating new implementations
+
+There's a template project for creating new implementations that already includes basic dependencies, configuration for tests, and Github Actions hooks. You can find it in [vintasend-ts/src/implementations/vintasend-implementation-template](https://github.com/vintasoftware/vintasend-ts/tree/main/src/implementations/vintasend-implementation-template)
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
