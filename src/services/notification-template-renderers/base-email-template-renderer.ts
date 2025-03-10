@@ -18,7 +18,7 @@ export interface BaseEmailTemplateRenderer<
     EmailTemplate
   > {
   render(
-    notification: Notification<Config['ContextMap'], Config['NotificationIdType'], Config['UserIdType']>,
+    notification: Notification<Config>,
     context: JsonObject,
   ): Promise<EmailTemplate>;
 }

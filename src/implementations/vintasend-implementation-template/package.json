@@ -1,6 +1,6 @@
 {
   "name": "vintasend-implementation-template",
-  "version": "0.1.8",
+  "version": "0.1.12",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
@@ -17,7 +17,7 @@
   "license": "MIT",
   "dependencies": {
     "jsonwebtoken": "^9.0.2",
-    "vintasend": "^0.1.8",
+    "vintasend": "^0.1.12",
     "winston": "^3.17.0"
   },
   "devDependencies": {

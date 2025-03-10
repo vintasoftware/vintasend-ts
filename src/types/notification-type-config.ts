@@ -10,13 +10,4 @@ export type BaseNotificationTypeConfig = {
   ContextMap: Record<string, ContextGenerator>;
   NotificationIdType: Identifier;
   UserIdType: Identifier;
-  AdaptersList: BaseNotificationAdapter<
-    BaseNotificationTemplateRenderer<
-      BaseNotificationTypeConfig
-    >,
-    BaseNotificationTypeConfig
-  >[];
-  Backend: BaseNotificationBackend<BaseNotificationTypeConfig>;
-  Logger: BaseLogger;
-  QueueService: BaseNotificationQueueService<BaseNotificationTypeConfig>;
-}
+};

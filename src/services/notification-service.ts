@@ -1,11 +1,14 @@
-import type { Identifier } from '../types/identifier';
-import type { Notification } from '../types/notification';
-import type { BaseLogger } from './loggers/base-logger';
+import type { DatabaseNotification, Notification } from '../types/notification';
 import {
   NotificationContextRegistry,
 } from './notification-context-registry';
 import type { JsonObject } from '../types/json-values';
 import type { BaseNotificationTypeConfig } from '../types/notification-type-config';
+import type { BaseNotificationAdapter } from './notification-adapters/base-notification-adapter';
+import type { BaseNotificationTemplateRenderer } from './notification-template-renderers/base-notification-template-renderer';
+import type { BaseNotificationBackend } from './notification-backends/base-notification-backend';
+import type { BaseLogger } from './loggers/base-logger';
+import type { BaseNotificationQueueService } from './notification-queue-service/base-notification-queue-service';
 
 
 type NotificationServiceOptions = {
@@ -16,10 +19,10 @@ export class NotificationService<
   Config extends BaseNotificationTypeConfig
 > {
   constructor(
-    private adapters: Config['AdaptersList'],
-    private backend: Config['Backend'],
+    private adapters: BaseNotificationAdapter<BaseNotificationTemplateRenderer<Config>, Config>[],
+    private backend: BaseNotificationBackend<Config>,
     private logger: BaseLogger,
-    private queueService?: Config['QueueService'],
+    private queueService?: BaseNotificationQueueService<Config>,
     private options: NotificationServiceOptions = {
       raiseErrorOnFailedSend: false,
     },
@@ -29,12 +32,12 @@ export class NotificationService<
     }
   }
 
-  registerQueueService(queueService: Config['QueueService']): void {
+  registerQueueService(queueService: BaseNotificationQueueService<Config>): void {
     this.queueService = queueService;
   }
 
   async send(
-    notification: Notification<Config['ContextMap'], Config['NotificationIdType'], Config['UserIdType']>,
+    notification: DatabaseNotification<Config>,
   ): Promise<void> {
     const adaptersOfType = this.adapters.filter(
       (adapter) => adapter.notificationType === notification.notificationType,
@@ -48,7 +51,7 @@ export class NotificationService<
     }
 
     if (!notification.id) {
-      throw new Error("Notification wan't created in the database. Please create it first");
+      throw new Error("Notification wasn't created in the database. Please create it first");
     }
 
     for (const adapter of adaptersOfType) {
@@ -120,8 +123,8 @@ export class NotificationService<
   }
 
   async createNotification(
-    notification: Omit<Notification<Config['ContextMap'], Config['NotificationIdType'], Config['UserIdType']>, 'id'>,
-  ): Promise<Notification<Config['ContextMap'], Config['NotificationIdType'], Config['UserIdType']>> {
+    notification: Omit<Notification<Config>, 'id'>,
+  ): Promise<Notification<Config>> {
     const createdNotification = await this.backend.persistNotification(notification);
     this.logger.error(`Notification ${createdNotification.id} created`);
 
@@ -136,9 +139,9 @@ export class NotificationService<
   }
 
   async updateNotification(
-    notificationId: Identifier,
+    notificationId: Config['NotificationIdType'],
     notification: Partial<
-      Omit<Notification<Config['ContextMap'], Config['NotificationIdType'], Config['UserIdType']>, 'id'>
+      Omit<Notification<Config>, 'id'>
     >,
   ) {
     const updatedNotification = this.backend.persistNotificationUpdate(notificationId, notification);
@@ -174,7 +177,7 @@ export class NotificationService<
     const pendingNotifications = await this.backend.getAllPendingNotifications();
     await Promise.all(
       pendingNotifications.map((notification) =>
-        this.send(notification as Notification<Config['ContextMap'], Config['NotificationIdType'], Config['UserIdType']>),
+        this.send(notification),
       ),
     );
   }
@@ -232,7 +235,7 @@ export class NotificationService<
 
     for (const adapter of enqueueNotificationsAdapters) {
       try {
-        await adapter.send(notification as Notification<Config['ContextMap'], Config['NotificationIdType'], Config['UserIdType']>, context);
+        await adapter.send(notification, context);
       } catch (sendError) {
         this.logger.error(
           `Error sending notification ${notification.id} with adapter ${adapter.key}: ${sendError}`,

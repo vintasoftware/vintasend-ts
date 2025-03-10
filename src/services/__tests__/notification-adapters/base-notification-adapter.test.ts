@@ -1,10 +1,7 @@
 import { BaseNotificationAdapter } from '../../../services/notification-adapters/base-notification-adapter';
 import type { BaseNotificationTypeConfig } from '../../../types/notification-type-config';
 import type { BaseNotificationTemplateRenderer } from '../../../services/notification-template-renderers/base-notification-template-renderer';
-import type { NotificationType } from '../../../types/notification-type';
-import type { Notification } from '../../../types/notification';
-import type { ContextGenerator } from '../../../services/notification-context-registry';
-import type { BaseNotificationBackend } from '../../notification-backends/base-notification-backend';
+import type { DatabaseNotification } from '../../../types/notification';
 
 
 
@@ -30,7 +27,7 @@ describe('BaseNotificationAdapter', () => {
   let adapter: TestNotificationAdapter;
   let templateRenderer: MockTemplateRenderer;
   let mockBackend: MockConfig['Backend'];
-  let mockNotification: Notification<MockConfig['ContextMap'], string, string>;
+  let mockNotification: DatabaseNotification<MockConfig>;
 
   beforeEach(() => {
     templateRenderer = new MockTemplateRenderer();

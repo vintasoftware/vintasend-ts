@@ -67,7 +67,7 @@ describe('NotificationService', () => {
   // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   let service: NotificationService<any>;
   // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-  let mockNotification: DatabaseNotification<any, any, any> = {
+  let mockNotification: DatabaseNotification<any> = {
     id: '123',
     notificationType: 'EMAIL' as const,
     contextName: 'testContext',
@@ -123,7 +123,7 @@ describe('NotificationService', () => {
     it('should handle missing adapter', async () => {
       const invalidNotification = { ...mockNotification, notificationType: 'invalid' };
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-      await service.send(invalidNotification as unknown as Notification<any, any, any>);
+      await service.send(invalidNotification as unknown as DatabaseNotification<any>);
 
       expect(mockLogger.error).toHaveBeenCalled();
       expect(mockAdapter.send).not.toHaveBeenCalled();
@@ -145,7 +145,7 @@ describe('NotificationService', () => {
       const notificationWithoutId = { ...mockNotification, id: undefined };
 
       await expect(service.send(notificationWithoutId)).rejects.toThrow(
-        "Notification wan't created in the database"
+        "Notification wasn't created in the database"
       );
     });
 
@@ -460,7 +460,7 @@ describe('NotificationService', () => {
         id: '123',
         ...updates
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-      } as unknown as DatabaseNotification<any, any, any>);
+      } as unknown as DatabaseNotification<any>);
 
       const result = await service.updateNotification('123', updates);
 
@@ -539,11 +539,11 @@ describe('NotificationService', () => {
   describe('pending notifications', () => {
     it('should send all pending notifications', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-      const mockPendingNotifications: DatabaseNotification<any, any, any>[] = [
+      const mockPendingNotifications: DatabaseNotification<any>[] = [
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '1', notificationType: 'EMAIL' } as unknown as DatabaseNotification<any, any, any>,
+        { ...mockNotification, id: '1', notificationType: 'EMAIL' } as unknown as DatabaseNotification<any>,
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '2', notificationType: 'EMAIL' } as unknown as DatabaseNotification<any, any, any>
+        { ...mockNotification, id: '2', notificationType: 'EMAIL' } as unknown as DatabaseNotification<any>
       ];
       mockBackend.getAllPendingNotifications.mockResolvedValue(mockPendingNotifications);
       notificationContextgenerators.testContext.generate.mockReturnValue({});
@@ -562,11 +562,11 @@ describe('NotificationService', () => {
 
     it('should handle failed notifications in sendPendingNotifications', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-      const mockPendingNotifications: DatabaseNotification<any, any, any>[] = [
+      const mockPendingNotifications: DatabaseNotification<any>[] = [
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any, any, any>,
+        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any>,
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any, any, any>
+        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any>
       ];
       mockBackend.getAllPendingNotifications.mockResolvedValue(mockPendingNotifications);
       notificationContextgenerators.testContext.generate.mockRejectedValue(new Error('Context error'));
@@ -581,11 +581,11 @@ describe('NotificationService', () => {
 
     it('should log success for each pending notification sent', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-      const mockPendingNotifications: DatabaseNotification<any, any, any>[] = [
+      const mockPendingNotifications: DatabaseNotification<any>[] = [
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any, any, any>,
+        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any>,
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any, any, any>
+        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any>
       ];
       mockBackend.getAllPendingNotifications.mockResolvedValue(mockPendingNotifications);
       notificationContextgenerators.testContext.generate.mockResolvedValue({});
@@ -611,11 +611,11 @@ describe('NotificationService', () => {
 
     it('should continue processing other notifications after failure', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-      const notifications: DatabaseNotification<any, any, any>[] = [
+      const notifications: DatabaseNotification<any>[] = [
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any, any, any>,
+        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any>,
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any, any, any>
+        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any>
       ];
       mockBackend.getAllPendingNotifications.mockResolvedValue(notifications);
       notificationContextgenerators.testContext.generate.mockResolvedValue({});
@@ -632,11 +632,11 @@ describe('NotificationService', () => {
 
     it('should log info for each notification context generation', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-      const mockPendingNotifications: DatabaseNotification<any, any, any>[] = [
+      const mockPendingNotifications: DatabaseNotification<any>[] = [
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any, any, any>,
+        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any>,
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any, any, any>
+        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any>
       ];
       mockBackend.getAllPendingNotifications.mockResolvedValue(mockPendingNotifications);
       notificationContextgenerators.testContext.generate.mockResolvedValue({});
@@ -651,7 +651,7 @@ describe('NotificationService', () => {
   describe('notification status management', () => {
     it('should mark notification as read', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-      mockBackend.markSentAsRead.mockResolvedValue({ ...mockNotification, id: '123', readAt: new Date() } as unknown as DatabaseNotification<any, any, any>);
+      mockBackend.markSentAsRead.mockResolvedValue({ ...mockNotification, id: '123', readAt: new Date() } as unknown as DatabaseNotification<any>);
       await service.markRead('123');
       expect(mockBackend.markSentAsRead).toHaveBeenCalledWith('123');
       expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 marked as read');
@@ -734,7 +734,7 @@ describe('NotificationService', () => {
   describe('notification retrieval', () => {
     it('should get a single notification', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-      const mockNotif = { ...mockAdapter, id: '123', title: 'Test' } as unknown as DatabaseNotification<any, any, any>;
+      const mockNotif = { ...mockAdapter, id: '123', title: 'Test' } as unknown as DatabaseNotification<any>;
       mockBackend.getNotification.mockResolvedValue(mockNotif);
 
       const result = await service.getNotification('123');

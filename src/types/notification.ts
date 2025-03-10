@@ -1,21 +1,19 @@
-import type { ContextGenerator } from '../services/notification-context-registry';
-import type { Identifier } from './identifier';
 import type { InputJsonValue, JsonValue } from './json-values';
 import type { NotificationStatus } from './notification-status';
 import type { NotificationType } from './notification-type';
+import type { BaseNotificationTypeConfig } from './notification-type-config';
 
 export type NotificationInput<
-  AvailableContexts extends Record<string, ContextGenerator>,
-  UserIdType extends Identifier = Identifier
+  Config extends BaseNotificationTypeConfig,
 > = {
   id: undefined;
-  userId: UserIdType;
+  userId: Config['UserIdType'];
   notificationType: NotificationType;
   title: string | null;
   bodyTemplate: string;
-  contextName: keyof AvailableContexts;
+  contextName: keyof Config['ContextMap'];
   contextParameters: Parameters<
-    AvailableContexts[NotificationInput<AvailableContexts>['contextName']]['generate']
+    Config['ContextMap'][NotificationInput<Config>['contextName']]['generate']
   >[0];
   sendAfter: Date | null;
   subjectTemplate: string | null;
@@ -23,24 +21,22 @@ export type NotificationInput<
 };
 
 export type DatabaseNotification<
-  AvailableContexts extends Record<string, ContextGenerator>,
-  NotificatioIdType extends Identifier = Identifier,
-  UserIdType extends Identifier = Identifier
+  Config extends BaseNotificationTypeConfig,
 > = {
-  id: NotificatioIdType;
-  userId: UserIdType;
+  id: Config['NotificationIdType'];
+  userId: Config['UserIdType'];
   notificationType: NotificationType;
   title: string | null;
   bodyTemplate: string;
-  contextName: keyof AvailableContexts;
+  contextName: keyof Config['ContextMap'];
   contextParameters: Parameters<
-    AvailableContexts[NotificationInput<AvailableContexts>['contextName']]['generate']
+    Config['ContextMap'][NotificationInput<Config>['contextName']]['generate']
   >[0];
   sendAfter: Date | null;
   subjectTemplate: string | null;
   status: NotificationStatus;
   contextUsed: ReturnType<
-    AvailableContexts[NotificationInput<AvailableContexts>['contextName']]['generate']
+    Config['ContextMap'][NotificationInput<Config>['contextName']]['generate']
   > | null;
   extraParams: JsonValue;
   adapterUsed: string | null;
@@ -51,9 +47,7 @@ export type DatabaseNotification<
 };
 
 export type Notification<
-  AvailableContexts extends Record<string, ContextGenerator>,
-  NotificatioIdType extends Identifier = Identifier,
-  UserIdType extends Identifier = Identifier
+  Config extends BaseNotificationTypeConfig,
 > =
-  | NotificationInput<AvailableContexts, UserIdType>
-  | DatabaseNotification<AvailableContexts, NotificatioIdType, UserIdType>;
+  | NotificationInput<Config>
+  | DatabaseNotification<Config>;
