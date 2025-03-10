@@ -1,9 +1,8 @@
 import type { BaseNotificationTemplateRenderer } from './base-notification-template-renderer';
 import type { Notification } from '../../types/notification';
 import type { Buffer } from 'node:buffer';
-import type { ContextGenerator } from '../notification-context-registry';
 import type { JsonObject } from '../../types/json-values';
-import type { Identifier } from '../../types/identifier';
+import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
 
 export type Attachment = File | Buffer | string;
 
@@ -13,17 +12,13 @@ export type EmailTemplate = {
 };
 
 export interface BaseEmailTemplateRenderer<
-  AvailableContexts extends Record<string, ContextGenerator>,
-  NotificationIdType extends Identifier = Identifier,
-  UserIdType extends Identifier = Identifier,
+  Config extends BaseNotificationTypeConfig,
 > extends BaseNotificationTemplateRenderer<
-    AvailableContexts,
-    NotificationIdType,
-    UserIdType,
+    Config,
     EmailTemplate
   > {
   render(
-    notification: Notification<AvailableContexts, NotificationIdType, UserIdType>,
+    notification: Notification<Config['ContextMap'], Config['NotificationIdType'], Config['UserIdType']>,
     context: JsonObject,
   ): Promise<EmailTemplate>;
 }

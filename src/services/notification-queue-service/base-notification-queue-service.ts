@@ -1,5 +1,5 @@
-import type { Identifier } from '../../types/identifier';
+import type { BaseNotificationTypeConfig } from "../../types/notification-type-config";
 
-export interface BaseNotificationQueueService<NotificationIdType extends Identifier = Identifier> {
-  enqueueNotification(notificationId: NotificationIdType): Promise<void>;
+export interface BaseNotificationQueueService<Config extends BaseNotificationTypeConfig> {
+  enqueueNotification(notificationId: Config['NotificationIdType']): Promise<void>;
 }

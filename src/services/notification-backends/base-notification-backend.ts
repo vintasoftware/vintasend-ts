@@ -1,47 +1,43 @@
 import type { InputJsonValue } from '../../types/json-values';
 import type { Identifier } from '../../types/identifier';
 import type { DatabaseNotification, Notification } from '../../types/notification';
-import type { ContextGenerator } from '../notification-context-registry';
+import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
 
-export interface BaseNotificationBackend<
-  AvailableContexts extends Record<string, ContextGenerator>,
-  NotificationIdType extends Identifier = Identifier,
-  UserIdType extends Identifier = Identifier,
-> {
-  getAllPendingNotifications(): Promise<DatabaseNotification<AvailableContexts, NotificationIdType, UserIdType>[]>;
-  getPendingNotifications(): Promise<DatabaseNotification<AvailableContexts, NotificationIdType, UserIdType>[]>;
-  getAllFutureNotifications(): Promise<DatabaseNotification<AvailableContexts, NotificationIdType, UserIdType>[]>;
-  getFutureNotifications(): Promise<DatabaseNotification<AvailableContexts, NotificationIdType, UserIdType>[]>;
+export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
+  getAllPendingNotifications(): Promise<DatabaseNotification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>[]>;
+  getPendingNotifications(): Promise<DatabaseNotification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>[]>;
+  getAllFutureNotifications(): Promise<DatabaseNotification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>[]>;
+  getFutureNotifications(): Promise<DatabaseNotification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>[]>;
   getAllFutureNotificationsFromUser(
-    userId: Identifier,
-  ): Promise<DatabaseNotification<AvailableContexts, NotificationIdType, UserIdType>[]>;
-  getFutureNotificationsFromUser(userId: Identifier): Promise<DatabaseNotification<AvailableContexts, NotificationIdType, UserIdType>[]>;
+    userId: Config["UserIdType"],
+  ): Promise<DatabaseNotification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>[]>;
+  getFutureNotificationsFromUser(userId: Config["UserIdType"]): Promise<DatabaseNotification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>[]>;
   persistNotification(
-    notification: Omit<Notification<AvailableContexts, NotificationIdType, UserIdType>, 'id'>,
-  ): Promise<DatabaseNotification<AvailableContexts, NotificationIdType, UserIdType>>;
+    notification: Omit<Notification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>, 'id'>,
+  ): Promise<DatabaseNotification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>>;
   persistNotificationUpdate(
-    notificationId: Identifier,
-    notification: Partial<Omit<Notification<AvailableContexts, NotificationIdType, UserIdType>, 'id'>>,
-  ): Promise<DatabaseNotification<AvailableContexts, NotificationIdType, UserIdType>>;
-  markPendingAsSent(notificationId: Identifier): Promise<DatabaseNotification<AvailableContexts, NotificationIdType, UserIdType>>;
-  markPendingAsFailed(notificationId: Identifier): Promise<DatabaseNotification<AvailableContexts, NotificationIdType, UserIdType>>;
-  markSentAsRead(notificationId: Identifier): Promise<DatabaseNotification<AvailableContexts, NotificationIdType, UserIdType>>;
-  cancelNotification(notificationId: Identifier): Promise<void>;
+    notificationId: Config["NotificationIdType"],
+    notification: Partial<Omit<Notification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>, 'id'>>,
+  ): Promise<DatabaseNotification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>>;
+  markPendingAsSent(notificationId: Config["NotificationIdType"],): Promise<DatabaseNotification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>>;
+  markPendingAsFailed(notificationId: Config["NotificationIdType"],): Promise<DatabaseNotification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>>;
+  markSentAsRead(notificationId: Config["NotificationIdType"],): Promise<DatabaseNotification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>>;
+  cancelNotification(notificationId: Config["NotificationIdType"],): Promise<void>;
   getNotification(
-    notificationId: Identifier,
+    notificationId: Config["NotificationIdType"],
     forUpdate: boolean,
-  ): Promise<DatabaseNotification<AvailableContexts, NotificationIdType, UserIdType> | null>;
+  ): Promise<DatabaseNotification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]> | null>;
   filterAllInAppUnreadNotifications(
-    userId: Identifier,
-  ): Promise<DatabaseNotification<AvailableContexts, NotificationIdType, UserIdType>[]>;
+    userId: Config["UserIdType"],
+  ): Promise<DatabaseNotification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>[]>;
   filterInAppUnreadNotifications(
-    userId: Identifier,
+    userId: Config["UserIdType"],
     page: number,
     pageSize: number,
-  ): Promise<DatabaseNotification<AvailableContexts, NotificationIdType, UserIdType>[]>;
-  getUserEmailFromNotification(notificationId: Identifier): Promise<string | undefined>;
+  ): Promise<DatabaseNotification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>[]>;
+  getUserEmailFromNotification(notificationId: Config["NotificationIdType"],): Promise<string | undefined>;
   storeContextUsed(
-    notificationId: Identifier,
+    notificationId: Config["NotificationIdType"],
     context: InputJsonValue,
   ): Promise<void>;
 }

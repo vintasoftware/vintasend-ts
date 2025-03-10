@@ -9,7 +9,7 @@ import { NotificationContextRegistry } from '../notification-context-registry';
 
 // Mock implementations
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-const mockBackend: jest.Mocked<BaseNotificationBackend<any, any, any>> = {
+const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   persistNotification: jest.fn(),
   persistNotificationUpdate: jest.fn(),
   getAllFutureNotifications: jest.fn(),
@@ -30,12 +30,12 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any, any, any>> = {
 };
 
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-const mockTemplateRenderer: jest.Mocked<BaseEmailTemplateRenderer<any, any, any>> = {
+const mockTemplateRenderer: jest.Mocked<BaseEmailTemplateRenderer<any>> = {
   render: jest.fn(),
 };
 
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any, any, any>> = {
+const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any>> = {
   notificationType: 'EMAIL',
   key: 'test-adapter',
   enqueueNotifications: false,

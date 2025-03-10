@@ -1,16 +1,13 @@
-import type { Identifier } from '../../types/identifier';
 import type { JsonObject } from '../../types/json-values';
 import type { Notification } from '../../types/notification';
-import type { ContextGenerator } from '../notification-context-registry';
+import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
 
 export interface BaseNotificationTemplateRenderer<
-  AvailableContexts extends Record<string, ContextGenerator>,
-  NotificationIdType extends Identifier = Identifier,
-  UserIdType extends Identifier = Identifier,
+  Config extends BaseNotificationTypeConfig,
   T = unknown,
 > {
   render(
-    notification: Notification<AvailableContexts, NotificationIdType, UserIdType>,
+    notification: Notification<Config['ContextMap'], Config['NotificationIdType'], Config['UserIdType']>,
     context: JsonObject,
   ): Promise<T>;
 }

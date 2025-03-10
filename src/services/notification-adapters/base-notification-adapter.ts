@@ -1,19 +1,15 @@
 import type { NotificationType } from '../../types/notification-type';
 import type { Notification } from '../../types/notification';
-import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseNotificationTemplateRenderer } from '../notification-template-renderers/base-notification-template-renderer';
-import type { ContextGenerator } from '../notification-context-registry';
 import type { JsonValue } from '../../types/json-values';
-import type { Identifier } from '../../types/identifier';
+import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
 
 export abstract class BaseNotificationAdapter<
-  TemplateRenderer extends BaseNotificationTemplateRenderer<AvailableContexts>,
-  AvailableContexts extends Record<string, ContextGenerator>,
-  NotificationIdType extends Identifier = Identifier,
-  UserIdType extends Identifier = Identifier,
+  TemplateRenderer extends BaseNotificationTemplateRenderer<Config>,
+  Config extends BaseNotificationTypeConfig,
 > {
   key: string | null = null;
-  backend: BaseNotificationBackend<AvailableContexts, NotificationIdType, UserIdType> | null = null;
+  backend: Config['Backend'] | null = null;
 
   constructor(
     protected templateRenderer: TemplateRenderer,
@@ -22,17 +18,17 @@ export abstract class BaseNotificationAdapter<
   ) {};
 
   send(
-    notification: Notification<AvailableContexts, NotificationIdType, UserIdType>,
+    notification: Notification<Config["ContextMap"], Config["NotificationIdType"], Config["UserIdType"]>,
     context: JsonValue,
   ): Promise<void> {
     if (this.backend === null) {
-      throw new Error('Backend not injected');
+      return Promise.reject(new Error('Backend not injected'));
     }
     return Promise.resolve();
   };
 
   injectBackend(
-    backend: BaseNotificationBackend<AvailableContexts, NotificationIdType, UserIdType>,
+    backend: Config["Backend"],
   ): void {
     this.backend = backend;
   };
