@@ -60,7 +60,7 @@ export function getNotificationService() {
    Function to instanciate the notificationService 
    The Backend, Template Renderer, Logger, and Adapter used here are not included
      here and should be installed and imported separately or manually defined if 
-     the existing implementation don't support the specific use-case.
+     the existing implementations don't support the specific use-case.
   */
   const backend = new MyNotificationBackend<NotificationTypeConfig>();
   const templateRenderer = new MyTemplateRenderer<NotificationTypeConfig>();
