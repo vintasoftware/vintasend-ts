@@ -1,0 +1,109 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/app_db?schema=public
+      - MAIL_HOST=mailpit
+      - MAIL_PORT=1025
+      - NODE_ENV=development
+    depends_on:
+      - postgres
+      - mailpit
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - app_node_modules:/app/node_modules
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.notifications-worker
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    depends_on:
+      - temporal
+      - mailpit
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - worker_node_modules:/app/node_modules
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.pending-notifications-client
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    depends_on:
+      - temporal
+      - mailpit
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - client_node_modules:/app/node_modules
+
+  temporal:
+    image: temporalio/auto-setup:1.20.0
+    ports:
+      - "7233:7233"
+      - "8233:8233"
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=temporal
+      - POSTGRES_SEEDS=temporal-postgresql
+      - DYNAMIC_CONFIG_FILE_PATH=/etc/temporal/config/dynamicconfig/development.yml
+    depends_on:
+      - temporal-postgresql
+    volumes:
+      - ./temporal-config/dynamicconfig:/etc/temporal/config/dynamicconfig
+
+  temporal-postgresql:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    volumes:
+      - temporal-pgdata:/var/lib/postgresql/data
+
+  temporal-web:
+    image: temporalio/web:1.15.0
+    environment:
+      - TEMPORAL_GRPC_ENDPOINT=temporal:7233
+      - TEMPORAL_PERMIT_WRITE_API=true
+    ports:
+      - "8088:8088"
+    depends_on:
+      - temporal
+
+  postgres:
+    image: postgres:13
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  mailpit:
+    image: axllent/mailpit
+    restart: always
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+
+volumes:
+  pgdata:
+  temporal-pgdata:
+  app_node_modules:
+  worker_node_modules:
+  client_node_modules:

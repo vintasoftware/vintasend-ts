@@ -1,0 +1,95 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-arm64-openssl-1.1.x"]
+}
+
+model User {
+  id              Int            @id @default(autoincrement())
+  email           String         @unique
+  password        String
+  firstName       String?
+  lastName        String?
+  isEmailVerified Boolean        @default(false)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  tokens          Token[]
+  roles           Role[]         @relation("UserToRole")
+  permissions     Permission[]   @relation("UserToPermission")
+  Notification    Notification[]
+}
+
+model Token {
+  id        Int       @id @default(autoincrement())
+  token     String    @unique
+  type      TokenType
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  userId    Int
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Permission {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  users       User[]   @relation("UserToPermission")
+  roles       Role[]   @relation("RoleToPermission")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Role {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  description String?
+  users       User[]       @relation("UserToRole")
+  permissions Permission[] @relation("RoleToPermission")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+enum TokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+}
+
+model Notification {
+  id                Int                @id @default(autoincrement())
+  userId            Int
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationType  NotificationType
+  title             String?
+  bodyTemplate      String
+  contextName       String
+  contextParameters Json               @default("{}")
+  sendAfter         DateTime?
+  subjectTemplate   String?
+  extraParams       Json?
+  status            NotificationStatus @default(PENDING_SEND)
+  contextUsed       Json?
+  adapterUsed       String?
+  sentAt            DateTime?
+  readAt            DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+enum NotificationType {
+  EMAIL
+  PUSH
+  SMS
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING_SEND
+  SENT
+  FAILED
+  READ
+  CANCELLED
+}
