@@ -10,7 +10,7 @@ A flexible package for implementing transactional notifications in TypeScript.
 * **Flexible backend**: Your projects database is getting slow after you created the first milion notifications? You can migrate to a faster no-sql database with a blink of an eye without affecting how you send the notifications.
 * **Flexible adapters**: Your project probably will need to change how it sends notifications overtime. This package allows to change the adapter without having to change how notifications templates are rendered or how the notification themselves are stored.
 * **Flexible template renderers**: Wanna start managing your templates with a third party tool (so non-technical people can help maintaining them)? Or even choose a more powerful rendering engine? You can do it independently of how you send the notifications or store them in the database.
-* **Sending notifications in background jobs**: This packages supports enqueing notifications to send it from separate processes. This may be helpful to free the HTTP server of processing heavy notifications during the request time.
+* **Sending notifications in background jobs**: This packages supports enqueing notifications to send it from separate processes. This may be helpful to free up the HTTP server of processing heavy notifications during the request time.
 
 ## How does it work?
 
