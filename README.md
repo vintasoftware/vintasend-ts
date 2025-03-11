@@ -12,6 +12,20 @@ A flexible package for implementing transactional notifications in TypeScript.
 * **Flexible template renderers**: Wanna start managing your templates with a third party tool (so non-technical people can help maintaining them)? Or even choose a more powerful rendering engine? You can do it independently of how you send the notifications or store them in the database.
 * **Sending notifications in background jobs**: This packages supports enqueing notifications to send it from separate processes. This may be helpful to free the HTTP server of processing heavy notifications during the request time.
 
+## How does it work?
+
+The VintaSend package provides a NotificationService class that allows the user to store and send notification, scheduled or not. It relies on Dependency Injection to define how to store/retrieve, render the notification templates, and send notifications. This architechture allows us to swap each part without changing the code we actually use to send the notifications.
+
+### Scheduled Notifications
+
+VintaSend schedules notifications by creating them on the database for sending when the send_after value has passed. The sending isn't done automatically but we have a service method called `sendPendingNotifications` to send all pending notifications found in the database.
+
+You need to call the `sendPendingNotifications` service method in a cron job or a tool for running periodic jobs.
+
+#### Keeping the content up-to-date in scheduled notifications
+
+The NotificationService stores every notification in a database. This helps us to audit and manage our notifications. At the same time, notifications usually have a context that's used to hydrate its template with data. If we stored the cotext directly on the notification records, we'd have to update it anytime the context changes. Instead of storing the context itself, we store a reference to a Context Generator class and the parameters it requires (like ids, flags, types, etc) so we generate the context only when the notification is sent. This ensures we're always getting the most up-to-date context when sending notifications. We also store the generated context after we send the notification, for auditing purposes.
+
 ## Installation
 
 ```bash
@@ -94,12 +108,6 @@ export function sendWelcomeEmail(userId: number) {
   });
 } 
 ```
-
-### Scheduled Notifications
-
-VintaSend schedules notifications by creating them on the database for sending when the send_after value has passed. The sending isn't done automatically but we have a service method called `sendPendingNotifications` to send all pending notifications found in the database.
-
-You need to call the `sendPendingNotifications` service method in a cron job or a tool for running periodic jobs.
 
 ## Glossary
 
