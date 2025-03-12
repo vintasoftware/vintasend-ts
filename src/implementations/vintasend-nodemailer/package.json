@@ -1,6 +1,6 @@
 {
   "name": "vintasend-nodemailer",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
@@ -17,7 +17,7 @@
   "license": "MIT",
   "dependencies": {
     "nodemailer": "^6.10.0",
-    "vintasend": "^0.1.12"
+    "vintasend": "^0.1.13"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
