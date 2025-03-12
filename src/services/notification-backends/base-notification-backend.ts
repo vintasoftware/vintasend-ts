@@ -1,5 +1,4 @@
 import type { InputJsonValue } from '../../types/json-values';
-import type { Identifier } from '../../types/identifier';
 import type { DatabaseNotification, Notification } from '../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
 
@@ -19,9 +18,9 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     notificationId: Config["NotificationIdType"],
     notification: Partial<Omit<Notification<Config>, 'id'>>,
   ): Promise<DatabaseNotification<Config>>;
-  markPendingAsSent(notificationId: Config["NotificationIdType"],): Promise<DatabaseNotification<Config>>;
-  markPendingAsFailed(notificationId: Config["NotificationIdType"],): Promise<DatabaseNotification<Config>>;
-  markSentAsRead(notificationId: Config["NotificationIdType"],): Promise<DatabaseNotification<Config>>;
+  markAsSent(notificationId: Config["NotificationIdType"], checkIsPending: boolean): Promise<DatabaseNotification<Config>>;
+  markAsFailed(notificationId: Config["NotificationIdType"], checkIsPending: boolean): Promise<DatabaseNotification<Config>>;
+  markAsRead(notificationId: Config["NotificationIdType"], checkIsSent: boolean): Promise<DatabaseNotification<Config>>;
   cancelNotification(notificationId: Config["NotificationIdType"],): Promise<void>;
   getNotification(
     notificationId: Config["NotificationIdType"],

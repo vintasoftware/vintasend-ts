@@ -40,31 +40,22 @@ To start using VintaSend you just need to initialize the notification service an
 
 
 ```typescript
-import { NotificationService, NotificationContextRegistry } from 'vintasend/dist/index.js';
-import type { ContextGenerator } from 'vintasend/dist/services/notification-context-registry';
-import type { BaseNotificationTypeConfig } from 'vintasend/dist/types/notification-type-config';
-
-
-// class for generating the context for the "Welcome" notification
-class WelcomeContextGenerator implements ContextGenerator {
-  generate({ userId }: { userId: number }) {
-    const user = getUserById(userId);
-    return {
-      firstName: user.firstName,
-    };
-  }
-}
+import { NotificationService } from 'vintasend';
 
 // context map for generating the context of each notification
 export const contextGeneratorsMap = {
-  welcome: new WelcomeContextGenerator(),
+  welcome: {
+    generate: async ({ userId }: { userId: number }): { firstName: string } => {
+      const user = await getUserById(userId);  // example
+      return {
+        firstName: user.firstName,
+      };
+    }
+  },
 } as const;
 
-// initialize the global context registry singleton
-NotificationContextRegistry.initialize<ContextMap>(contextGeneratorsMap);
-
-// type config definition, so all modules use the same typesa 
-export type NotificationTypeConfig = BaseNotificationTypeConfig & {
+// type config definition, so all modules use the same types
+export type NotificationTypeConfig = {
   ContextMap: typeof contextGeneratorsMap;
   NotificationIdType: number;
   UserIdType: number;
@@ -87,6 +78,7 @@ export function getNotificationService() {
     [adapter],
     backend,
     new MyLogger(loggerOptions),
+    contextGeneratorsMap,
   );
 }
 
@@ -115,9 +107,9 @@ export function sendWelcomeEmail(userId: number) {
 * **Notification Adapter**: It is a class that implements the methods necessary for VintaSend services to send Notifications through email, SMS or even push/in-app notifications.
 * **Template Renderer**: It is a class that implements the methods necessary for VintaSend adapter to render the notification body.
 * **Notification Context**: It's the data passed to the templates to render the notification correctly. It's generated when the notification is sent, not on creation time
-* **Context generator**: It's a class defined by the user and registered on the `NotificationContextRegistry` singleton (Context Registry) with a Context name. That class has a `generate` method that, when called, generates the data necessary to render its respective notification.
+* **Context generator**: It's a class defined by the user context generator map with a context name. That class has a `generate` method that, when called, generates the data necessary to render its respective notification.
 * **Context name**: The registered name of a context generator. It's stored in the notification so the context generator is called at the moment the notification will be sent.
-* **Context registry**: We store all registered context generators on a Singleton class, we call it context registry. 
+* **Context generators map**: It's an object defined by the user that maps context names to their respective context generators.
 * **Queue service**: Service for enqueueing notifications so they are send by an external service.
 * **Logger**: A class that allows the `NotificationService` to create logs following a format defined by its users.  
 

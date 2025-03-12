@@ -18,11 +18,11 @@ describe('NotificationServiceSingleton', () => {
     getAllPendingNotifications: jest.fn(),
     getPendingNotifications: jest.fn(),
     getNotification: jest.fn(),
-    markSentAsRead: jest.fn(),
+    markAsRead: jest.fn(),
     filterAllInAppUnreadNotifications: jest.fn(),
     cancelNotification: jest.fn(),
-    markPendingAsSent: jest.fn(),
-    markPendingAsFailed: jest.fn(),
+    markAsSent: jest.fn(),
+    markAsFailed: jest.fn(),
     storeContextUsed: jest.fn(),
     getUserEmailFromNotification: jest.fn(),
     filterInAppUnreadNotifications: jest.fn(),
@@ -42,7 +42,7 @@ describe('NotificationServiceSingleton', () => {
     injectBackend: jest.fn(),
     backend: mockBackend,
     templateRenderer: mockTemplateRenderer,
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+    // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   } as any;
 
   const mockLogger: jest.Mocked<BaseLogger> = {
@@ -56,6 +56,11 @@ describe('NotificationServiceSingleton', () => {
     enqueueNotification: jest.fn(),
   };
 
+  const notificationContextGenerators = {
+    testNotification: {
+      generate: jest.fn()
+    },
+  };
 
   beforeEach(() => {
     // Reset the singleton instance before each test
@@ -64,8 +69,8 @@ describe('NotificationServiceSingleton', () => {
   });
 
   it('should create a singleton instance', () => {
-    const instance1 = NotificationServiceSingleton.getInstance([mockAdapter], mockBackend, mockLogger);
-    const instance2 = NotificationServiceSingleton.getInstance([mockAdapter], mockBackend, mockLogger);
+    const instance1 = NotificationServiceSingleton.getInstance([mockAdapter], mockBackend, mockLogger, notificationContextGenerators);
+    const instance2 = NotificationServiceSingleton.getInstance([mockAdapter], mockBackend, mockLogger, notificationContextGenerators);
 
     expect(instance1).toBe(instance2);
   });
@@ -77,8 +82,8 @@ describe('NotificationServiceSingleton', () => {
   });
 
   it('should maintain same instance across multiple calls with different parameters', () => {
-    const instance1 = NotificationServiceSingleton.getInstance([mockAdapter], mockBackend, mockLogger);
-    const instance2 = NotificationServiceSingleton.getInstance([mockAdapter], mockBackend, mockLogger);
+    const instance1 = NotificationServiceSingleton.getInstance([mockAdapter], mockBackend, mockLogger, notificationContextGenerators);
+    const instance2 = NotificationServiceSingleton.getInstance([mockAdapter], mockBackend, mockLogger, notificationContextGenerators);
 
     expect(instance1).toBe(instance2);
   });
