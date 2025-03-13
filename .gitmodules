@@ -1,0 +1,15 @@
+[submodule "src/implementations/vintasend-pug"]
+	path = src/implementations/vintasend-pug
+	url = git@github.com:vintasoftware/vintasend-pug.git
+[submodule "src/implementations/vintasend-prisma"]
+	path = src/implementations/vintasend-prisma
+	url = git@github.com:vintasoftware/vintasend-ts-prisma.git
+[submodule "src/implementations/vintasend-nodemailer"]
+	path = src/implementations/vintasend-nodemailer
+	url = git@github.com:vintasoftware/vintasend-nodemailer.git
+[submodule "src/implementations/vintasend-winston"]
+	path = src/implementations/vintasend-winston
+	url = git@github.com:vintasoftware/vintasend-winston.git
+[submodule "src/examples"]
+	path = src/examples
+	url = git@github.com:vintasoftware/vintasend-ts-examples.git
