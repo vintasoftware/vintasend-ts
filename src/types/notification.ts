@@ -10,7 +10,7 @@ export type NotificationInput<
   notificationType: NotificationType;
   title: string | null;
   bodyTemplate: string;
-  contextName: keyof Config['ContextMap'];
+  contextName: string & keyof Config['ContextMap'];
   contextParameters: Parameters<
     Config['ContextMap'][NotificationInput<Config>['contextName']]['generate']
   >[0];
@@ -26,18 +26,14 @@ export type NotificationResendWithContextInput<
   notificationType: NotificationType;
   title: string | null;
   bodyTemplate: string;
-  contextName: keyof Config['ContextMap'];
+  contextName: string & keyof Config['ContextMap'];
   contextParameters: Parameters<
     Config['ContextMap'][NotificationResendWithContextInput<Config>['contextName']]['generate']
   >[0];
   contextUsed: ReturnType<
-    Config['ContextMap'][DatabaseNotification<Config>['contextName']]['generate']
-  > extends JsonObject ? ReturnType<
-    Config['ContextMap'][DatabaseNotification<Config>['contextName']]['generate']
-  > : Awaited<
-    ReturnType<
-      Config['ContextMap'][DatabaseNotification<Config>['contextName']]['generate']
-    >
+    Config['ContextMap'][NotificationResendWithContextInput<Config>['contextName']]['generate']
+  > extends Promise<infer T> ? T : ReturnType<
+    Config['ContextMap'][NotificationResendWithContextInput<Config>['contextName']]['generate']
   >;
   sendAfter: Date | null;
   subjectTemplate: string | null;
@@ -52,7 +48,7 @@ export type DatabaseNotification<
   notificationType: NotificationType;
   title: string | null;
   bodyTemplate: string;
-  contextName: keyof Config['ContextMap'];
+  contextName: string & keyof Config['ContextMap'];
   contextParameters: Parameters<
     Config['ContextMap'][DatabaseNotification<Config>['contextName']]['generate']
   >[0];
@@ -61,12 +57,8 @@ export type DatabaseNotification<
   status: NotificationStatus;
   contextUsed: ReturnType<
     Config['ContextMap'][DatabaseNotification<Config>['contextName']]['generate']
-  > extends JsonObject ? ReturnType<
+  > extends Promise<infer T> ? T : ReturnType<
     Config['ContextMap'][DatabaseNotification<Config>['contextName']]['generate']
-  > : Awaited<
-    ReturnType<
-      Config['ContextMap'][DatabaseNotification<Config>['contextName']]['generate']
-    >
   >;
   extraParams: JsonValue;
   adapterUsed: string | null;

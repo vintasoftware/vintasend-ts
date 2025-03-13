@@ -1,51 +1,77 @@
 import type { DatabaseNotification, Notification, NotificationResendWithContextInput } from '../types/notification';
-import type {
-  ContextGenerator,
-} from '../types/notification-context-generators';
-import type { JsonObject, JsonPrimitive } from '../types/json-values';
+import type { JsonObject } from '../types/json-values';
 import type { BaseNotificationTypeConfig } from '../types/notification-type-config';
 import type { BaseNotificationAdapter } from './notification-adapters/base-notification-adapter';
 import type { BaseNotificationTemplateRenderer } from './notification-template-renderers/base-notification-template-renderer';
 import type { BaseNotificationBackend } from './notification-backends/base-notification-backend';
 import type { BaseLogger } from './loggers/base-logger';
 import type { BaseNotificationQueueService } from './notification-queue-service/base-notification-queue-service';
+import { NotificationContextGeneratorsMap } from './notification-context-generators-map';
 
-
-type NotificationServiceOptions = {
+type VintaSendOptions = {
   raiseErrorOnFailedSend: boolean;
 };
 
-export class NotificationService<
-  Config extends BaseNotificationTypeConfig<ContextGeneratorsMap>,
-  ContextGeneratorsMap extends Record<
-      string,
-      ContextGenerator<
-        Parameters<ContextGeneratorsMap[keyof ContextGeneratorsMap]['generate']>[0] extends Record<string, JsonPrimitive>
-          ? Parameters<ContextGeneratorsMap[keyof ContextGeneratorsMap]['generate']>[0] : never,
-        ReturnType<ContextGeneratorsMap[keyof ContextGeneratorsMap]['generate']> extends JsonObject ?
-            ReturnType<ContextGeneratorsMap[keyof ContextGeneratorsMap]['generate']>
-            : Awaited<ReturnType<ContextGeneratorsMap[keyof ContextGeneratorsMap]['generate']>> extends JsonObject ?
-              Awaited<ReturnType<ContextGeneratorsMap[keyof ContextGeneratorsMap]['generate']>>
-              : never
-      >
-    >
+export class VintaSendFactory<
+  Config extends BaseNotificationTypeConfig
 > {
-  constructor(
-    private adapters: BaseNotificationAdapter<BaseNotificationTemplateRenderer<Config>, Config>[],
-    private backend: BaseNotificationBackend<Config>,
-    private logger: BaseLogger,
-    private contextGeneratorsMap: ContextGeneratorsMap,
-    private queueService?: BaseNotificationQueueService<Config>,
-    private options: NotificationServiceOptions = {
+  create<
+    AdaptersList extends BaseNotificationAdapter<BaseNotificationTemplateRenderer<Config>, Config>[],
+    Backend extends BaseNotificationBackend<Config>,
+    Logger extends BaseLogger,
+    QueueService extends BaseNotificationQueueService<Config>,
+  >(
+    adapters: AdaptersList,
+    backend: Backend,
+    logger: Logger,
+    contextGeneratorsMap: BaseNotificationTypeConfig['ContextMap'],
+    queueService?: QueueService,
+    options: VintaSendOptions = {
       raiseErrorOnFailedSend: false,
     },
   ) {
+    return new VintaSend<
+      Config,
+      AdaptersList,
+      Backend,
+      Logger,
+      QueueService
+    >(
+      adapters,
+      backend,
+      logger,
+      contextGeneratorsMap,
+      queueService,
+      options,
+    );
+  }
+}
+
+export class VintaSend<
+  Config extends BaseNotificationTypeConfig,
+  AdaptersList extends BaseNotificationAdapter<BaseNotificationTemplateRenderer<Config>, Config>[],
+  Backend extends BaseNotificationBackend<Config>,
+  Logger extends BaseLogger,
+  QueueService extends BaseNotificationQueueService<Config>,
+> {
+  private contextGeneratorsMap: NotificationContextGeneratorsMap<Config['ContextMap']>;
+  constructor(
+    private adapters: AdaptersList,
+    private backend: Backend,
+    private logger: Logger,
+    contextGeneratorsMap: Config['ContextMap'],
+    private queueService?: QueueService,
+    private options: VintaSendOptions = {
+      raiseErrorOnFailedSend: false,
+    },
+  ) {
+    this.contextGeneratorsMap = new NotificationContextGeneratorsMap(contextGeneratorsMap);
     for (const adapter of adapters) {
       adapter.injectBackend(backend);
     }
   }
 
-  registerQueueService(queueService: BaseNotificationQueueService<Config>): void {
+  registerQueueService(queueService: QueueService): void {
     this.queueService = queueService;
   }
 
@@ -183,11 +209,11 @@ export class NotificationService<
     return this.backend.getFutureNotifications();
   }
 
-  async getNotificationContext<ContextName extends keyof Config['ContextMap']>(
+  async getNotificationContext<ContextName extends string & keyof Config['ContextMap']>(
     contextName: ContextName,
-    parameters: Parameters<ContextGeneratorsMap[ContextName]['generate']>[0],
+    parameters: Parameters<ReturnType<typeof this.contextGeneratorsMap.getContextGenerator<ContextName>>['generate']>[0],
   ) {
-    const context = this.contextGeneratorsMap[contextName].generate(parameters);
+    const context = this.contextGeneratorsMap.getContextGenerator(contextName).generate(parameters);
 
     if (context instanceof Promise) {
       return await context;
@@ -212,7 +238,7 @@ export class NotificationService<
     return this.backend.getNotification(notificationId, forUpdate);
   }
 
-  async markRead(notificationId: Config['NotificationIdType'], checkIsSent=true): Promise<DatabaseNotification<Config>> {
+  async markRead(notificationId: Config['NotificationIdType'], checkIsSent = true): Promise<DatabaseNotification<Config>> {
     const notification = await this.backend.markAsRead(notificationId, checkIsSent);
     this.logger.info(`Notification ${notificationId} marked as read`);
     return notification;
@@ -227,7 +253,7 @@ export class NotificationService<
     this.logger.info(`Notification ${notificationId} cancelled`);
   }
 
-  async resendNotification(notificationId: Config['NotificationIdType'], useStoredContextIfAvailable = false): Promise<DatabaseNotification<Config> | undefined>  {
+  async resendNotification(notificationId: Config['NotificationIdType'], useStoredContextIfAvailable = false): Promise<DatabaseNotification<Config> | undefined> {
     const notification = await this.getNotification(notificationId, false);
 
     if (!notification) {
@@ -238,7 +264,7 @@ export class NotificationService<
       return;
     }
 
-    if (notification?.sendAfter && notification.sendAfter > new Date()) {
+    if (notification.sendAfter && notification.sendAfter > new Date()) {
       this.logger.error(`Notification ${notificationId} is scheduled for the future`);
       if (this.options.raiseErrorOnFailedSend) {
         throw new Error(`Notification ${notificationId} is scheduled for the future`);
@@ -254,25 +280,36 @@ export class NotificationService<
       return;
     }
 
-    const notificationResendInput: NotificationResendWithContextInput<Config> = {
+    const notificationResendInputWithoutContext = {
       userId: notification.userId,
       notificationType: notification.notificationType,
       title: notification.title,
       bodyTemplate: notification.bodyTemplate,
       contextName: notification.contextName,
       contextParameters: notification.contextParameters,
-      contextUsed: useStoredContextIfAvailable && notification.contextUsed
-        ? notification.contextUsed
-        : await this.getNotificationContext(
-          notification.contextName,
-          notification.contextParameters,
-        ),
       sendAfter: null,
       subjectTemplate: notification.subjectTemplate,
       extraParams: notification.extraParams,
+    };
+
+    let createdNotification: DatabaseNotification<Config>;
+    if (useStoredContextIfAvailable && notification.contextUsed) {
+      const notificationResendInput = {
+        ...notificationResendInputWithoutContext,
+        contextUsed: notification.contextUsed,
+      };
+      createdNotification = await this.backend.persistNotification(notificationResendInput);
+    } else {
+      const notificationResendInput = {
+        ...notificationResendInputWithoutContext,
+        contextUsed: await this.getNotificationContext(
+          notification.contextName,
+          notification.contextParameters,
+        ),
+      };
+      createdNotification = await this.backend.persistNotification(notificationResendInput);
     }
 
-    const createdNotification = await this.backend.persistNotification(notificationResendInput);
     this.logger.info(`Notification ${createdNotification.id} created for resending notification ${notificationId}`);
     this.send(createdNotification);
     return createdNotification;
@@ -341,40 +378,5 @@ export class NotificationService<
         `Error storing context for notification ${notification.id}: ${storeContextError}`,
       );
     }
-  }
-}
-
-// biome-ignore lint/complexity/noStaticOnlyClass: <explanation>
-export class NotificationServiceSingleton {
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-  private static instance: NotificationService<any, any>;
-
-  static getInstance<
-    Config extends BaseNotificationTypeConfig<ContextGeneratorsMap>,
-    ContextGeneratorsMap extends Record<
-      string,
-      ContextGenerator<
-        Parameters<ContextGeneratorsMap[keyof ContextGeneratorsMap]['generate']>[0] extends Record<string, JsonPrimitive>
-          ? Parameters<ContextGeneratorsMap[keyof ContextGeneratorsMap]['generate']>[0] : never,
-        ReturnType<ContextGeneratorsMap[keyof ContextGeneratorsMap]['generate']> extends JsonObject ?
-            ReturnType<ContextGeneratorsMap[keyof ContextGeneratorsMap]['generate']>
-            : Awaited<ReturnType<ContextGeneratorsMap[keyof ContextGeneratorsMap]['generate']>> extends JsonObject ?
-              Awaited<ReturnType<ContextGeneratorsMap[keyof ContextGeneratorsMap]['generate']>>
-              : never
-      >
-    >
-  >(
-    ...args: ConstructorParameters<typeof NotificationService> | []
-  ): NotificationService<Config, ContextGeneratorsMap> {
-    if (!NotificationServiceSingleton.instance) {
-      if (!args || args.length === 0) {
-        throw new Error(
-          'NotificationServiceSingleton is not initialized. Please call getInstance with the required arguments',
-        );
-      }
-      NotificationServiceSingleton.instance = new NotificationService(...args);
-    }
-
-    return NotificationServiceSingleton.instance;
   }
 }

@@ -40,18 +40,22 @@ To start using VintaSend you just need to initialize the notification service an
 
 
 ```typescript
-import { NotificationService } from 'vintasend';
+import { VintaSendFactory } from 'vintasend';
+import type { ContextGenerator } from 'vintasend';
+
+// context generator for Welcome notification
+class WelcomeContextGenerator extends ContextGenerator {
+  async generate ({ userId }: { userId: number }): { firstName: string } {
+    const user = await getUserById(userId);  // example
+    return {
+      firstName: user.firstName,
+    };
+  }
+}
 
 // context map for generating the context of each notification
 export const contextGeneratorsMap = {
-  welcome: {
-    generate: async ({ userId }: { userId: number }): { firstName: string } => {
-      const user = await getUserById(userId);  // example
-      return {
-        firstName: user.firstName,
-      };
-    }
-  },
+  welcome: new WelcomeContextGenerator(),
 } as const;
 
 // type config definition, so all modules use the same types
@@ -68,13 +72,12 @@ export function getNotificationService() {
      here and should be installed and imported separately or manually defined if 
      the existing implementations don't support the specific use-case.
   */
-  const backend = new MyNotificationBackend<NotificationTypeConfig>();
-  const templateRenderer = new MyTemplateRenderer<NotificationTypeConfig>();
-  const adapter = new MyNotificationAdapter<
-    typeof templateRenderer,
-    NotificationTypeConfig
-  >(templateRenderer, true)
-  return new NotificationService<NotificationTypeConfig>(
+  const backend = new MyNotificationBackendFactory<NotificationTypeConfig>().create();
+  const templateRenderer = new MyNotificationAdapterFactory<NotificationTypeConfig>().create();
+  const adapter = new MyNotificationAdapterFactory<NotificationTypeConfig>().create(
+    templateRenderer, true
+  );
+  return new VintaSendFactory<NotificationTypeConfig>().create(
     [adapter],
     backend,
     new MyLogger(loggerOptions),
@@ -88,15 +91,15 @@ export function sendWelcomeEmail(userId: number) {
   const now = new Date();
 
   vintasend.createNotification({
-      userId: user.id,
-      notificationType: 'EMAIL',
-      title: 'Welcome Email',
-      contextName: 'welcome',
-      contextParameters: { userId },
-      sendAfter: now,
-      bodyTemplate: './src/email-templates/auth/welcome/welcome-body.html.template',
-      subjectTemplate: './src/email-templates/auth/welcome/welcome-subject.txt.template',
-      extraParams: {},
+    userId: user.id,
+    notificationType: 'EMAIL',
+    title: 'Welcome Email',
+    contextName: 'welcome',
+    contextParameters: { userId },
+    sendAfter: now,
+    bodyTemplate: './src/email-templates/auth/welcome/welcome-body.html.template',
+    subjectTemplate: './src/email-templates/auth/welcome/welcome-subject.txt.template',
+    extraParams: {},
   });
 } 
 ```

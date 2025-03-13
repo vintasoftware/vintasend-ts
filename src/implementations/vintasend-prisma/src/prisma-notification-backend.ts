@@ -159,7 +159,7 @@ export class PrismaNotificationBackend<
       notificationType: notification.notificationType,
       title: notification.title,
       bodyTemplate: notification.bodyTemplate,
-      contextName: notification.contextName as keyof Config['ContextMap'],
+      contextName: notification.contextName,
       contextParameters: notification.contextParameters
         ? (notification.contextParameters as Parameters<
           Config['ContextMap'][keyof Config['ContextMap']]['generate']
@@ -168,7 +168,11 @@ export class PrismaNotificationBackend<
       sendAfter: notification.sendAfter,
       subjectTemplate: notification.subjectTemplate,
       status: notification.status,
-      contextUsed: notification.contextUsed as Awaited<ReturnType<Config['ContextMap'][typeof notification.contextName]['generate']>>,
+      contextUsed: notification.contextUsed as ReturnType<
+          Config['ContextMap'][keyof Config['ContextMap']]['generate']
+        > extends Promise<infer T> ? T : ReturnType<
+          Config['ContextMap'][keyof Config['ContextMap']]['generate']
+        >,
       extraParams: notification.extraParams
         ? convertJsonValueToRecord(notification.extraParams)
         : null,
@@ -512,5 +516,15 @@ export class PrismaNotificationBackend<
         contextUsed: context,
       },
     });
+  }
+}
+
+export class PrismaNotificationBackendFactory<
+  Config extends BaseNotificationTypeConfig
+> {
+  create<Client extends NotificationPrismaClientInterface<Config['NotificationIdType'], Config['UserIdType']>>(
+    prismaClient: Client,
+  ) {
+    return new PrismaNotificationBackend<Client, Config>(prismaClient);
   }
 }

@@ -56,3 +56,13 @@ export class NodemailerNotificationAdapter<
     await this.transporter.sendMail(mailOptions);
   }
 }
+
+export class NodemailerNotificationAdapterFactory<Config extends BaseNotificationTypeConfig> {
+  create<TemplateRenderer extends BaseEmailTemplateRenderer<Config>>(
+    templateRenderer: TemplateRenderer,
+    enqueueNotifications: boolean,
+    transportOptions: Parameters<typeof nodemailer.createTransport>[0],
+  ) {
+    return new NodemailerNotificationAdapter<TemplateRenderer, Config>(templateRenderer, enqueueNotifications, transportOptions);
+  }
+}

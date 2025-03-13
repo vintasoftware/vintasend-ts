@@ -1,10 +1,11 @@
-import { NotificationService } from '../../index';
+import { VintaSendFactory } from '../../index';
 import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseLogger } from '../loggers/base-logger';
 import type { BaseNotificationQueueService } from '../notification-queue-service/base-notification-queue-service';
 import type { DatabaseNotification } from '../../types/notification';
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
+import { mock } from 'node:test';
 
 // Mock implementations
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
@@ -69,7 +70,7 @@ type Config = {
 }
 
 describe('NotificationService', () => {
-  let service: NotificationService<Config, typeof notificationContextgenerators>;
+  let service: ReturnType<VintaSendFactory<Config>['create']>;
   // biome-ignore lint/suspicious/noExplicitAny: <explanation>
   let mockNotification: DatabaseNotification<any> = {
     id: '123',
@@ -91,7 +92,7 @@ describe('NotificationService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new NotificationService([mockAdapter], mockBackend, mockLogger, notificationContextgenerators);
+    service = new VintaSendFactory<Config>().create([mockAdapter], mockBackend, mockLogger, notificationContextgenerators);
     mockNotification = {
       id: '123',
       notificationType: 'EMAIL' as const,
@@ -153,7 +154,7 @@ describe('NotificationService', () => {
     });
 
     it('should handle queue service integration with enqueue adapter', async () => {
-      const serviceWithQueue = new NotificationService(
+      const serviceWithQueue = new VintaSendFactory<Config>().create(
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
         [{ ...mockAdapter, enqueueNotifications: true } as any],
         mockBackend,
@@ -180,7 +181,7 @@ describe('NotificationService', () => {
     });
 
     it('should handle missing queue service for distributed adapter', async () => {
-      const serviceWithDistributedAdapter = new NotificationService(
+      const serviceWithDistributedAdapter = new VintaSendFactory<Config>().create(
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
         [{ ...mockAdapter, enqueueNotifications: true } as any],
         mockBackend,
@@ -195,7 +196,7 @@ describe('NotificationService', () => {
     });
 
     it('should handle queue service enqueue error', async () => {
-      const serviceWithQueue = new NotificationService(
+      const serviceWithQueue = new VintaSendFactory<Config>().create(
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
         [{ ...mockAdapter, enqueueNotifications: true } as any],
         mockBackend,
@@ -319,6 +320,21 @@ describe('NotificationService', () => {
 
       expect(mockLogger.error).toHaveBeenCalledWith('Notification 123 created');
     });
+
+    it('should handle notification with null sendAfter date', async () => {
+      const notificationWithNullSendAfter = {
+        ...mockNewNotification,
+        sendAfter: null
+      };
+
+      mockBackend.persistNotification.mockResolvedValue({ ...notificationWithNullSendAfter, id: '123' });
+      jest.spyOn(service, 'send').mockResolvedValue();
+
+      await service.createNotification(notificationWithNullSendAfter);
+
+      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 scheduled for null');
+      expect(service.send).not.toHaveBeenCalled();
+    });
   });
 
   describe('delayed send', () => {
@@ -343,7 +359,7 @@ describe('NotificationService', () => {
     it('should handle delayed send with distributed adapter', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
       const distributedAdapter = { ...mockAdapter, enqueueNotifications: true } as any;
-      const serviceWithQueue = new NotificationService(
+      const serviceWithQueue = new VintaSendFactory<Config>().create(
         [distributedAdapter],
         mockBackend,
         mockLogger,
@@ -372,7 +388,7 @@ describe('NotificationService', () => {
 
     it('should fail when there are no distributed adapters with raiseErrorOnFailedSend enabled', async () => {
       mockBackend.getNotification.mockResolvedValue(mockNotification);
-      const serviceWithError = new NotificationService(
+      const serviceWithError = new VintaSendFactory<Config>().create(
         [mockAdapter],
         mockBackend,
         mockLogger,
@@ -389,7 +405,7 @@ describe('NotificationService', () => {
     it('should handle error when marking notification as sent in delayedSend', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
       const distributedAdapter = { ...mockAdapter, enqueueNotifications: true } as any;
-      const serviceWithQueue = new NotificationService(
+      const serviceWithQueue = new VintaSendFactory<Config>().create(
         [distributedAdapter],
         mockBackend,
         mockLogger,
@@ -412,7 +428,7 @@ describe('NotificationService', () => {
     it('should handle send error and mark as failed in delayedSend', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
       const distributedAdapter = { ...mockAdapter, enqueueNotifications: true } as any;
-      const serviceWithQueue = new NotificationService(
+      const serviceWithQueue = new VintaSendFactory<Config>().create(
         [distributedAdapter],
         mockBackend,
         mockLogger,
@@ -435,7 +451,7 @@ describe('NotificationService', () => {
     it('should handle error when marking as failed in delayedSend', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
       const distributedAdapter = { ...mockAdapter, enqueueNotifications: true } as any;
-      const serviceWithQueue = new NotificationService(
+      const serviceWithQueue = new VintaSendFactory<Config>().create(
         [distributedAdapter],
         mockBackend,
         mockLogger,
@@ -660,7 +676,7 @@ describe('NotificationService', () => {
   });
 
   describe('error handling', () => {
-    const serviceWithError = new NotificationService(
+    const serviceWithError = new VintaSendFactory<Config>().create(
       [mockAdapter],
       mockBackend,
       mockLogger,
@@ -706,7 +722,7 @@ describe('NotificationService', () => {
 
   describe('notification context errors', () => {
     it('should handle context errors with raiseErrorOnFailedSend enabled', async () => {
-      const serviceWithError = new NotificationService(
+      const serviceWithError = new VintaSendFactory<Config>().create(
         [mockAdapter],
         mockBackend,
         mockLogger,
@@ -812,7 +828,7 @@ describe('NotificationService', () => {
     });
 
     it('should throw errors when raiseErrorOnFailedSend is enabled', async () => {
-      const serviceWithError = new NotificationService(
+      const serviceWithError = new VintaSendFactory<Config>().create(
         [mockAdapter],
         mockBackend,
         mockLogger,
@@ -839,6 +855,47 @@ describe('NotificationService', () => {
       await service.resendNotification('123');
 
       expect(service.send).toHaveBeenCalledWith(newNotification);
+    });
+
+    it('should throw error when notification is scheduled for the future with raiseErrorOnFailedSend enabled', async () => {
+      const serviceWithError = new VintaSendFactory<Config>().create(
+        [mockAdapter],
+        mockBackend,
+        mockLogger,
+        notificationContextgenerators,
+        undefined,
+        { raiseErrorOnFailedSend: true }
+      );
+
+      const futureDate = new Date();
+      futureDate.setHours(futureDate.getHours() + 1);
+      const scheduledNotification = { ...mockNotification, sendAfter: futureDate };
+      mockBackend.getNotification.mockResolvedValue(scheduledNotification);
+
+      await expect(serviceWithError.resendNotification('123')).rejects.toThrow(
+        'Notification 123 is scheduled for the future'
+      );
+    });
+
+    it('should throw error when using stored context but none exists with raiseErrorOnFailedSend enabled', async () => {
+      const serviceWithError = new VintaSendFactory<Config>().create(
+        [mockAdapter],
+        mockBackend,
+        mockLogger,
+        notificationContextgenerators,
+        undefined,
+        { raiseErrorOnFailedSend: true }
+      );
+
+      const notificationWithoutContext = {
+        ...mockNotification,
+        contextUsed: null
+      };
+      mockBackend.getNotification.mockResolvedValue(notificationWithoutContext);
+
+      await expect(serviceWithError.resendNotification('123', true)).rejects.toThrow(
+        'Context not found for notification 123'
+      );
     });
   });
 });

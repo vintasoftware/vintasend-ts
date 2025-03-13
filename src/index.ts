@@ -1,5 +1,6 @@
 export { Notification } from "./types/notification";
-export { NotificationService } from "./services/notification-service";
+export { VintaSendFactory } from "./services/notification-service";
+export type { VintaSend } from "./services/notification-service";
 export type { ContextGenerator } from "./types/notification-context-generators";
 export type { BaseNotificationTypeConfig } from "./types/notification-type-config";
 export type { BaseNotificationQueueService } from "./services/notification-queue-service/base-notification-queue-service";

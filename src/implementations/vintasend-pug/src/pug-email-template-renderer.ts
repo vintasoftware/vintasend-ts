@@ -33,3 +33,11 @@ export class PugEmailTemplateRenderer<
     });
   }
 }
+
+export class PugEmailTemplateRendererFactory <Config extends BaseNotificationTypeConfig> {
+  create(
+    options: pug.Options,
+  ) {
+    return new PugEmailTemplateRenderer<Config>(options);
+  }
+}
