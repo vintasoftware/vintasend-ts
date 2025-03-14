@@ -55,11 +55,13 @@ export type DatabaseNotification<
   sendAfter: Date | null;
   subjectTemplate: string | null;
   status: NotificationStatus;
-  contextUsed: null | ReturnType<
-    Config['ContextMap'][DatabaseNotification<Config>['contextName']]['generate']
-  > extends Promise<infer T> ? T : ReturnType<
-    Config['ContextMap'][DatabaseNotification<Config>['contextName']]['generate']
-  >;
+  contextUsed: null | (
+    ReturnType<
+      Config['ContextMap'][DatabaseNotification<Config>['contextName']]['generate']
+    > extends Promise<infer T> ? T : ReturnType<
+      Config['ContextMap'][DatabaseNotification<Config>['contextName']]['generate']
+    >
+  );
   extraParams: JsonValue;
   adapterUsed: string | null;
   sentAt: Date | null;
