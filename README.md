@@ -4,27 +4,27 @@ A flexible package for implementing transactional notifications in TypeScript.
 
 ## Features
 
-* **Storing notifications in a Database**: This package relies on a data store to record all the notifications that will be sent. It also keeps it's state column up to date.
-* **Scheduling notifications**: Storing notifications to be send in the future. The notification's context for rendering the template is only evaluated at the moment the notification is sent due to the lib's context generation registry.
-* **Notification context fetched at send time**: On scheduled notifications, we only get the notification context at the send time, so we always get the most up-to-date information.
-* **Flexible backend**: Your projects database is getting slow after you created the first milion notifications? You can migrate to a faster no-sql database with a blink of an eye without affecting how you send the notifications.
-* **Flexible adapters**: Your project probably will need to change how it sends notifications overtime. This package allows to change the adapter without having to change how notifications templates are rendered or how the notification themselves are stored.
-* **Flexible template renderers**: Wanna start managing your templates with a third party tool (so non-technical people can help maintaining them)? Or even choose a more powerful rendering engine? You can do it independently of how you send the notifications or store them in the database.
-* **Sending notifications in background jobs**: This packages supports enqueing notifications to send it from separate processes. This may be helpful to free up the HTTP server of processing heavy notifications during the request time.
+* **Storing notifications in a Database**: This package relies on a data store to record all the notifications that will be sent. It also keeps its state column up to date.
+* **Scheduling notifications**: Storing notifications to be sent in the future. The notification's context for rendering the template is only evaluated at the moment the notification is sent due to the lib's context generation registry.
+* **Notification context fetched at send time**: On scheduled notifications, the package only gets the notification context (information to render the templates) at the send time, so we always get the most up-to-date information.
+* **Flexible backend**: Your project's database is getting slow after you created the first million notifications? You can migrate to a faster no-sql database with a blink of an eye without affecting how you send the notifications.
+* **Flexible adapters**: Your project probably will need to change how it sends notifications over time. This package allows you to change the adapter without having to change how notification templates are rendered or how the notification themselves are stored.
+* **Flexible template renderers**: Wanna start managing your templates with a third party tool (so non-technical people can help maintain them)? Or even choose a more powerful rendering engine? You can do it independently of how you send the notifications or store them in the database.
+* **Sending notifications in background jobs**: This package supports using job queues to send notifications from separate processes. This may be helpful to free up the HTTP server of processing heavy notifications during the request time.
 
 ## How does it work?
 
-The VintaSend package provides a NotificationService class that allows the user to store and send notification, scheduled or not. It relies on Dependency Injection to define how to store/retrieve, render the notification templates, and send notifications. This architechture allows us to swap each part without changing the code we actually use to send the notifications.
+The VintaSend package provides a NotificationService class that allows the user to store and send notifications, scheduled or not. It relies on Dependency Injection to define how to store/retrieve, render the notification templates, and send notifications. This architecture allows us to swap each part without changing the code we actually use to send the notifications.
 
 ### Scheduled Notifications
 
-VintaSend schedules notifications by creating them on the database for sending when the send_after value has passed. The sending isn't done automatically but we have a service method called `sendPendingNotifications` to send all pending notifications found in the database.
+VintaSend schedules notifications by creating them on the database for sending when the `sendAfter` value has passed. The sending isn't done automatically but we have a service method called `sendPendingNotifications` to send all pending notifications found in the database.
 
 You need to call the `sendPendingNotifications` service method in a cron job or a tool for running periodic jobs.
 
 #### Keeping the content up-to-date in scheduled notifications
 
-The NotificationService stores every notification in a database. This helps us to audit and manage our notifications. At the same time, notifications usually have a context that's used to hydrate its template with data. If we stored the cotext directly on the notification records, we'd have to update it anytime the context changes. Instead of storing the context itself, we store a reference to a Context Generator class and the parameters it requires (like ids, flags, types, etc) so we generate the context only when the notification is sent. This ensures we're always getting the most up-to-date context when sending notifications. We also store the generated context after we send the notification, for auditing purposes.
+The VintaSend class stores every notification in a database. This helps us to audit and manage our notifications. At the same time, notifications usually have a context that's used to hydrate its template with data. If we stored the context directly on the notification records, we'd have to update it anytime the context changes. 
 
 ## Installation
 
