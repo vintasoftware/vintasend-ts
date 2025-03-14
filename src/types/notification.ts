@@ -55,7 +55,7 @@ export type DatabaseNotification<
   sendAfter: Date | null;
   subjectTemplate: string | null;
   status: NotificationStatus;
-  contextUsed: ReturnType<
+  contextUsed: null | ReturnType<
     Config['ContextMap'][DatabaseNotification<Config>['contextName']]['generate']
   > extends Promise<infer T> ? T : ReturnType<
     Config['ContextMap'][DatabaseNotification<Config>['contextName']]['generate']
