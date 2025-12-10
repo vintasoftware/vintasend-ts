@@ -396,7 +396,7 @@ export class VintaSend<
         const { id, ...notificationWithoutId } = notification;
         return notificationWithoutId;
       });
-      destinationBackend.bulkPersistNotifications(notificationsWitoutId);
+      await destinationBackend.bulkPersistNotifications(notificationsWitoutId);
       notifications = await this.backend.getNotifications(pageNumber, batchSize);
     }
   }
