@@ -5,7 +5,6 @@ import type { BaseLogger } from '../loggers/base-logger';
 import type { BaseNotificationQueueService } from '../notification-queue-service/base-notification-queue-service';
 import type { DatabaseNotification } from '../../types/notification';
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
-import { mock } from 'node:test';
 
 // Mock implementations
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
@@ -27,6 +26,9 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   storeContextUsed: jest.fn(),
   getUserEmailFromNotification: jest.fn(),
   filterInAppUnreadNotifications: jest.fn(),
+  bulkPersistNotifications: jest.fn(),
+  getAllNotifications: jest.fn(),
+  getNotifications: jest.fn(),
 };
 
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
@@ -292,7 +294,7 @@ describe('NotificationService', () => {
       await service.createNotification(notification);
 
       expect(service.send).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 sent immediately because sendAfter is in the past');
+      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 sent immediately because sendAfter is null or in the past');
     });
 
     it('should not send immediately when sendAfter is in the future', async () => {
@@ -332,8 +334,8 @@ describe('NotificationService', () => {
 
       await service.createNotification(notificationWithNullSendAfter);
 
-      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 scheduled for null');
-      expect(service.send).not.toHaveBeenCalled();
+      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 sent immediately because sendAfter is null or in the past');
+      expect(service.send).toHaveBeenCalled();
     });
   });
 
@@ -506,8 +508,8 @@ describe('NotificationService', () => {
 
     it('should get future notifications from user', async () => {
       mockBackend.getFutureNotificationsFromUser.mockResolvedValue([]);
-      await service.getFutureNotificationsFromUser('user123');
-      expect(mockBackend.getFutureNotificationsFromUser).toHaveBeenCalledWith('user123');
+      await service.getFutureNotificationsFromUser('user123', 1, 10);
+      expect(mockBackend.getFutureNotificationsFromUser).toHaveBeenCalledWith('user123', 1, 10);
     });
 
     it('should get all future notifications from user', async () => {
@@ -518,8 +520,8 @@ describe('NotificationService', () => {
 
     it('should get future notifications', async () => {
       mockBackend.getFutureNotifications.mockResolvedValue([]);
-      await service.getFutureNotifications();
-      expect(mockBackend.getFutureNotifications).toHaveBeenCalled();
+      await service.getFutureNotifications(1, 10);
+      expect(mockBackend.getFutureNotifications).toHaveBeenCalledWith(1, 10);
     });
   });
 
@@ -561,8 +563,8 @@ describe('NotificationService', () => {
 
     it('should get pending notifications', async () => {
       mockBackend.getPendingNotifications.mockResolvedValue([]);
-      await service.getPendingNotifications();
-      expect(mockBackend.getPendingNotifications).toHaveBeenCalled();
+      await service.getPendingNotifications(1, 10);
+      expect(mockBackend.getPendingNotifications).toHaveBeenCalledWith(1, 10);
     });
 
     it('should handle failed notifications in sendPendingNotifications', async () => {

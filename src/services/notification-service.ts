@@ -172,9 +172,9 @@ export class VintaSend<
     const createdNotification = await this.backend.persistNotification(notification);
     this.logger.error(`Notification ${createdNotification.id} created`);
 
-    if (notification.sendAfter && notification.sendAfter <= new Date()) {
-      this.logger.info(`Notification ${createdNotification.id} sent immediately because sendAfter is in the past`);
-      this.send(createdNotification);
+    if (!notification.sendAfter || notification.sendAfter <= new Date()) {
+      this.logger.info(`Notification ${createdNotification.id} sent immediately because sendAfter is null or in the past`);
+      await this.send(createdNotification);
     } else {
       this.logger.info(`Notification ${createdNotification.id} scheduled for ${notification.sendAfter}`);
     }
@@ -201,12 +201,12 @@ export class VintaSend<
     return this.backend.getAllFutureNotificationsFromUser(userId);
   }
 
-  async getFutureNotificationsFromUser(userId: Config['NotificationIdType']) {
-    return this.backend.getFutureNotificationsFromUser(userId);
+  async getFutureNotificationsFromUser(userId: Config['NotificationIdType'], page: number, pageSize: number) {
+    return this.backend.getFutureNotificationsFromUser(userId, page, pageSize);
   }
 
-  async getFutureNotifications() {
-    return this.backend.getFutureNotifications();
+  async getFutureNotifications(page: number, pageSize: number) {
+    return this.backend.getFutureNotifications(page, pageSize);
   }
 
   async getNotificationContext<ContextName extends string & keyof Config['ContextMap']>(
@@ -230,8 +230,8 @@ export class VintaSend<
     );
   }
 
-  async getPendingNotifications() {
-    return this.backend.getPendingNotifications();
+  async getPendingNotifications(page: number, pageSize: number) {
+    return this.backend.getPendingNotifications(page, pageSize);
   }
 
   async getNotification(notificationId: Config['NotificationIdType'], forUpdate = false) {
@@ -316,7 +316,6 @@ export class VintaSend<
 
   }
 
-
   async delayedSend(notificationId: Config['NotificationIdType']): Promise<void> {
     const notification = await this.getNotification(notificationId, false);
 
@@ -377,6 +376,28 @@ export class VintaSend<
       this.logger.error(
         `Error storing context for notification ${notification.id}: ${storeContextError}`,
       );
+    }
+  }
+
+  async bulkPersistNotifications(
+    notifications: Omit<Notification<Config>, 'id'>[],
+  ): Promise<Config['NotificationIdType'][]> {
+    return this.backend.bulkPersistNotifications(notifications);
+  }
+
+  async migrateToBackend<
+    DestinationBackend extends BaseNotificationBackend<Config>
+  >(destinationBackend: DestinationBackend, batchSize = 5000): Promise<void> {
+    let pageNumber = 0;
+    let notifications: DatabaseNotification<Config>[] = await this.backend.getNotifications(pageNumber, batchSize);
+    while (notifications.length > 0) {
+      pageNumber += 1;
+      const notificationsWitoutId = notifications.map((notification) => {
+        const { id, ...notificationWithoutId } = notification;
+        return notificationWithoutId;
+      });
+      await destinationBackend.bulkPersistNotifications(notificationsWitoutId);
+      notifications = await this.backend.getNotifications(pageNumber, batchSize);
     }
   }
 }
