@@ -294,7 +294,7 @@ describe('NotificationService', () => {
       await service.createNotification(notification);
 
       expect(service.send).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 sent immediately because sendAfter is in the past');
+      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 sent immediately because sendAfter is null or in the past');
     });
 
     it('should not send immediately when sendAfter is in the future', async () => {
@@ -334,8 +334,8 @@ describe('NotificationService', () => {
 
       await service.createNotification(notificationWithNullSendAfter);
 
-      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 scheduled for null');
-      expect(service.send).not.toHaveBeenCalled();
+      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 sent immediately because sendAfter is null or in the past');
+      expect(service.send).toHaveBeenCalled();
     });
   });
 

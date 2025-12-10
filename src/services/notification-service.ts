@@ -173,7 +173,7 @@ export class VintaSend<
     this.logger.error(`Notification ${createdNotification.id} created`);
 
     if (!notification.sendAfter || notification.sendAfter <= new Date()) {
-      this.logger.info(`Notification ${createdNotification.id} sent immediately because sendAfter is in the past`);
+      this.logger.info(`Notification ${createdNotification.id} sent immediately because sendAfter is null or in the past`);
       await this.send(createdNotification);
     } else {
       this.logger.info(`Notification ${createdNotification.id} scheduled for ${notification.sendAfter}`);
@@ -265,7 +265,7 @@ export class VintaSend<
     }
 
     if (notification.sendAfter && notification.sendAfter > new Date()) {
-      this.logger.info(`Notification ${notificationId} is scheduled for the future`);
+      this.logger.error(`Notification ${notificationId} is scheduled for the future`);
       if (this.options.raiseErrorOnFailedSend) {
         throw new Error(`Notification ${notificationId} is scheduled for the future`);
       }
