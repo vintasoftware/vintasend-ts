@@ -1,12 +1,12 @@
 import type { InputJsonValue } from '../../types/json-values';
-import type { DatabaseNotification, Notification } from '../../types/notification';
+import type { DatabaseNotification, Notification, DatabaseOneOffNotification, OneOffNotificationInput, AnyDatabaseNotification } from '../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
 
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
-  getAllPendingNotifications(): Promise<DatabaseNotification<Config>[]>;
-  getPendingNotifications(page: number, pageSize: number): Promise<DatabaseNotification<Config>[]>;
-  getAllFutureNotifications(): Promise<DatabaseNotification<Config>[]>;
-  getFutureNotifications(page: number, pageSize: number): Promise<DatabaseNotification<Config>[]>;
+  getAllPendingNotifications(): Promise<AnyDatabaseNotification<Config>[]>;
+  getPendingNotifications(page: number, pageSize: number): Promise<AnyDatabaseNotification<Config>[]>;
+  getAllFutureNotifications(): Promise<AnyDatabaseNotification<Config>[]>;
+  getFutureNotifications(page: number, pageSize: number): Promise<AnyDatabaseNotification<Config>[]>;
   getAllFutureNotificationsFromUser(
     userId: Config['UserIdType'],
   ): Promise<DatabaseNotification<Config>[]>;
@@ -18,8 +18,8 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
   persistNotification(
     notification: Omit<Notification<Config>, 'id'>,
   ): Promise<DatabaseNotification<Config>>;
-  getAllNotifications(): Promise<DatabaseNotification<Config>[]>;
-  getNotifications(page: number, pageSize: number): Promise<DatabaseNotification<Config>[]>;
+  getAllNotifications(): Promise<AnyDatabaseNotification<Config>[]>;
+  getNotifications(page: number, pageSize: number): Promise<AnyDatabaseNotification<Config>[]>;
   bulkPersistNotifications(
     notifications: Omit<Notification<Config>, 'id'>[],
   ): Promise<Config['NotificationIdType'][]>;
@@ -30,11 +30,11 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
   markAsSent(
     notificationId: Config['NotificationIdType'],
     checkIsPending: boolean,
-  ): Promise<DatabaseNotification<Config>>;
+  ): Promise<AnyDatabaseNotification<Config>>;
   markAsFailed(
     notificationId: Config['NotificationIdType'],
     checkIsPending: boolean,
-  ): Promise<DatabaseNotification<Config>>;
+  ): Promise<AnyDatabaseNotification<Config>>;
   markAsRead(
     notificationId: Config['NotificationIdType'],
     checkIsSent: boolean,
@@ -43,7 +43,7 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
   getNotification(
     notificationId: Config['NotificationIdType'],
     forUpdate: boolean,
-  ): Promise<DatabaseNotification<Config> | null>;
+  ): Promise<AnyDatabaseNotification<Config> | null>;
   filterAllInAppUnreadNotifications(
     userId: Config['UserIdType'],
   ): Promise<DatabaseNotification<Config>[]>;
@@ -59,4 +59,19 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     notificationId: Config['NotificationIdType'],
     context: InputJsonValue,
   ): Promise<void>;
+
+  // One-off notification methods
+  persistOneOffNotification(
+    notification: Omit<OneOffNotificationInput<Config>, 'id'>,
+  ): Promise<DatabaseOneOffNotification<Config>>;
+  persistOneOffNotificationUpdate(
+    notificationId: Config['NotificationIdType'],
+    notification: Partial<Omit<OneOffNotificationInput<Config>, 'id'>>,
+  ): Promise<DatabaseOneOffNotification<Config>>;
+  getOneOffNotification(
+    notificationId: Config['NotificationIdType'],
+    forUpdate: boolean,
+  ): Promise<DatabaseOneOffNotification<Config> | null>;
+  getAllOneOffNotifications(): Promise<DatabaseOneOffNotification<Config>[]>;
+  getOneOffNotifications(page: number, pageSize: number): Promise<DatabaseOneOffNotification<Config>[]>;
 }

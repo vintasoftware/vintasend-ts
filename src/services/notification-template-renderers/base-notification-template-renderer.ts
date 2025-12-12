@@ -1,5 +1,5 @@
 import type { JsonObject } from '../../types/json-values';
-import type { Notification } from '../../types/notification';
+import type { Notification, AnyNotification } from '../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
 
 export interface BaseNotificationTemplateRenderer<
@@ -7,7 +7,7 @@ export interface BaseNotificationTemplateRenderer<
   T = unknown,
 > {
   render(
-    notification: Notification<Config>,
+    notification: AnyNotification<Config>,
     context: JsonObject,
   ): Promise<T>;
 }

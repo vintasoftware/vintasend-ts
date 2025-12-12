@@ -5,6 +5,7 @@ A flexible package for implementing transactional notifications in TypeScript.
 ## Features
 
 * **Storing notifications in a Database**: This package relies on a data store to record all the notifications that will be sent. It also keeps its state column up to date.
+* **One-off notifications**: Send notifications directly to email addresses or phone numbers without requiring a user account. Perfect for prospects, guests, or external contacts.
 * **Scheduling notifications**: Storing notifications to be sent in the future. The notification's context for rendering the template is only evaluated at the moment the notification is sent due to the lib's context generation registry.
 * **Notification context fetched at send time**: On scheduled notifications, the package only gets the notification context (information to render the templates) at the send time, so we always get the most up-to-date information.
 * **Flexible backend**: Your project's database is getting slow after you created the first million notifications? You can migrate to a faster no-sql database with a blink of an eye without affecting how you send the notifications.
@@ -21,7 +22,7 @@ The VintaSend package provides a NotificationService class that allows the user 
 VintaSend schedules notifications by creating them on the database for sending when the `sendAfter` value has passed. The sending isn't done automatically but we have a service method called `sendPendingNotifications` to send all pending notifications found in the database.
 
 You need to call the `sendPendingNotifications` service method in a cron job or a tool for running periodic jobs.
-
+npm run build
 #### Keeping the content up-to-date in scheduled notifications
 
 The VintaSend class stores every notification in a database. This helps us to audit and manage our notifications. At the same time, notifications usually have a context that's used to hydrate its template with data. If we stored the context directly on the notification records, we'd have to update it anytime the context changes. 
@@ -104,6 +105,236 @@ export function sendWelcomeEmail(userId: number) {
 } 
 ```
 
+## One-Off Notifications
+
+One-off notifications allow you to send notifications directly to an email address or phone number without requiring a user account in your system. This is particularly useful for:
+
+- **Prospects**: Send welcome emails or marketing materials to potential customers
+- **Guests**: Invite external participants to events or meetings
+- **External Contacts**: Share information with partners or vendors
+- **Temporary Recipients**: Send one-time notifications without creating user accounts
+
+### Key Differences from Regular Notifications
+
+| Feature | Regular Notification | One-Off Notification |
+|---------|---------------------|----------------------|
+| **Recipient** | User ID (requires account) | Email/phone directly |
+| **User Data** | Fetched from user table | Provided inline (firstName, lastName) |
+| **Use Case** | Registered users | Prospects, guests, external contacts |
+| **Storage** | Same table with `userId` | Same table with `emailOrPhone` |
+
+### Creating One-Off Notifications
+
+```typescript
+// Send an immediate one-off notification
+const notification = await vintaSend.createOneOffNotification({
+  emailOrPhone: 'prospect@example.com',
+  firstName: 'John',
+  lastName: 'Doe',
+  notificationType: 'EMAIL',
+  title: 'Welcome!',
+  bodyTemplate: './templates/welcome.html',
+  subjectTemplate: 'Welcome to {{companyName}}!',
+  contextName: 'welcomeContext',
+  contextParameters: { companyName: 'Acme Corp' },
+  sendAfter: null, // Send immediately
+  extraParams: null,
+});
+```
+
+### Scheduling One-Off Notifications
+
+```typescript
+// Schedule a one-off notification for future delivery
+const sendDate = new Date();
+sendDate.setDate(sendDate.getDate() + 7); // Send in 7 days
+
+const scheduledNotification = await vintaSend.createOneOffNotification({
+  emailOrPhone: 'guest@example.com',
+  firstName: 'Jane',
+  lastName: 'Smith',
+  notificationType: 'EMAIL',
+  title: 'Event Reminder',
+  bodyTemplate: './templates/event-invitation.html',
+  subjectTemplate: 'You\'re invited: {{eventName}}',
+  contextName: 'eventInvitation',
+  contextParameters: { 
+    eventName: 'Annual Conference 2025',
+    eventDate: '2025-06-15',
+    eventLocation: 'San Francisco, CA'
+  },
+  sendAfter: sendDate, // Schedule for later
+  extraParams: { eventId: 123 },
+});
+```
+
+### Updating One-Off Notifications
+
+```typescript
+// Update a scheduled one-off notification
+const updatedNotification = await vintaSend.updateOneOffNotification(
+  notificationId,
+  {
+    sendAfter: new Date('2025-07-01'),
+    emailOrPhone: 'newemail@example.com', // Change recipient if needed
+  }
+);
+```
+
+### Using with Phone Numbers (SMS)
+
+```typescript
+// Send SMS to a phone number (requires SMS adapter)
+const smsNotification = await vintaSend.createOneOffNotification({
+  emailOrPhone: '+15551234567', // E.164 format recommended
+  firstName: 'John',
+  lastName: 'Doe',
+  notificationType: 'SMS',
+  title: 'Welcome SMS',
+  bodyTemplate: './templates/welcome-sms.txt',
+  subjectTemplate: null, // SMS doesn't use subjects
+  contextName: 'welcomeContext',
+  contextParameters: { companyName: 'Acme Corp' },
+  sendAfter: null,
+  extraParams: null,
+});
+```
+
+### Bulk One-Off Notifications
+
+```typescript
+// Send to multiple recipients
+const recipients = [
+  { email: 'user1@example.com', firstName: 'Alice', lastName: 'Johnson' },
+  { email: 'user2@example.com', firstName: 'Bob', lastName: 'Williams' },
+];
+
+const notifications = await Promise.all(
+  recipients.map((recipient) =>
+    vintaSend.createOneOffNotification({
+      emailOrPhone: recipient.email,
+      firstName: recipient.firstName,
+      lastName: recipient.lastName,
+      notificationType: 'EMAIL',
+      title: 'Welcome!',
+      bodyTemplate: './templates/welcome.html',
+      subjectTemplate: 'Welcome to our platform!',
+      contextName: 'welcomeContext',
+      contextParameters: { companyName: 'Acme Corp' },
+      sendAfter: null,
+      extraParams: null,
+    })
+  )
+);
+```
+
+### Context Generators for One-Off Notifications
+
+Context generators work the same way for one-off notifications:
+
+```typescript
+class ProspectWelcomeContextGenerator implements ContextGenerator<{ companyName: string }> {
+  async generate(params: { companyName: string }): Promise<JsonObject> {
+    return {
+      companyName: params.companyName,
+      year: new Date().getFullYear(),
+      supportEmail: 'support@acme.com',
+    };
+  }
+}
+
+const contextGeneratorsMap = {
+  welcomeContext: new ProspectWelcomeContextGenerator(),
+} as const;
+```
+
+### Database Schema Considerations
+
+One-off notifications are stored in the same table as regular notifications using a unified approach:
+
+- **Regular notifications**: Have `userId` set, `emailOrPhone` is null
+- **One-off notifications**: Have `emailOrPhone` set, `userId` is null
+
+### Migration Guide
+
+If you're adding one-off notification support to an existing installation:
+
+1. **Update your Prisma schema** to make `userId` optional and add one-off fields:
+   ```bash
+   # Add the new fields to your schema.prisma
+   # Then run:
+   prisma migrate dev --name add-one-off-notification-support
+   ```
+
+2. **No code changes required** for existing functionality - all existing notifications continue to work as before.
+
+3. **Existing notifications are preserved** - they have `userId` set and `emailOrPhone` as null.
+
+### Best Practices
+
+1. **Email/Phone Validation**: Always validate email addresses and phone numbers before creating one-off notifications:
+   ```typescript
+   function isValidEmail(email: string): boolean {
+     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+   }
+   
+   function isValidPhone(phone: string): boolean {
+     return /^\+?[0-9]{10,15}$/.test(phone);
+   }
+   ```
+
+2. **Use E.164 Format for Phone Numbers**: For SMS notifications, use international format (e.g., `+15551234567`).
+
+3. **Provide Meaningful Names**: Include first and last names for better personalization in templates.
+
+4. **Template Access**: One-off notifications have access to `firstName` and `lastName` in templates:
+   ```pug
+   p Hello #{firstName} #{lastName}!
+   ```
+
+5. **Error Handling**: Wrap one-off notification creation in try-catch blocks:
+   ```typescript
+   try {
+     const notification = await vintaSend.createOneOffNotification({...});
+   } catch (error) {
+     console.error('Failed to create one-off notification:', error);
+   }
+   ```
+
+6. **Privacy Considerations**: Be mindful of data privacy laws (GDPR, CCPA) when storing email addresses and phone numbers.
+
+### Limitations
+
+- One-off notifications don't have associated user accounts, so you can't query by user
+- They rely on the provided `emailOrPhone` field for delivery
+- No automatic user preference checking (unsubscribe, notification settings)
+- Recipient name changes must be updated manually if notification is scheduled
+
+### Complete Example
+
+See [src/examples/one-off-notification-example.ts](./src/examples/one-off-notification-example.ts) for a complete working example with various use cases.
+
+## Regular Notifications vs One-Off Notifications
+
+Both types support the same features:
+- ✅ Scheduling with `sendAfter`
+- ✅ Context generation
+- ✅ Template rendering
+- ✅ Multiple adapters (EMAIL, SMS, PUSH)
+- ✅ Status tracking
+- ✅ Extra parameters
+- ✅ Same sending pipeline
+
+Choose **Regular Notifications** when you have user accounts and want to:
+- Track notification preferences
+- Query notifications by user
+- Leverage user data in contexts
+
+Choose **One-Off Notifications** when you need to:
+- Send to recipients without accounts
+- Avoid creating user records
+- Send quick transactional emails to external contacts
+
 ## Glossary
 
 * **Notification Backend**: It is a class that implements the methods necessary for VintaSend services to create, update, and retrieve Notifications from da database.
@@ -114,7 +345,9 @@ export function sendWelcomeEmail(userId: number) {
 * **Context name**: The registered name of a context generator. It's stored in the notification so the context generator is called at the moment the notification will be sent.
 * **Context generators map**: It's an object defined by the user that maps context names to their respective context generators.
 * **Queue service**: Service for enqueueing notifications so they are send by an external service.
-* **Logger**: A class that allows the `NotificationService` to create logs following a format defined by its users.  
+* **Logger**: A class that allows the `NotificationService` to create logs following a format defined by its users.
+* **One-off Notification**: A notification sent directly to an email address or phone number without requiring a user account. Used for prospects, guests, or external contacts.
+* **Regular Notification**: A notification associated with a user account (via userId). Used for registered users in your system.  
 
 
 ## Implementations
