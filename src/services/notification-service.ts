@@ -1,4 +1,4 @@
-import type { DatabaseNotification, Notification, NotificationResendWithContextInput, AnyDatabaseNotification, DatabaseOneOffNotification } from '../types/notification';
+import type { DatabaseNotification, Notification, AnyNotification, AnyDatabaseNotification, DatabaseOneOffNotification } from '../types/notification';
 import type { OneOffNotificationInput } from '../types/one-off-notification';
 import type { JsonObject } from '../types/json-values';
 import type { BaseNotificationTypeConfig } from '../types/notification-type-config';
@@ -477,7 +477,7 @@ export class VintaSend<
   }
 
   async bulkPersistNotifications(
-    notifications: Omit<Notification<Config>, 'id'>[],
+    notifications: Omit<AnyNotification<Config>, 'id'>[],
   ): Promise<Config['NotificationIdType'][]> {
     return this.backend.bulkPersistNotifications(notifications);
   }
@@ -491,12 +491,7 @@ export class VintaSend<
     while (allNotifications.length > 0) {
       pageNumber += 1;
 
-      // Filter to get only regular notifications (not one-off notifications)
-      const regularNotifications = allNotifications.filter(
-        (notification): notification is DatabaseNotification<Config> => 'userId' in notification
-      );
-
-      const notificationsWithoutId = regularNotifications.map((notification) => {
+      const notificationsWithoutId = allNotifications.map((notification) => {
         const { id, ...notificationWithoutId } = notification;
         return notificationWithoutId;
       });

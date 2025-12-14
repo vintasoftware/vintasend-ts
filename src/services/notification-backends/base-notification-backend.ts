@@ -1,5 +1,5 @@
 import type { InputJsonValue } from '../../types/json-values';
-import type { DatabaseNotification, Notification, DatabaseOneOffNotification, OneOffNotificationInput, AnyDatabaseNotification } from '../../types/notification';
+import type { DatabaseNotification, Notification, DatabaseOneOffNotification, OneOffNotificationInput, AnyNotification, AnyDatabaseNotification } from '../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
 
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
@@ -21,7 +21,7 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
   getAllNotifications(): Promise<AnyDatabaseNotification<Config>[]>;
   getNotifications(page: number, pageSize: number): Promise<AnyDatabaseNotification<Config>[]>;
   bulkPersistNotifications(
-    notifications: Omit<Notification<Config>, 'id'>[],
+    notifications: Omit<AnyNotification<Config>, 'id'>[],
   ): Promise<Config['NotificationIdType'][]>;
   persistNotificationUpdate(
     notificationId: Config['NotificationIdType'],
