@@ -337,7 +337,7 @@ Choose **One-Off Notifications** when you need to:
 
 ## Glossary
 
-* **Notification Backend**: It is a class that implements the methods necessary for VintaSend services to create, update, and retrieve Notifications from da database.
+* **Notification Backend**: It is a class that implements the methods necessary for VintaSend services to create, update, and retrieve Notifications from the database.
 * **Notification Adapter**: It is a class that implements the methods necessary for VintaSend services to send Notifications through email, SMS or even push/in-app notifications.
 * **Template Renderer**: It is a class that implements the methods necessary for VintaSend adapter to render the notification body.
 * **Notification Context**: It's the data passed to the templates to render the notification correctly. It's generated when the notification is sent, not on creation time
