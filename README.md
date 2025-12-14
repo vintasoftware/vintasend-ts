@@ -344,7 +344,7 @@ Choose **One-Off Notifications** when you need to:
 * **Context generator**: It's a class defined by the user context generator map with a context name. That class has a `generate` method that, when called, generates the data necessary to render its respective notification.
 * **Context name**: The registered name of a context generator. It's stored in the notification so the context generator is called at the moment the notification will be sent.
 * **Context generators map**: It's an object defined by the user that maps context names to their respective context generators.
-* **Queue service**: Service for enqueueing notifications so they are send by an external service.
+* **Queue service**: Service for enqueueing notifications so they are sent by an external service.
 * **Logger**: A class that allows the `NotificationService` to create logs following a format defined by its users.
 * **One-off Notification**: A notification sent directly to an email address or phone number without requiring a user account. Used for prospects, guests, or external contacts.
 * **Regular Notification**: A notification associated with a user account (via userId). Used for registered users in your system.  
