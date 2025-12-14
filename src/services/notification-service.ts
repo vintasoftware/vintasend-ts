@@ -496,12 +496,12 @@ export class VintaSend<
         (notification): notification is DatabaseNotification<Config> => 'userId' in notification
       );
 
-      const notificationsWitoutId = regularNotifications.map((notification) => {
+      const notificationsWithoutId = regularNotifications.map((notification) => {
         const { id, ...notificationWithoutId } = notification;
         return notificationWithoutId;
       });
 
-      await destinationBackend.bulkPersistNotifications(notificationsWitoutId);
+      await destinationBackend.bulkPersistNotifications(notificationsWithoutId);
 
       allNotifications = await this.backend.getNotifications(pageNumber, batchSize);
     }
