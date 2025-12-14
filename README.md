@@ -22,7 +22,7 @@ The VintaSend package provides a NotificationService class that allows the user 
 VintaSend schedules notifications by creating them on the database for sending when the `sendAfter` value has passed. The sending isn't done automatically but we have a service method called `sendPendingNotifications` to send all pending notifications found in the database.
 
 You need to call the `sendPendingNotifications` service method in a cron job or a tool for running periodic jobs.
-npm run build
+
 #### Keeping the content up-to-date in scheduled notifications
 
 The VintaSend class stores every notification in a database. This helps us to audit and manage our notifications. At the same time, notifications usually have a context that's used to hydrate its template with data. If we stored the context directly on the notification records, we'd have to update it anytime the context changes. 
