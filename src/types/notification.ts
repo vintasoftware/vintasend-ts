@@ -2,6 +2,7 @@ import type { InputJsonValue, JsonObject, JsonValue } from './json-values';
 import type { NotificationStatus } from './notification-status';
 import type { NotificationType } from './notification-type';
 import type { BaseNotificationTypeConfig } from './notification-type-config';
+import type { DatabaseOneOffNotification, OneOffNotification, OneOffNotificationInput } from './one-off-notification';
 
 // Export one-off notification types
 export type {
@@ -87,7 +88,7 @@ export type Notification<Config extends BaseNotificationTypeConfig> =
  */
 export type AnyNotification<Config extends BaseNotificationTypeConfig> =
   | Notification<Config>
-  | import('./one-off-notification').OneOffNotification<Config>;
+  | OneOffNotification<Config>;
 
 /**
  * Union type for database notifications only (regular or one-off).
@@ -95,7 +96,7 @@ export type AnyNotification<Config extends BaseNotificationTypeConfig> =
  */
 export type AnyDatabaseNotification<Config extends BaseNotificationTypeConfig> =
   | DatabaseNotification<Config>
-  | import('./one-off-notification').DatabaseOneOffNotification<Config>;
+  | DatabaseOneOffNotification<Config>;
 
 /**
  * Union type for notification inputs only (regular or one-off).
@@ -103,4 +104,4 @@ export type AnyDatabaseNotification<Config extends BaseNotificationTypeConfig> =
  */
 export type AnyNotificationInput<Config extends BaseNotificationTypeConfig> =
   | NotificationInput<Config>
-  | import('./one-off-notification').OneOffNotificationInput<Config>;
+  | OneOffNotificationInput<Config>;
