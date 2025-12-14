@@ -2,7 +2,7 @@ import type { DatabaseNotification, Notification, AnyNotification, AnyDatabaseNo
 import type { OneOffNotificationInput } from '../types/one-off-notification';
 import type { JsonObject } from '../types/json-values';
 import type { BaseNotificationTypeConfig } from '../types/notification-type-config';
-import type { BaseNotificationAdapter } from './notification-adapters/base-notification-adapter';
+import { isOneOffNotification, type BaseNotificationAdapter } from './notification-adapters/base-notification-adapter';
 import type { BaseNotificationTemplateRenderer } from './notification-template-renderers/base-notification-template-renderer';
 import type { BaseNotificationBackend } from './notification-backends/base-notification-backend';
 import type { BaseLogger } from './loggers/base-logger';
@@ -232,7 +232,7 @@ export class VintaSend<
     notification: Partial<Omit<OneOffNotificationInput<Config>, 'id'>>,
   ): Promise<DatabaseOneOffNotification<Config>> {
     // Validate email or phone format if provided
-    if (notification.emailOrPhone) {
+    if (notification.emailOrPhone !== undefined) {
       this.validateEmailOrPhone(notification.emailOrPhone);
     }
 
@@ -257,6 +257,8 @@ export class VintaSend<
    * @throws Error if the format is invalid
    */
   private validateEmailOrPhone(emailOrPhone: string): void {
+    // Basic non-empty check
+    if (emailOrPhone === '' || emailOrPhone.trim() === '') { throw new Error('emailOrPhone cannot be empty'); }
     // Check if it's an email (has @ with characters before and after)
     const isEmail = /^.+@.+\..+$/.test(emailOrPhone);
     // Check if it's a phone (10-15 digits, optionally starting with +)
@@ -353,7 +355,7 @@ export class VintaSend<
     }
 
     // Check if this is a one-off notification (which cannot be resent this way)
-    if ('emailOrPhone' in notification) {
+    if (isOneOffNotification(notification)) {
       this.logger.error(`Cannot resend one-off notification ${notificationId} using resendNotification. One-off notifications are not supported.`);
       if (this.options.raiseErrorOnFailedSend) {
         throw new Error(`Cannot resend one-off notification ${notificationId}. One-off notifications must be resent using a different method.`);
