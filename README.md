@@ -142,46 +142,7 @@ const notification = await vintaSend.createOneOffNotification({
 });
 ```
 
-### Scheduling One-Off Notifications
-
-```typescript
-// Schedule a one-off notification for future delivery
-const sendDate = new Date();
-sendDate.setDate(sendDate.getDate() + 7); // Send in 7 days
-
-const scheduledNotification = await vintaSend.createOneOffNotification({
-  emailOrPhone: 'guest@example.com',
-  firstName: 'Jane',
-  lastName: 'Smith',
-  notificationType: 'EMAIL',
-  title: 'Event Reminder',
-  bodyTemplate: './templates/event-invitation.html',
-  subjectTemplate: 'You\'re invited: {{eventName}}',
-  contextName: 'eventInvitation',
-  contextParameters: { 
-    eventName: 'Annual Conference 2025',
-    eventDate: '2025-06-15',
-    eventLocation: 'San Francisco, CA'
-  },
-  sendAfter: sendDate, // Schedule for later
-  extraParams: { eventId: 123 },
-});
-```
-
-### Updating One-Off Notifications
-
-```typescript
-// Update a scheduled one-off notification
-const updatedNotification = await vintaSend.updateOneOffNotification(
-  notificationId,
-  {
-    sendAfter: new Date('2025-07-01'),
-    emailOrPhone: 'newemail@example.com', // Change recipient if needed
-  }
-);
-```
-
-### Using with Phone Numbers (SMS)
+#### Using with Phone Numbers (SMS)
 
 ```typescript
 // Send SMS to a phone number (requires SMS adapter)
@@ -198,54 +159,6 @@ const smsNotification = await vintaSend.createOneOffNotification({
   sendAfter: null,
   extraParams: null,
 });
-```
-
-### Bulk One-Off Notifications
-
-```typescript
-// Send to multiple recipients
-const recipients = [
-  { email: 'user1@example.com', firstName: 'Alice', lastName: 'Johnson' },
-  { email: 'user2@example.com', firstName: 'Bob', lastName: 'Williams' },
-];
-
-const notifications = await Promise.all(
-  recipients.map((recipient) =>
-    vintaSend.createOneOffNotification({
-      emailOrPhone: recipient.email,
-      firstName: recipient.firstName,
-      lastName: recipient.lastName,
-      notificationType: 'EMAIL',
-      title: 'Welcome!',
-      bodyTemplate: './templates/welcome.html',
-      subjectTemplate: 'Welcome to our platform!',
-      contextName: 'welcomeContext',
-      contextParameters: { companyName: 'Acme Corp' },
-      sendAfter: null,
-      extraParams: null,
-    })
-  )
-);
-```
-
-### Context Generators for One-Off Notifications
-
-Context generators work the same way for one-off notifications:
-
-```typescript
-class ProspectWelcomeContextGenerator implements ContextGenerator<{ companyName: string }> {
-  async generate(params: { companyName: string }): Promise<JsonObject> {
-    return {
-      companyName: params.companyName,
-      year: new Date().getFullYear(),
-      supportEmail: 'support@acme.com',
-    };
-  }
-}
-
-const contextGeneratorsMap = {
-  welcomeContext: new ProspectWelcomeContextGenerator(),
-} as const;
 ```
 
 ### Database Schema Considerations
@@ -270,71 +183,6 @@ If you're adding one-off notification support to an existing installation:
 
 3. **Existing notifications are preserved** - they have `userId` set and `emailOrPhone` as null.
 
-### Best Practices
-
-1. **Email/Phone Validation**: Always validate email addresses and phone numbers before creating one-off notifications:
-   ```typescript
-   function isValidEmail(email: string): boolean {
-     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-   }
-   
-   function isValidPhone(phone: string): boolean {
-     return /^\+?[0-9]{10,15}$/.test(phone);
-   }
-   ```
-
-2. **Use E.164 Format for Phone Numbers**: For SMS notifications, use international format (e.g., `+15551234567`).
-
-3. **Provide Meaningful Names**: Include first and last names for better personalization in templates.
-
-4. **Template Access**: One-off notifications have access to `firstName` and `lastName` in templates:
-   ```pug
-   p Hello #{firstName} #{lastName}!
-   ```
-
-5. **Error Handling**: Wrap one-off notification creation in try-catch blocks:
-   ```typescript
-   try {
-     const notification = await vintaSend.createOneOffNotification({...});
-   } catch (error) {
-     console.error('Failed to create one-off notification:', error);
-   }
-   ```
-
-6. **Privacy Considerations**: Be mindful of data privacy laws (GDPR, CCPA) when storing email addresses and phone numbers.
-
-### Limitations
-
-- One-off notifications don't have associated user accounts, so you can't query by user
-- They rely on the provided `emailOrPhone` field for delivery
-- No automatic user preference checking (unsubscribe, notification settings)
-- Recipient name changes must be updated manually if notification is scheduled
-
-### Complete Example
-
-See [src/examples/one-off-notification-example.ts](./src/examples/one-off-notification-example.ts) for a complete working example with various use cases.
-
-## Regular Notifications vs One-Off Notifications
-
-Both types support the same features:
-- ✅ Scheduling with `sendAfter`
-- ✅ Context generation
-- ✅ Template rendering
-- ✅ Multiple adapters (EMAIL, SMS, PUSH)
-- ✅ Status tracking
-- ✅ Extra parameters
-- ✅ Same sending pipeline
-
-Choose **Regular Notifications** when you have user accounts and want to:
-- Track notification preferences
-- Query notifications by user
-- Leverage user data in contexts
-
-Choose **One-Off Notifications** when you need to:
-- Send to recipients without accounts
-- Avoid creating user records
-- Send quick transactional emails to external contacts
-
 ## Glossary
 
 * **Notification Backend**: It is a class that implements the methods necessary for VintaSend services to create, update, and retrieve Notifications from the database.
@@ -352,25 +200,24 @@ Choose **One-Off Notifications** when you need to:
 
 ## Implementations
 
-
-## Community
+### Community
 
 VintaSend has many backend, adapter, and template renderer implementations. If you can't find something that fulfills your needs, the package has very clear interfaces you can implement and achieve the exact behavior you expect without loosing VintaSend's friendly API.
 
-### Officially supported packages 
+#### Officially supported packages 
 
-#### Backends
+##### Backends
 
 * **[vintasend-prisma](https://github.com/vintasoftware/vintasend-prisma/)**: Uses Prisma Client to manage the notifications in the database.
 
-#### Adapters
+##### Adapters
 
 * **[vintasend-nodemailer](https://github.com/vintasoftware/vintasend-nodemailer/)**: Uses nodemailer to send transactional emails to users. 
 
-#### Template Renderers
+##### Template Renderers
 * **[vintasend-pug](https://github.com/vintasoftware/vintasend-pug/)**: Renders emails using Pug.
 
-#### Loggers
+##### Loggers
 * **[vintasend-winston](https://github.com/vintasoftware/vintasend-winston/)**: Uses Winston to allow `NotificationService` to create log entries.
 
 ## Examples
