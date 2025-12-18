@@ -1,5 +1,5 @@
 import type { BaseNotificationTemplateRenderer } from './base-notification-template-renderer';
-import type { Notification } from '../../types/notification';
+import type { Notification, AnyNotification } from '../../types/notification';
 import type { Buffer } from 'node:buffer';
 import type { JsonObject } from '../../types/json-values';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
@@ -18,7 +18,7 @@ export interface BaseEmailTemplateRenderer<
     EmailTemplate
   > {
   render(
-    notification: Notification<Config>,
+    notification: AnyNotification<Config>,
     context: JsonObject,
   ): Promise<EmailTemplate>;
 }

@@ -1,7 +1,8 @@
-import type { DatabaseNotification, Notification, NotificationResendWithContextInput } from '../types/notification';
+import type { DatabaseNotification, Notification, AnyNotification, AnyDatabaseNotification, DatabaseOneOffNotification } from '../types/notification';
+import type { OneOffNotificationInput } from '../types/one-off-notification';
 import type { JsonObject } from '../types/json-values';
 import type { BaseNotificationTypeConfig } from '../types/notification-type-config';
-import type { BaseNotificationAdapter } from './notification-adapters/base-notification-adapter';
+import { isOneOffNotification, type BaseNotificationAdapter } from './notification-adapters/base-notification-adapter';
 import type { BaseNotificationTemplateRenderer } from './notification-template-renderers/base-notification-template-renderer';
 import type { BaseNotificationBackend } from './notification-backends/base-notification-backend';
 import type { BaseLogger } from './loggers/base-logger';
@@ -76,7 +77,7 @@ export class VintaSend<
   }
 
   async send(
-    notification: DatabaseNotification<Config>,
+    notification: AnyDatabaseNotification<Config>,
   ): Promise<void> {
     const adaptersOfType = this.adapters.filter(
       (adapter) => adapter.notificationType === notification.notificationType,
@@ -193,6 +194,81 @@ export class VintaSend<
     return updatedNotification;
   }
 
+  /**
+   * Creates and sends a one-off notification.
+   * One-off notifications are sent directly to an email/phone without requiring a user account.
+   *
+   * @param notification - The one-off notification to create (without id)
+   * @returns The created database notification
+   */
+  async createOneOffNotification(
+    notification: Omit<OneOffNotificationInput<Config>, 'id'>,
+  ): Promise<DatabaseOneOffNotification<Config>> {
+    // Validate email or phone format
+    this.validateEmailOrPhone(notification.emailOrPhone);
+
+    const createdNotification = await this.backend.persistOneOffNotification(notification);
+    this.logger.info(`One-off notification ${createdNotification.id} created`);
+
+    if (!notification.sendAfter || notification.sendAfter <= new Date()) {
+      this.logger.info(`One-off notification ${createdNotification.id} sent immediately`);
+      await this.send(createdNotification);
+    } else {
+      this.logger.info(`One-off notification ${createdNotification.id} scheduled for ${notification.sendAfter}`);
+    }
+
+    return createdNotification;
+  }
+
+  /**
+   * Updates a one-off notification and re-sends it if the sendAfter date is in the past.
+   *
+   * @param notificationId - The ID of the notification to update
+   * @param notification - The partial notification data to update
+   * @returns The updated database notification
+   */
+  async updateOneOffNotification(
+    notificationId: Config['NotificationIdType'],
+    notification: Partial<Omit<OneOffNotificationInput<Config>, 'id'>>,
+  ): Promise<DatabaseOneOffNotification<Config>> {
+    // Validate email or phone format if provided
+    if (notification.emailOrPhone !== undefined) {
+      this.validateEmailOrPhone(notification.emailOrPhone);
+    }
+
+    const updatedNotification = await this.backend.persistOneOffNotificationUpdate(
+      notificationId,
+      notification,
+    );
+    this.logger.info(`One-off notification ${notificationId} updated`);
+
+    if (!updatedNotification.sendAfter || updatedNotification.sendAfter <= new Date()) {
+      this.logger.info(`One-off notification ${notificationId} sent after update`);
+      await this.send(updatedNotification);
+    }
+
+    return updatedNotification;
+  }
+
+  /**
+   * Validates that an email or phone number has a basic valid format.
+   *
+   * @param emailOrPhone - The email or phone string to validate
+   * @throws Error if the format is invalid
+   */
+  private validateEmailOrPhone(emailOrPhone: string): void {
+    // Basic non-empty check
+    if (emailOrPhone === '' || emailOrPhone.trim() === '') { throw new Error('emailOrPhone cannot be empty'); }
+    // Check if it's an email (has @ with characters before and after)
+    const isEmail = /^.+@.+\..+$/.test(emailOrPhone);
+    // Check if it's a phone (10-15 digits, optionally starting with +)
+    const isPhone = /^\+?[0-9]{10,15}$/.test(emailOrPhone);
+
+    if (!isEmail && !isPhone) {
+      throw new Error('Invalid email or phone format');
+    }
+  }
+
   async getAllFutureNotifications() {
     return this.backend.getAllFutureNotifications();
   }
@@ -238,6 +314,20 @@ export class VintaSend<
     return this.backend.getNotification(notificationId, forUpdate);
   }
 
+  /**
+   * Gets a one-off notification by ID.
+   *
+   * @param notificationId - The ID of the one-off notification to retrieve
+   * @param forUpdate - Whether the notification is being retrieved for update (default: false)
+   * @returns The one-off notification or null if not found
+   */
+  async getOneOffNotification(
+    notificationId: Config['NotificationIdType'],
+    forUpdate = false,
+  ): Promise<DatabaseOneOffNotification<Config> | null> {
+    return this.backend.getOneOffNotification(notificationId, forUpdate);
+  }
+
   async markRead(notificationId: Config['NotificationIdType'], checkIsSent = true): Promise<DatabaseNotification<Config>> {
     const notification = await this.backend.markAsRead(notificationId, checkIsSent);
     this.logger.info(`Notification ${notificationId} marked as read`);
@@ -260,6 +350,15 @@ export class VintaSend<
       this.logger.error(`Notification ${notificationId} not found`);
       if (this.options.raiseErrorOnFailedSend) {
         throw new Error(`Notification ${notificationId} not found`);
+      }
+      return;
+    }
+
+    // Check if this is a one-off notification (which cannot be resent this way)
+    if (isOneOffNotification(notification)) {
+      this.logger.error(`Cannot resend one-off notification ${notificationId} using resendNotification. One-off notifications are not supported.`);
+      if (this.options.raiseErrorOnFailedSend) {
+        throw new Error(`Cannot resend one-off notification ${notificationId}. One-off notifications must be resent using a different method.`);
       }
       return;
     }
@@ -380,7 +479,7 @@ export class VintaSend<
   }
 
   async bulkPersistNotifications(
-    notifications: Omit<Notification<Config>, 'id'>[],
+    notifications: Omit<AnyNotification<Config>, 'id'>[],
   ): Promise<Config['NotificationIdType'][]> {
     return this.backend.bulkPersistNotifications(notifications);
   }
@@ -389,15 +488,19 @@ export class VintaSend<
     DestinationBackend extends BaseNotificationBackend<Config>
   >(destinationBackend: DestinationBackend, batchSize = 5000): Promise<void> {
     let pageNumber = 0;
-    let notifications: DatabaseNotification<Config>[] = await this.backend.getNotifications(pageNumber, batchSize);
-    while (notifications.length > 0) {
+    let allNotifications: AnyDatabaseNotification<Config>[] = await this.backend.getNotifications(pageNumber, batchSize);
+
+    while (allNotifications.length > 0) {
       pageNumber += 1;
-      const notificationsWitoutId = notifications.map((notification) => {
+
+      const notificationsWithoutId = allNotifications.map((notification) => {
         const { id, ...notificationWithoutId } = notification;
         return notificationWithoutId;
       });
-      await destinationBackend.bulkPersistNotifications(notificationsWitoutId);
-      notifications = await this.backend.getNotifications(pageNumber, batchSize);
+
+      await destinationBackend.bulkPersistNotifications(notificationsWithoutId);
+
+      allNotifications = await this.backend.getNotifications(pageNumber, batchSize);
     }
   }
 }

@@ -5,9 +5,10 @@ A flexible package for implementing transactional notifications in TypeScript.
 ## Features
 
 * **Storing notifications in a Database**: This package relies on a data store to record all the notifications that will be sent. It also keeps its state column up to date.
+* **One-off notifications**: Send notifications directly to email addresses or phone numbers without requiring a user account. Perfect for prospects, guests, or external contacts.
 * **Scheduling notifications**: Storing notifications to be sent in the future. The notification's context for rendering the template is only evaluated at the moment the notification is sent due to the lib's context generation registry.
 * **Notification context fetched at send time**: On scheduled notifications, the package only gets the notification context (information to render the templates) at the send time, so we always get the most up-to-date information.
-* **Flexible backend**: Your project's database is getting slow after you created the first million notifications? You can migrate to a faster no-sql database with a blink of an eye without affecting how you send the notifications.
+* **Flexible backend**: Your project's database is getting slow after you created the first million notifications? You can migrate to a faster NoSQL database in the blink of an eye without affecting how you send the notifications.
 * **Flexible adapters**: Your project probably will need to change how it sends notifications over time. This package allows you to change the adapter without having to change how notification templates are rendered or how the notification themselves are stored.
 * **Flexible template renderers**: Wanna start managing your templates with a third party tool (so non-technical people can help maintain them)? Or even choose a more powerful rendering engine? You can do it independently of how you send the notifications or store them in the database.
 * **Sending notifications in background jobs**: This package supports using job queues to send notifications from separate processes. This may be helpful to free up the HTTP server of processing heavy notifications during the request time.
@@ -104,40 +105,119 @@ export function sendWelcomeEmail(userId: number) {
 } 
 ```
 
+## One-Off Notifications
+
+One-off notifications allow you to send notifications directly to an email address or phone number without requiring a user account in your system. This is particularly useful for:
+
+- **Prospects**: Send welcome emails or marketing materials to potential customers
+- **Guests**: Invite external participants to events or meetings
+- **External Contacts**: Share information with partners or vendors
+- **Temporary Recipients**: Send one-time notifications without creating user accounts
+
+### Key Differences from Regular Notifications
+
+| Feature | Regular Notification | One-Off Notification |
+|---------|---------------------|----------------------|
+| **Recipient** | User ID (requires account) | Email/phone directly |
+| **User Data** | Fetched from user table | Provided inline (firstName, lastName) |
+| **Use Case** | Registered users | Prospects, guests, external contacts |
+| **Storage** | Same table with `userId` | Same table with `emailOrPhone` |
+
+### Creating One-Off Notifications
+
+```typescript
+// Send an immediate one-off notification
+const notification = await vintaSend.createOneOffNotification({
+  emailOrPhone: 'prospect@example.com',
+  firstName: 'John',
+  lastName: 'Doe',
+  notificationType: 'EMAIL',
+  title: 'Welcome!',
+  bodyTemplate: './templates/welcome.html',
+  subjectTemplate: 'Welcome to {{companyName}}!',
+  contextName: 'welcomeContext',
+  contextParameters: { companyName: 'Acme Corp' },
+  sendAfter: null, // Send immediately
+  extraParams: null,
+});
+```
+
+#### Using with Phone Numbers (SMS)
+
+```typescript
+// Send SMS to a phone number (requires SMS adapter)
+const smsNotification = await vintaSend.createOneOffNotification({
+  emailOrPhone: '+15551234567', // E.164 format recommended
+  firstName: 'John',
+  lastName: 'Doe',
+  notificationType: 'SMS',
+  title: 'Welcome SMS',
+  bodyTemplate: './templates/welcome-sms.txt',
+  subjectTemplate: null, // SMS doesn't use subjects
+  contextName: 'welcomeContext',
+  contextParameters: { companyName: 'Acme Corp' },
+  sendAfter: null,
+  extraParams: null,
+});
+```
+
+### Database Schema Considerations
+
+One-off notifications are stored in the same table as regular notifications using a unified approach:
+
+- **Regular notifications**: Have `userId` set, `emailOrPhone` is null
+- **One-off notifications**: Have `emailOrPhone` set, `userId` is null
+
+### Migration Guide
+
+If you're adding one-off notification support to an existing installation:
+
+1. **Update your Prisma schema** to make `userId` optional and add one-off fields:
+   ```bash
+   # Add the new fields to your schema.prisma
+   # Then run:
+   prisma migrate dev --name add-one-off-notification-support
+   ```
+
+2. **No code changes required** for existing functionality - all existing notifications continue to work as before.
+
+3. **Existing notifications are preserved** - they have `userId` set and `emailOrPhone` as null.
+
 ## Glossary
 
-* **Notification Backend**: It is a class that implements the methods necessary for VintaSend services to create, update, and retrieve Notifications from da database.
+* **Notification Backend**: It is a class that implements the methods necessary for VintaSend services to create, update, and retrieve Notifications from the database.
 * **Notification Adapter**: It is a class that implements the methods necessary for VintaSend services to send Notifications through email, SMS or even push/in-app notifications.
 * **Template Renderer**: It is a class that implements the methods necessary for VintaSend adapter to render the notification body.
 * **Notification Context**: It's the data passed to the templates to render the notification correctly. It's generated when the notification is sent, not on creation time
 * **Context generator**: It's a class defined by the user context generator map with a context name. That class has a `generate` method that, when called, generates the data necessary to render its respective notification.
 * **Context name**: The registered name of a context generator. It's stored in the notification so the context generator is called at the moment the notification will be sent.
 * **Context generators map**: It's an object defined by the user that maps context names to their respective context generators.
-* **Queue service**: Service for enqueueing notifications so they are send by an external service.
-* **Logger**: A class that allows the `NotificationService` to create logs following a format defined by its users.  
+* **Queue service**: Service for enqueueing notifications so they are sent by an external service.
+* **Logger**: A class that allows the `NotificationService` to create logs following a format defined by its users.
+* **One-off Notification**: A notification sent directly to an email address or phone number without requiring a user account. Used for prospects, guests, or external contacts.
+* **Regular Notification**: A notification associated with a user account (via userId). Used for registered users in your system.  
 
 
 ## Implementations
 
-
-## Community
+### Community
 
 VintaSend has many backend, adapter, and template renderer implementations. If you can't find something that fulfills your needs, the package has very clear interfaces you can implement and achieve the exact behavior you expect without loosing VintaSend's friendly API.
 
-### Officially supported packages 
+#### Officially supported packages 
 
-#### Backends
+##### Backends
 
 * **[vintasend-prisma](https://github.com/vintasoftware/vintasend-prisma/)**: Uses Prisma Client to manage the notifications in the database.
 
-#### Adapters
+##### Adapters
 
 * **[vintasend-nodemailer](https://github.com/vintasoftware/vintasend-nodemailer/)**: Uses nodemailer to send transactional emails to users. 
 
-#### Template Renderers
+##### Template Renderers
 * **[vintasend-pug](https://github.com/vintasoftware/vintasend-pug/)**: Renders emails using Pug.
 
-#### Loggers
+##### Loggers
 * **[vintasend-winston](https://github.com/vintasoftware/vintasend-winston/)**: Uses Winston to allow `NotificationService` to create log entries.
 
 ## Examples

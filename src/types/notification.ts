@@ -2,6 +2,15 @@ import type { InputJsonValue, JsonObject, JsonValue } from './json-values';
 import type { NotificationStatus } from './notification-status';
 import type { NotificationType } from './notification-type';
 import type { BaseNotificationTypeConfig } from './notification-type-config';
+import type { DatabaseOneOffNotification, OneOffNotification, OneOffNotificationInput } from './one-off-notification';
+
+// Export one-off notification types
+export type {
+  OneOffNotificationInput,
+  OneOffNotificationResendWithContextInput,
+  DatabaseOneOffNotification,
+  OneOffNotification,
+} from './one-off-notification';
 
 export type NotificationInput<Config extends BaseNotificationTypeConfig> = {
   userId: Config['UserIdType'];
@@ -72,3 +81,27 @@ export type Notification<Config extends BaseNotificationTypeConfig> =
   | NotificationInput<Config>
   | NotificationResendWithContextInput<Config>
   | DatabaseNotification<Config>;
+
+/**
+ * Union type representing any notification type (regular or one-off).
+ * This is useful for methods that handle both notification types.
+ */
+export type AnyNotification<Config extends BaseNotificationTypeConfig> =
+  | Notification<Config>
+  | OneOffNotification<Config>;
+
+/**
+ * Union type for database notifications only (regular or one-off).
+ * Useful for send methods and database queries.
+ */
+export type AnyDatabaseNotification<Config extends BaseNotificationTypeConfig> =
+  | DatabaseNotification<Config>
+  | DatabaseOneOffNotification<Config>;
+
+/**
+ * Union type for notification inputs only (regular or one-off).
+ * Useful for creation methods.
+ */
+export type AnyNotificationInput<Config extends BaseNotificationTypeConfig> =
+  | NotificationInput<Config>
+  | OneOffNotificationInput<Config>;

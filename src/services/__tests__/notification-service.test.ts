@@ -29,6 +29,11 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   bulkPersistNotifications: jest.fn(),
   getAllNotifications: jest.fn(),
   getNotifications: jest.fn(),
+  persistOneOffNotification: jest.fn(),
+  persistOneOffNotificationUpdate: jest.fn(),
+  getOneOffNotification: jest.fn(),
+  getAllOneOffNotifications: jest.fn(),
+  getOneOffNotifications: jest.fn(),
 };
 
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
