@@ -1,16 +1,16 @@
 import type {
-  OneOffNotificationInput,
-  OneOffNotificationResendWithContextInput,
-  DatabaseOneOffNotification,
-  OneOffNotification,
-} from '../one-off-notification';
-import type {
-  AnyNotification,
   AnyDatabaseNotification,
+  AnyNotification,
   AnyNotificationInput,
 } from '../notification';
 import type { NotificationStatus } from '../notification-status';
 import type { NotificationType } from '../notification-type';
+import type {
+  DatabaseOneOffNotification,
+  OneOffNotification,
+  OneOffNotificationInput,
+  OneOffNotificationResendWithContextInput,
+} from '../one-off-notification';
 
 // Test configuration
 type TestContextMap = {
@@ -67,7 +67,9 @@ describe('OneOffNotification Types', () => {
       };
 
       // Type assertion for accessing contextParameters after narrowing contextName
-      expect((validInput.contextParameters as { companyName: string }).companyName).toBe('Tech Inc');
+      expect((validInput.contextParameters as { companyName: string }).companyName).toBe(
+        'Tech Inc',
+      );
     });
 
     it('should accept phone numbers as emailOrPhone', () => {
@@ -217,7 +219,13 @@ describe('OneOffNotification Types', () => {
     });
 
     it('should accept different notification statuses', () => {
-      const statuses: NotificationStatus[] = ['PENDING_SEND', 'SENT', 'FAILED', 'READ', 'CANCELLED'];
+      const statuses: NotificationStatus[] = [
+        'PENDING_SEND',
+        'SENT',
+        'FAILED',
+        'READ',
+        'CANCELLED',
+      ];
 
       for (const status of statuses) {
         const notification: DatabaseOneOffNotification<TestConfig> = {
@@ -452,7 +460,10 @@ describe('OneOffNotification Types', () => {
       };
 
       const welcomeNotif = createNotification('welcomeContext', { companyName: 'TypeScript Inc' });
-      const reminderNotif = createNotification('reminderContext', { taskName: 'Test', dueDate: '2024-01-01' });
+      const reminderNotif = createNotification('reminderContext', {
+        taskName: 'Test',
+        dueDate: '2024-01-01',
+      });
 
       expect(welcomeNotif.contextName).toBe('welcomeContext');
       expect(reminderNotif.contextName).toBe('reminderContext');

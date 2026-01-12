@@ -1,9 +1,9 @@
 import { VintaSendFactory } from '../../index';
-import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
-import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
-import type { BaseLogger } from '../loggers/base-logger';
 import type { DatabaseOneOffNotification } from '../../types/one-off-notification';
 import type { OneOffNotificationInput } from '../../types/one-off-notification';
+import type { BaseLogger } from '../loggers/base-logger';
+import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
+import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
 
 // Mock implementations
@@ -50,7 +50,7 @@ const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any>> = {
   injectBackend: jest.fn(),
   backend: mockBackend,
   templateRenderer: mockTemplateRenderer,
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
 } as any;
 
 const mockLogger: jest.Mocked<BaseLogger> = {
@@ -82,12 +82,7 @@ describe('NotificationService - One-Off Notifications', () => {
     jest.clearAllMocks();
 
     const factory = new VintaSendFactory<Config>();
-    service = factory.create(
-      [mockAdapter],
-      mockBackend,
-      mockLogger,
-      notificationContextgenerators,
-    );
+    service = factory.create([mockAdapter], mockBackend, mockLogger, notificationContextgenerators);
 
     mockOneOffNotificationInput = {
       emailOrPhone: 'test@example.com',
@@ -125,9 +120,13 @@ describe('NotificationService - One-Off Notifications', () => {
 
       const result = await service.createOneOffNotification(mockOneOffNotificationInput);
 
-      expect(mockBackend.persistOneOffNotification).toHaveBeenCalledWith(mockOneOffNotificationInput);
+      expect(mockBackend.persistOneOffNotification).toHaveBeenCalledWith(
+        mockOneOffNotificationInput,
+      );
       expect(result).toEqual(mockOneOffNotification);
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('One-off notification 123 created'));
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('One-off notification 123 created'),
+      );
     });
 
     it('should send immediately when sendAfter is null', async () => {
@@ -143,7 +142,7 @@ describe('NotificationService - One-Off Notifications', () => {
       const pastDate = new Date(Date.now() - 1000);
       const inputWithPastDate: typeof mockOneOffNotificationInput = {
         ...mockOneOffNotificationInput,
-        sendAfter: pastDate
+        sendAfter: pastDate,
       };
       const notificationWithPastDate = { ...mockOneOffNotification, sendAfter: pastDate };
 
@@ -159,7 +158,7 @@ describe('NotificationService - One-Off Notifications', () => {
       const futureDate = new Date(Date.now() + 10000);
       const inputWithFutureDate: typeof mockOneOffNotificationInput = {
         ...mockOneOffNotificationInput,
-        sendAfter: futureDate
+        sendAfter: futureDate,
       };
       const notificationWithFutureDate = { ...mockOneOffNotification, sendAfter: futureDate };
 
@@ -174,7 +173,7 @@ describe('NotificationService - One-Off Notifications', () => {
     it('should throw error for invalid email format', async () => {
       const invalidInput: typeof mockOneOffNotificationInput = {
         ...mockOneOffNotificationInput,
-        emailOrPhone: 'invalid-email'
+        emailOrPhone: 'invalid-email',
       };
 
       await expect(service.createOneOffNotification(invalidInput)).rejects.toThrow(
@@ -187,7 +186,7 @@ describe('NotificationService - One-Off Notifications', () => {
     it('should accept valid phone number format', async () => {
       const phoneInput: typeof mockOneOffNotificationInput = {
         ...mockOneOffNotificationInput,
-        emailOrPhone: '+1234567890'
+        emailOrPhone: '+1234567890',
       };
       const phoneNotification = { ...mockOneOffNotification, emailOrPhone: '+1234567890' };
 
@@ -201,7 +200,7 @@ describe('NotificationService - One-Off Notifications', () => {
     it('should throw error for invalid phone format', async () => {
       const invalidPhoneInput: typeof mockOneOffNotificationInput = {
         ...mockOneOffNotificationInput,
-        emailOrPhone: '123'
+        emailOrPhone: '123',
       };
 
       await expect(service.createOneOffNotification(invalidPhoneInput)).rejects.toThrow(
@@ -232,7 +231,9 @@ describe('NotificationService - One-Off Notifications', () => {
 
       expect(mockBackend.persistOneOffNotificationUpdate).toHaveBeenCalledWith('123', updateData);
       expect(result).toEqual(updatedNotification);
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('One-off notification 123 updated'));
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('One-off notification 123 updated'),
+      );
     });
 
     it('should re-send if updated sendAfter is null', async () => {
@@ -362,7 +363,7 @@ describe('NotificationService - One-Off Notifications', () => {
 
         const input: typeof mockOneOffNotificationInput = {
           ...mockOneOffNotificationInput,
-          emailOrPhone: email
+          emailOrPhone: email,
         };
         const notification = { ...mockOneOffNotification, emailOrPhone: email };
         mockBackend.persistOneOffNotification.mockResolvedValue(notification);
@@ -372,19 +373,14 @@ describe('NotificationService - One-Off Notifications', () => {
     });
 
     it('should accept valid phone numbers', async () => {
-      const validPhones = [
-        '+12345678901',
-        '+1234567890',
-        '1234567890',
-        '+123456789012345',
-      ];
+      const validPhones = ['+12345678901', '+1234567890', '1234567890', '+123456789012345'];
 
       for (const phone of validPhones) {
         mockBackend.persistOneOffNotification.mockClear();
 
         const input: typeof mockOneOffNotificationInput = {
           ...mockOneOffNotificationInput,
-          emailOrPhone: phone
+          emailOrPhone: phone,
         };
         const notification = { ...mockOneOffNotification, emailOrPhone: phone };
         mockBackend.persistOneOffNotification.mockResolvedValue(notification);
@@ -408,7 +404,7 @@ describe('NotificationService - One-Off Notifications', () => {
 
         const input: typeof mockOneOffNotificationInput = {
           ...mockOneOffNotificationInput,
-          emailOrPhone: invalid
+          emailOrPhone: invalid,
         };
 
         await expect(service.createOneOffNotification(input)).rejects.toThrow(
@@ -428,10 +424,7 @@ describe('NotificationService - One-Off Notifications', () => {
       await service.createOneOffNotification(mockOneOffNotificationInput);
 
       expect(notificationContextgenerators.testContext.generate).toHaveBeenCalledWith({});
-      expect(mockAdapter.send).toHaveBeenCalledWith(
-        mockOneOffNotification,
-        { test: 'context' },
-      );
+      expect(mockAdapter.send).toHaveBeenCalledWith(mockOneOffNotification, { test: 'context' });
     });
 
     it('should mark as sent after successful send', async () => {

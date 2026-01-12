@@ -1,9 +1,9 @@
 import { VintaSendFactory } from '../../index';
+import type { DatabaseNotification } from '../../types/notification';
+import type { BaseLogger } from '../loggers/base-logger';
 import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
-import type { BaseLogger } from '../loggers/base-logger';
 import type { BaseNotificationQueueService } from '../notification-queue-service/base-notification-queue-service';
-import type { DatabaseNotification } from '../../types/notification';
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
 
 // Mock implementations
@@ -50,7 +50,7 @@ const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any>> = {
   injectBackend: jest.fn(),
   backend: mockBackend,
   templateRenderer: mockTemplateRenderer,
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
 } as any;
 
 const mockLogger: jest.Mocked<BaseLogger> = {
@@ -65,16 +65,16 @@ const mockQueueService: jest.Mocked<BaseNotificationQueueService<any>> = {
 };
 
 const notificationContextgenerators = {
-  "testContext": {
+  testContext: {
     generate: jest.fn(),
-  }
+  },
 };
 
 type Config = {
   ContextMap: typeof notificationContextgenerators;
   NotificationIdType: string;
   UserIdType: string;
-}
+};
 
 describe('NotificationService', () => {
   let service: ReturnType<VintaSendFactory<Config>['create']>;
@@ -99,7 +99,12 @@ describe('NotificationService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new VintaSendFactory<Config>().create([mockAdapter], mockBackend, mockLogger, notificationContextgenerators);
+    service = new VintaSendFactory<Config>().create(
+      [mockAdapter],
+      mockBackend,
+      mockLogger,
+      notificationContextgenerators,
+    );
     mockNotification = {
       id: '123',
       notificationType: 'EMAIL' as const,
@@ -146,7 +151,7 @@ describe('NotificationService', () => {
       await service.send(mockNotification);
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        `Error getting context for notification ${mockNotification.id}: ${error}`
+        `Error getting context for notification ${mockNotification.id}: ${error}`,
       );
       expect(mockAdapter.send).not.toHaveBeenCalled();
     });
@@ -156,7 +161,7 @@ describe('NotificationService', () => {
 
       // @ts-ignore - testing invalid input
       await expect(service.send(notificationWithoutId)).rejects.toThrow(
-        "Notification wasn't created in the database"
+        "Notification wasn't created in the database",
       );
     });
 
@@ -183,7 +188,7 @@ describe('NotificationService', () => {
       await service.send(mockNotification);
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error marking notification 123 as sent')
+        expect.stringContaining('Error marking notification 123 as sent'),
       );
     });
 
@@ -198,7 +203,9 @@ describe('NotificationService', () => {
 
       await serviceWithDistributedAdapter.send(mockNotification);
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Distributed adapter found but no queue service provided');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Distributed adapter found but no queue service provided',
+      );
       expect(mockAdapter.send).not.toHaveBeenCalled();
     });
 
@@ -209,7 +216,7 @@ describe('NotificationService', () => {
         mockBackend,
         mockLogger,
         notificationContextgenerators,
-        mockQueueService
+        mockQueueService,
       );
 
       mockQueueService.enqueueNotification.mockRejectedValue(new Error('Queue error'));
@@ -217,7 +224,7 @@ describe('NotificationService', () => {
       await serviceWithQueue.send(mockNotification);
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error enqueuing notification')
+        expect.stringContaining('Error enqueuing notification'),
       );
     });
 
@@ -230,7 +237,7 @@ describe('NotificationService', () => {
       expect(mockAdapter.send).toHaveBeenCalled();
       expect(mockBackend.storeContextUsed).toHaveBeenCalledWith(mockNotification.id, {});
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error storing context for notification')
+        expect.stringContaining('Error storing context for notification'),
       );
     });
 
@@ -241,7 +248,7 @@ describe('NotificationService', () => {
       await service.send(mockNotification);
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error storing context for notification')
+        expect.stringContaining('Error storing context for notification'),
       );
       // Should still complete the send operation
       expect(mockAdapter.send).toHaveBeenCalled();
@@ -290,7 +297,7 @@ describe('NotificationService', () => {
 
       const notification = {
         ...mockNewNotification,
-        sendAfter: pastDate
+        sendAfter: pastDate,
       };
 
       mockBackend.persistNotification.mockResolvedValue({ ...notification, id: '123' });
@@ -299,7 +306,9 @@ describe('NotificationService', () => {
       await service.createNotification(notification);
 
       expect(service.send).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 sent immediately because sendAfter is null or in the past');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Notification 123 sent immediately because sendAfter is null or in the past',
+      );
     });
 
     it('should not send immediately when sendAfter is in the future', async () => {
@@ -308,7 +317,7 @@ describe('NotificationService', () => {
 
       const notification = {
         ...mockNewNotification,
-        sendAfter: futureDate
+        sendAfter: futureDate,
       };
 
       mockBackend.persistNotification.mockResolvedValue({ ...notification, id: '123' });
@@ -331,15 +340,20 @@ describe('NotificationService', () => {
     it('should handle notification with null sendAfter date', async () => {
       const notificationWithNullSendAfter = {
         ...mockNewNotification,
-        sendAfter: null
+        sendAfter: null,
       };
 
-      mockBackend.persistNotification.mockResolvedValue({ ...notificationWithNullSendAfter, id: '123' });
+      mockBackend.persistNotification.mockResolvedValue({
+        ...notificationWithNullSendAfter,
+        id: '123',
+      });
       jest.spyOn(service, 'send').mockResolvedValue();
 
       await service.createNotification(notificationWithNullSendAfter);
 
-      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 sent immediately because sendAfter is null or in the past');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Notification 123 sent immediately because sendAfter is null or in the past',
+      );
       expect(service.send).toHaveBeenCalled();
     });
   });
@@ -371,7 +385,7 @@ describe('NotificationService', () => {
         mockBackend,
         mockLogger,
         notificationContextgenerators,
-        mockQueueService
+        mockQueueService,
       );
 
       mockBackend.getNotification.mockResolvedValue(mockNotification);
@@ -389,7 +403,7 @@ describe('NotificationService', () => {
       await service.delayedSend('123');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Delayed send is not supported if there are no distributed adapters'
+        'Delayed send is not supported if there are no distributed adapters',
       );
     });
 
@@ -401,11 +415,11 @@ describe('NotificationService', () => {
         mockLogger,
         notificationContextgenerators,
         undefined,
-        { raiseErrorOnFailedSend: true }
+        { raiseErrorOnFailedSend: true },
       );
 
       await expect(serviceWithError.delayedSend('123')).rejects.toThrow(
-        new Error('Delayed send is not supported if there are no distributed adapters')
+        new Error('Delayed send is not supported if there are no distributed adapters'),
       );
     });
 
@@ -417,7 +431,7 @@ describe('NotificationService', () => {
         mockBackend,
         mockLogger,
         notificationContextgenerators,
-        mockQueueService
+        mockQueueService,
       );
 
       mockBackend.getNotification.mockResolvedValue(mockNotification);
@@ -427,7 +441,7 @@ describe('NotificationService', () => {
       await serviceWithQueue.delayedSend('123');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error marking notification 123 as sent')
+        expect.stringContaining('Error marking notification 123 as sent'),
       );
       expect(distributedAdapter.send).toHaveBeenCalled();
     });
@@ -440,7 +454,7 @@ describe('NotificationService', () => {
         mockBackend,
         mockLogger,
         notificationContextgenerators,
-        mockQueueService
+        mockQueueService,
       );
 
       mockBackend.getNotification.mockResolvedValue(mockNotification);
@@ -450,7 +464,7 @@ describe('NotificationService', () => {
       await serviceWithQueue.delayedSend('123');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error sending notification 123')
+        expect.stringContaining('Error sending notification 123'),
       );
       expect(mockBackend.markAsFailed).toHaveBeenCalled();
     });
@@ -463,7 +477,7 @@ describe('NotificationService', () => {
         mockBackend,
         mockLogger,
         notificationContextgenerators,
-        mockQueueService
+        mockQueueService,
       );
 
       mockBackend.getNotification.mockResolvedValue(mockNotification);
@@ -473,7 +487,7 @@ describe('NotificationService', () => {
       await serviceWithQueue.delayedSend('123');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error marking notification 123 as failed')
+        expect.stringContaining('Error marking notification 123 as failed'),
       );
     });
   });
@@ -492,7 +506,7 @@ describe('NotificationService', () => {
       mockBackend.persistNotificationUpdate.mockResolvedValue({
         ...mockNotification,
         id: '123',
-        ...updates
+        ...updates,
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
       } as unknown as DatabaseNotification<any>);
 
@@ -538,7 +552,6 @@ describe('NotificationService', () => {
       expect(result).toEqual(mockContext);
     });
 
-
     it('should handle null context generation', async () => {
       notificationContextgenerators.testContext.generate.mockResolvedValue(null);
 
@@ -553,9 +566,17 @@ describe('NotificationService', () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
       const mockPendingNotifications: DatabaseNotification<any>[] = [
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '1', notificationType: 'EMAIL' } as unknown as DatabaseNotification<any>,
+        {
+          ...mockNotification,
+          id: '1',
+          notificationType: 'EMAIL',
+        } as unknown as DatabaseNotification<any>,
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '2', notificationType: 'EMAIL' } as unknown as DatabaseNotification<any>
+        {
+          ...mockNotification,
+          id: '2',
+          notificationType: 'EMAIL',
+        } as unknown as DatabaseNotification<any>,
       ];
       mockBackend.getAllPendingNotifications.mockResolvedValue(mockPendingNotifications);
       notificationContextgenerators.testContext.generate.mockReturnValue({});
@@ -576,17 +597,19 @@ describe('NotificationService', () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
       const mockPendingNotifications: DatabaseNotification<any>[] = [
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any>,
+        { ...mockNotification, id: '1' } as unknown as DatabaseNotification<any>,
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any>
+        { ...mockNotification, id: '2' } as unknown as DatabaseNotification<any>,
       ];
       mockBackend.getAllPendingNotifications.mockResolvedValue(mockPendingNotifications);
-      notificationContextgenerators.testContext.generate.mockRejectedValue(new Error('Context error'));
+      notificationContextgenerators.testContext.generate.mockRejectedValue(
+        new Error('Context error'),
+      );
 
       await service.sendPendingNotifications();
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error getting context for notification')
+        expect.stringContaining('Error getting context for notification'),
       );
       expect(mockAdapter.send).not.toHaveBeenCalled();
     });
@@ -595,17 +618,21 @@ describe('NotificationService', () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
       const mockPendingNotifications: DatabaseNotification<any>[] = [
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any>,
+        { ...mockNotification, id: '1' } as unknown as DatabaseNotification<any>,
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any>
+        { ...mockNotification, id: '2' } as unknown as DatabaseNotification<any>,
       ];
       mockBackend.getAllPendingNotifications.mockResolvedValue(mockPendingNotifications);
       notificationContextgenerators.testContext.generate.mockResolvedValue({});
 
       await service.sendPendingNotifications();
 
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Generated context for notification 1'));
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Generated context for notification 2'));
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Generated context for notification 1'),
+      );
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Generated context for notification 2'),
+      );
     });
 
     it('should handle notification send failure in sendPendingNotifications', async () => {
@@ -617,7 +644,7 @@ describe('NotificationService', () => {
       await service.sendPendingNotifications();
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining(`Error sending notification ${mockNotification.id}`)
+        expect.stringContaining(`Error sending notification ${mockNotification.id}`),
       );
     });
 
@@ -625,20 +652,21 @@ describe('NotificationService', () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
       const notifications: DatabaseNotification<any>[] = [
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any>,
+        { ...mockNotification, id: '1' } as unknown as DatabaseNotification<any>,
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any>
+        { ...mockNotification, id: '2' } as unknown as DatabaseNotification<any>,
       ];
       mockBackend.getAllPendingNotifications.mockResolvedValue(notifications);
       notificationContextgenerators.testContext.generate.mockResolvedValue({});
-      mockAdapter.send.mockRejectedValueOnce(new Error('First send failed'))
-                     .mockResolvedValueOnce();
+      mockAdapter.send
+        .mockRejectedValueOnce(new Error('First send failed'))
+        .mockResolvedValueOnce();
 
       await service.sendPendingNotifications();
 
       expect(mockAdapter.send).toHaveBeenCalledTimes(2);
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error sending notification 1')
+        expect.stringContaining('Error sending notification 1'),
       );
     });
 
@@ -646,9 +674,9 @@ describe('NotificationService', () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
       const mockPendingNotifications: DatabaseNotification<any>[] = [
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '1'} as unknown as DatabaseNotification<any>,
+        { ...mockNotification, id: '1' } as unknown as DatabaseNotification<any>,
         // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-        { ...mockNotification, id: '2'} as unknown as DatabaseNotification<any>
+        { ...mockNotification, id: '2' } as unknown as DatabaseNotification<any>,
       ];
       mockBackend.getAllPendingNotifications.mockResolvedValue(mockPendingNotifications);
       notificationContextgenerators.testContext.generate.mockResolvedValue({});
@@ -663,7 +691,11 @@ describe('NotificationService', () => {
   describe('notification status management', () => {
     it('should mark notification as read', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-      mockBackend.markAsRead.mockResolvedValue({ ...mockNotification, id: '123', readAt: new Date() } as unknown as DatabaseNotification<any>);
+      mockBackend.markAsRead.mockResolvedValue({
+        ...mockNotification,
+        id: '123',
+        readAt: new Date(),
+      } as unknown as DatabaseNotification<any>);
       await service.markRead('123');
       expect(mockBackend.markAsRead).toHaveBeenCalledWith('123', true);
       expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 marked as read');
@@ -689,7 +721,7 @@ describe('NotificationService', () => {
       mockLogger,
       notificationContextgenerators,
       undefined,
-      { raiseErrorOnFailedSend: true }
+      { raiseErrorOnFailedSend: true },
     );
 
     it('should throw error when no adapter found with raiseErrorOnFailedSend enabled', async () => {
@@ -697,12 +729,12 @@ describe('NotificationService', () => {
         id: '123',
         notificationType: 'INVALID',
         contextName: 'testContext',
-        contextParameters: {}
+        contextParameters: {},
       };
 
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
       await expect(serviceWithError.send(invalidNotification as any)).rejects.toThrow(
-        'No adapter found for notification type INVALID'
+        'No adapter found for notification type INVALID',
       );
     });
 
@@ -710,20 +742,18 @@ describe('NotificationService', () => {
       mockBackend.getNotification.mockResolvedValue(null);
 
       await expect(serviceWithError.delayedSend('nonexistent')).rejects.toThrow(
-        'Notification nonexistent not found'
+        'Notification nonexistent not found',
       );
     });
 
     it('should log error when notification not found in delayed send with raiseErrorOnFailedSend disabled', async () => {
       mockBackend.getNotification.mockResolvedValue(null);
       // biome-ignore lint/complexity/useLiteralKeys: <explanation>
-      serviceWithError["options"]["raiseErrorOnFailedSend"] = false;
+      serviceWithError['options']['raiseErrorOnFailedSend'] = false;
 
-      await serviceWithError.delayedSend('nonexistent')
+      await serviceWithError.delayedSend('nonexistent');
 
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Notification nonexistent not found'
-      );
+      expect(mockLogger.error).toHaveBeenCalledWith('Notification nonexistent not found');
     });
   });
 
@@ -735,7 +765,7 @@ describe('NotificationService', () => {
         mockLogger,
         notificationContextgenerators,
         undefined,
-        { raiseErrorOnFailedSend: true }
+        { raiseErrorOnFailedSend: true },
       );
 
       const error = new Error('Context generation failed');
@@ -748,7 +778,11 @@ describe('NotificationService', () => {
   describe('notification retrieval', () => {
     it('should get a single notification', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-      const mockNotif = { ...mockAdapter, id: '123', title: 'Test' } as unknown as DatabaseNotification<any>;
+      const mockNotif = {
+        ...mockAdapter,
+        id: '123',
+        title: 'Test',
+      } as unknown as DatabaseNotification<any>;
       mockBackend.getNotification.mockResolvedValue(mockNotif);
 
       const result = await service.getNotification('123');
@@ -772,21 +806,25 @@ describe('NotificationService', () => {
       const result = await service.resendNotification('123');
 
       expect(result?.id).toBe('456');
-      expect(mockBackend.persistNotification).toHaveBeenCalledWith(expect.objectContaining({
-        userId: mockNotification.userId,
-        notificationType: mockNotification.notificationType,
-        contextName: mockNotification.contextName,
-        contextParameters: mockNotification.contextParameters,
-        contextUsed: newContext,
-      }));
-      expect(mockLogger.info).toHaveBeenCalledWith('Notification 456 created for resending notification 123');
+      expect(mockBackend.persistNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: mockNotification.userId,
+          notificationType: mockNotification.notificationType,
+          contextName: mockNotification.contextName,
+          contextParameters: mockNotification.contextParameters,
+          contextUsed: newContext,
+        }),
+      );
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Notification 456 created for resending notification 123',
+      );
     });
 
     it('should resend a notification using stored context when specified', async () => {
       const storedContext = { test: 'stored context' };
       const notificationWithContext = {
         ...mockNotification,
-        contextUsed: storedContext
+        contextUsed: storedContext,
       };
       mockBackend.getNotification.mockResolvedValue(notificationWithContext);
       mockBackend.persistNotification.mockResolvedValue({ ...notificationWithContext, id: '456' });
@@ -794,9 +832,11 @@ describe('NotificationService', () => {
       const result = await service.resendNotification('123', true);
 
       expect(result?.id).toBe('456');
-      expect(mockBackend.persistNotification).toHaveBeenCalledWith(expect.objectContaining({
-        contextUsed: storedContext,
-      }));
+      expect(mockBackend.persistNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          contextUsed: storedContext,
+        }),
+      );
       expect(notificationContextgenerators.testContext.generate).not.toHaveBeenCalled();
     });
 
@@ -824,7 +864,7 @@ describe('NotificationService', () => {
     it('should fail when using stored context but none exists', async () => {
       const notificationWithoutContext = {
         ...mockNotification,
-        contextUsed: null
+        contextUsed: null,
       };
       mockBackend.getNotification.mockResolvedValue(notificationWithoutContext);
 
@@ -841,12 +881,12 @@ describe('NotificationService', () => {
         mockLogger,
         notificationContextgenerators,
         undefined,
-        { raiseErrorOnFailedSend: true }
+        { raiseErrorOnFailedSend: true },
       );
       mockBackend.getNotification.mockResolvedValue(null);
 
       await expect(serviceWithError.resendNotification('123')).rejects.toThrow(
-        'Notification 123 not found'
+        'Notification 123 not found',
       );
     });
 
@@ -871,7 +911,7 @@ describe('NotificationService', () => {
         mockLogger,
         notificationContextgenerators,
         undefined,
-        { raiseErrorOnFailedSend: true }
+        { raiseErrorOnFailedSend: true },
       );
 
       const futureDate = new Date();
@@ -880,7 +920,7 @@ describe('NotificationService', () => {
       mockBackend.getNotification.mockResolvedValue(scheduledNotification);
 
       await expect(serviceWithError.resendNotification('123')).rejects.toThrow(
-        'Notification 123 is scheduled for the future'
+        'Notification 123 is scheduled for the future',
       );
     });
 
@@ -891,17 +931,17 @@ describe('NotificationService', () => {
         mockLogger,
         notificationContextgenerators,
         undefined,
-        { raiseErrorOnFailedSend: true }
+        { raiseErrorOnFailedSend: true },
       );
 
       const notificationWithoutContext = {
         ...mockNotification,
-        contextUsed: null
+        contextUsed: null,
       };
       mockBackend.getNotification.mockResolvedValue(notificationWithoutContext);
 
       await expect(serviceWithError.resendNotification('123', true)).rejects.toThrow(
-        'Context not found for notification 123'
+        'Context not found for notification 123',
       );
     });
   });

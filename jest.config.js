@@ -12,6 +12,6 @@ module.exports = {
     '!src/implementations/**/*',
   ],
   transform: {
-    '^.+\\.ts$': 'ts-jest'
-  }
+    '^.+\\.ts$': 'ts-jest',
+  },
 };

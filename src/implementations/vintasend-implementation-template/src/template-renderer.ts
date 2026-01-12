@@ -5,19 +5,15 @@ import type {
 } from 'vintasend';
 import type { JsonObject } from 'vintasend/dist/types/json-values';
 
-export class PugEmailTemplateRenderer<
-  Config extends BaseNotificationTypeConfig,
-> implements BaseNotificationTemplateRenderer<Config>
+export class PugEmailTemplateRenderer<Config extends BaseNotificationTypeConfig>
+  implements BaseNotificationTemplateRenderer<Config>
 {
-  async render(
-    notification: DatabaseNotification<Config>,
-    context: JsonObject,
-  ): Promise<unknown> {
+  async render(notification: DatabaseNotification<Config>, context: JsonObject): Promise<unknown> {
     throw new Error('Not implemented');
   }
 }
 
-export class PugEmailTemplateRendererFactory <Config extends BaseNotificationTypeConfig> {
+export class PugEmailTemplateRendererFactory<Config extends BaseNotificationTypeConfig> {
   create() {
     return new PugEmailTemplateRenderer<Config>();
   }

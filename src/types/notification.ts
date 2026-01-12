@@ -2,7 +2,11 @@ import type { InputJsonValue, JsonObject, JsonValue } from './json-values';
 import type { NotificationStatus } from './notification-status';
 import type { NotificationType } from './notification-type';
 import type { BaseNotificationTypeConfig } from './notification-type-config';
-import type { DatabaseOneOffNotification, OneOffNotification, OneOffNotificationInput } from './one-off-notification';
+import type {
+  DatabaseOneOffNotification,
+  OneOffNotification,
+  OneOffNotificationInput,
+} from './one-off-notification';
 
 // Export one-off notification types
 export type {

@@ -1,12 +1,25 @@
 import type { InputJsonValue } from '../../types/json-values';
-import type { DatabaseNotification, Notification, DatabaseOneOffNotification, OneOffNotificationInput, AnyNotification, AnyDatabaseNotification } from '../../types/notification';
+import type {
+  AnyDatabaseNotification,
+  AnyNotification,
+  DatabaseNotification,
+  DatabaseOneOffNotification,
+  Notification,
+  OneOffNotificationInput,
+} from '../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
 
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
   getAllPendingNotifications(): Promise<AnyDatabaseNotification<Config>[]>;
-  getPendingNotifications(page: number, pageSize: number): Promise<AnyDatabaseNotification<Config>[]>;
+  getPendingNotifications(
+    page: number,
+    pageSize: number,
+  ): Promise<AnyDatabaseNotification<Config>[]>;
   getAllFutureNotifications(): Promise<AnyDatabaseNotification<Config>[]>;
-  getFutureNotifications(page: number, pageSize: number): Promise<AnyDatabaseNotification<Config>[]>;
+  getFutureNotifications(
+    page: number,
+    pageSize: number,
+  ): Promise<AnyDatabaseNotification<Config>[]>;
   getAllFutureNotificationsFromUser(
     userId: Config['UserIdType'],
   ): Promise<DatabaseNotification<Config>[]>;
@@ -73,5 +86,8 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     forUpdate: boolean,
   ): Promise<DatabaseOneOffNotification<Config> | null>;
   getAllOneOffNotifications(): Promise<DatabaseOneOffNotification<Config>[]>;
-  getOneOffNotifications(page: number, pageSize: number): Promise<DatabaseOneOffNotification<Config>[]>;
+  getOneOffNotifications(
+    page: number,
+    pageSize: number,
+  ): Promise<DatabaseOneOffNotification<Config>[]>;
 }

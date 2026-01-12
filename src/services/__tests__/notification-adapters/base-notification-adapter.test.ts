@@ -1,9 +1,7 @@
 import { BaseNotificationAdapter } from '../../../services/notification-adapters/base-notification-adapter';
-import type { BaseNotificationTypeConfig } from '../../../types/notification-type-config';
 import type { BaseNotificationTemplateRenderer } from '../../../services/notification-template-renderers/base-notification-template-renderer';
 import type { DatabaseNotification } from '../../../types/notification';
-
-
+import type { BaseNotificationTypeConfig } from '../../../types/notification-type-config';
 
 // Mock implementations
 interface MockConfig extends BaseNotificationTypeConfig {
@@ -52,22 +50,22 @@ describe('BaseNotificationAdapter', () => {
     };
     adapter = new TestNotificationAdapter(templateRenderer, 'EMAIL', false);
     mockNotification = {
-        id: '123',
-        notificationType: 'EMAIL' as const,
-        contextName: 'testContext',
-        contextParameters: {},
-        userId: '456',
-        title: 'Test Notification',
-        bodyTemplate: '/path/to/template',
-        subjectTemplate: '/path/to/subject',
-        extraParams: {},
-        contextUsed: null,
-        adapterUsed: null,
-        status: 'PENDING_SEND' as const,
-        sentAt: null,
-        readAt: null,
-        sendAfter: new Date(),
-      };
+      id: '123',
+      notificationType: 'EMAIL' as const,
+      contextName: 'testContext',
+      contextParameters: {},
+      userId: '456',
+      title: 'Test Notification',
+      bodyTemplate: '/path/to/template',
+      subjectTemplate: '/path/to/subject',
+      extraParams: {},
+      contextUsed: null,
+      adapterUsed: null,
+      status: 'PENDING_SEND' as const,
+      sentAt: null,
+      readAt: null,
+      sendAfter: new Date(),
+    };
   });
 
   describe('constructor', () => {

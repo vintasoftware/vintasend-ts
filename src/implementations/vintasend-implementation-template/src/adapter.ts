@@ -1,32 +1,21 @@
 import { BaseNotificationAdapter } from 'vintasend/dist/services/notification-adapters/base-notification-adapter';
 import type { BaseEmailTemplateRenderer } from 'vintasend/dist/services/notification-template-renderers/base-email-template-renderer';
-import type { DatabaseNotification } from 'vintasend/dist/types/notification';
 import type { JsonObject } from 'vintasend/dist/types/json-values';
-import type{ BaseNotificationTypeConfig } from 'vintasend/dist/types/notification-type-config';
+import type { DatabaseNotification } from 'vintasend/dist/types/notification';
+import type { BaseNotificationTypeConfig } from 'vintasend/dist/types/notification-type-config';
 
 export class NotificationAdapter<
   TemplateRenderer extends BaseEmailTemplateRenderer<Config>,
   Config extends BaseNotificationTypeConfig,
-> extends
-    BaseNotificationAdapter<
-      TemplateRenderer,
-      Config
-    >
-{
+> extends BaseNotificationAdapter<TemplateRenderer, Config> {
   public key: string | null = 'adapter-key'; // TODO: Change this value
 
-  constructor(
-    templateRenderer: TemplateRenderer,
-    enqueueNotifications: boolean,
-  ) {
+  constructor(templateRenderer: TemplateRenderer, enqueueNotifications: boolean) {
     const notificationType = 'EMAIL'; // TODO: Change this value
     super(templateRenderer, notificationType, enqueueNotifications);
   }
 
-  async send(
-    notification: DatabaseNotification<Config>,
-    context: JsonObject,
-  ): Promise<void> {
+  async send(notification: DatabaseNotification<Config>, context: JsonObject): Promise<void> {
     if (!this.backend) {
       throw new Error('Backend not injected');
     }
@@ -52,6 +41,9 @@ export class NotificationAdapterFactory<Config extends BaseNotificationTypeConfi
     templateRenderer: TemplateRenderer,
     enqueueNotifications: boolean,
   ) {
-    return new NotificationAdapter<TemplateRenderer, Config>(templateRenderer, enqueueNotifications);
+    return new NotificationAdapter<TemplateRenderer, Config>(
+      templateRenderer,
+      enqueueNotifications,
+    );
   }
 }

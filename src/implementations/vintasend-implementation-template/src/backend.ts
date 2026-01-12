@@ -3,31 +3,22 @@ import type { InputJsonValue } from 'vintasend/dist/types/json-values';
 import type { DatabaseNotification, NotificationInput } from 'vintasend/dist/types/notification';
 import type { BaseNotificationTypeConfig } from 'vintasend/dist/types/notification-type-config';
 
-
-export class NotificationBackend<
-  Config extends BaseNotificationTypeConfig
-> implements BaseNotificationBackend<Config> {
-    async getAllPendingNotifications(): Promise<
-    DatabaseNotification<Config>[]
-  > {
+export class NotificationBackend<Config extends BaseNotificationTypeConfig>
+  implements BaseNotificationBackend<Config>
+{
+  async getAllPendingNotifications(): Promise<DatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  async getPendingNotifications(): Promise<
-    DatabaseNotification<Config>[]
-  > {
+  async getPendingNotifications(): Promise<DatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  async getAllFutureNotifications(): Promise<
-    DatabaseNotification<Config>[]
-  > {
+  async getAllFutureNotifications(): Promise<DatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  async getFutureNotifications(): Promise<
-    DatabaseNotification<Config>[]
-  > {
+  async getFutureNotifications(): Promise<DatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
@@ -51,9 +42,7 @@ export class NotificationBackend<
 
   async persistNotificationUpdate(
     notificationId: Config['NotificationIdType'],
-    notification: Partial<
-      Omit<DatabaseNotification<Config>, 'id'>
-    >,
+    notification: Partial<Omit<DatabaseNotification<Config>, 'id'>>,
   ): Promise<DatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
@@ -79,9 +68,7 @@ export class NotificationBackend<
     throw new Error('Method not implemented.');
   }
 
-  async cancelNotification(
-    notificationId: Config['NotificationIdType'],
-  ): Promise<void> {
+  async cancelNotification(notificationId: Config['NotificationIdType']): Promise<void> {
     throw new Error('Method not implemented.');
   }
 
@@ -120,9 +107,7 @@ export class NotificationBackend<
   }
 }
 
-export class NotificationBackendFactory<
-  Config extends BaseNotificationTypeConfig
-> {
+export class NotificationBackendFactory<Config extends BaseNotificationTypeConfig> {
   create() {
     return new NotificationBackend<Config>();
   }

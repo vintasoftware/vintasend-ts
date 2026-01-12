@@ -1,13 +1,13 @@
-import type { BaseNotificationBackend } from '../base-notification-backend';
-import type { BaseNotificationTypeConfig } from '../../../types/notification-type-config';
+import type { InputJsonValue } from '../../../types/json-values';
 import type {
+  AnyDatabaseNotification,
   DatabaseNotification,
   DatabaseOneOffNotification,
   Notification,
   OneOffNotificationInput,
-  AnyDatabaseNotification,
 } from '../../../types/notification';
-import type { InputJsonValue } from '../../../types/json-values';
+import type { BaseNotificationTypeConfig } from '../../../types/notification-type-config';
+import type { BaseNotificationBackend } from '../base-notification-backend';
 
 // Test configuration type
 type TestContextMap = {
@@ -38,7 +38,9 @@ describe('BaseNotificationBackend Interface', () => {
         getAllNotifications: jest.fn().mockResolvedValue([]),
         getNotifications: jest.fn().mockResolvedValue([]),
         bulkPersistNotifications: jest.fn().mockResolvedValue([]),
-        persistNotificationUpdate: jest.fn().mockResolvedValue({} as DatabaseNotification<TestConfig>),
+        persistNotificationUpdate: jest
+          .fn()
+          .mockResolvedValue({} as DatabaseNotification<TestConfig>),
         markAsSent: jest.fn().mockResolvedValue({} as DatabaseNotification<TestConfig>),
         markAsFailed: jest.fn().mockResolvedValue({} as DatabaseNotification<TestConfig>),
         markAsRead: jest.fn().mockResolvedValue({} as DatabaseNotification<TestConfig>),
@@ -50,8 +52,12 @@ describe('BaseNotificationBackend Interface', () => {
         storeContextUsed: jest.fn().mockResolvedValue(undefined),
 
         // One-off notification methods
-        persistOneOffNotification: jest.fn().mockResolvedValue({} as DatabaseOneOffNotification<TestConfig>),
-        persistOneOffNotificationUpdate: jest.fn().mockResolvedValue({} as DatabaseOneOffNotification<TestConfig>),
+        persistOneOffNotification: jest
+          .fn()
+          .mockResolvedValue({} as DatabaseOneOffNotification<TestConfig>),
+        persistOneOffNotificationUpdate: jest
+          .fn()
+          .mockResolvedValue({} as DatabaseOneOffNotification<TestConfig>),
         getOneOffNotification: jest.fn().mockResolvedValue(null),
         getAllOneOffNotifications: jest.fn().mockResolvedValue([]),
         getOneOffNotifications: jest.fn().mockResolvedValue([]),
@@ -100,7 +106,9 @@ describe('BaseNotificationBackend Interface', () => {
       };
 
       const mockBackend: BaseNotificationBackend<TestConfig> = {
-        getAllPendingNotifications: jest.fn().mockResolvedValue([regularNotification, oneOffNotification]),
+        getAllPendingNotifications: jest
+          .fn()
+          .mockResolvedValue([regularNotification, oneOffNotification]),
         getPendingNotifications: jest.fn().mockResolvedValue([]),
         getAllFutureNotifications: jest.fn().mockResolvedValue([]),
         getFutureNotifications: jest.fn().mockResolvedValue([]),
@@ -282,7 +290,9 @@ describe('BaseNotificationBackend Interface', () => {
         getUserEmailFromNotification: jest.fn(),
         storeContextUsed: jest.fn(),
         persistOneOffNotification: jest.fn(),
-        persistOneOffNotificationUpdate: jest.fn().mockResolvedValue({} as DatabaseOneOffNotification<TestConfig>),
+        persistOneOffNotificationUpdate: jest
+          .fn()
+          .mockResolvedValue({} as DatabaseOneOffNotification<TestConfig>),
         getOneOffNotification: jest.fn(),
         getAllOneOffNotifications: jest.fn(),
         getOneOffNotifications: jest.fn(),
@@ -380,8 +390,10 @@ describe('BaseNotificationBackend Interface', () => {
     it('should have correct return types for methods that now return union types', () => {
       // Type-only test - if this compiles, the types are correct
       const testReturnTypes = async (backend: BaseNotificationBackend<TestConfig>) => {
-        const pending: AnyDatabaseNotification<TestConfig>[] = await backend.getAllPendingNotifications();
-        const notification: AnyDatabaseNotification<TestConfig> | null = await backend.getNotification('1', false);
+        const pending: AnyDatabaseNotification<TestConfig>[] =
+          await backend.getAllPendingNotifications();
+        const notification: AnyDatabaseNotification<TestConfig> | null =
+          await backend.getNotification('1', false);
         const sent: AnyDatabaseNotification<TestConfig> = await backend.markAsSent('1', true);
         const failed: AnyDatabaseNotification<TestConfig> = await backend.markAsFailed('1', true);
 

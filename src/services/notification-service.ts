@@ -1,23 +1,33 @@
-import type { DatabaseNotification, Notification, AnyNotification, AnyDatabaseNotification, DatabaseOneOffNotification } from '../types/notification';
-import type { OneOffNotificationInput } from '../types/one-off-notification';
 import type { JsonObject } from '../types/json-values';
+import type {
+  AnyDatabaseNotification,
+  AnyNotification,
+  DatabaseNotification,
+  DatabaseOneOffNotification,
+  Notification,
+} from '../types/notification';
 import type { BaseNotificationTypeConfig } from '../types/notification-type-config';
-import { isOneOffNotification, type BaseNotificationAdapter } from './notification-adapters/base-notification-adapter';
-import type { BaseNotificationTemplateRenderer } from './notification-template-renderers/base-notification-template-renderer';
-import type { BaseNotificationBackend } from './notification-backends/base-notification-backend';
+import type { OneOffNotificationInput } from '../types/one-off-notification';
 import type { BaseLogger } from './loggers/base-logger';
-import type { BaseNotificationQueueService } from './notification-queue-service/base-notification-queue-service';
+import {
+  type BaseNotificationAdapter,
+  isOneOffNotification,
+} from './notification-adapters/base-notification-adapter';
+import type { BaseNotificationBackend } from './notification-backends/base-notification-backend';
 import { NotificationContextGeneratorsMap } from './notification-context-generators-map';
+import type { BaseNotificationQueueService } from './notification-queue-service/base-notification-queue-service';
+import type { BaseNotificationTemplateRenderer } from './notification-template-renderers/base-notification-template-renderer';
 
 type VintaSendOptions = {
   raiseErrorOnFailedSend: boolean;
 };
 
-export class VintaSendFactory<
-  Config extends BaseNotificationTypeConfig
-> {
+export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
   create<
-    AdaptersList extends BaseNotificationAdapter<BaseNotificationTemplateRenderer<Config>, Config>[],
+    AdaptersList extends BaseNotificationAdapter<
+      BaseNotificationTemplateRenderer<Config>,
+      Config
+    >[],
     Backend extends BaseNotificationBackend<Config>,
     Logger extends BaseLogger,
     QueueService extends BaseNotificationQueueService<Config>,
@@ -31,13 +41,7 @@ export class VintaSendFactory<
       raiseErrorOnFailedSend: false,
     },
   ) {
-    return new VintaSend<
-      Config,
-      AdaptersList,
-      Backend,
-      Logger,
-      QueueService
-    >(
+    return new VintaSend<Config, AdaptersList, Backend, Logger, QueueService>(
       adapters,
       backend,
       logger,
@@ -76,9 +80,7 @@ export class VintaSend<
     this.queueService = queueService;
   }
 
-  async send(
-    notification: AnyDatabaseNotification<Config>,
-  ): Promise<void> {
+  async send(notification: AnyDatabaseNotification<Config>): Promise<void> {
     const adaptersOfType = this.adapters.filter(
       (adapter) => adapter.notificationType === notification.notificationType,
     );
@@ -103,10 +105,14 @@ export class VintaSend<
         try {
           this.logger.info(`Enqueuing notification ${notification.id} with adapter ${adapter.key}`);
           await this.queueService.enqueueNotification(notification.id);
-          this.logger.info(`Enqueued notification ${notification.id} with adapter ${adapter.key} successfully`);
+          this.logger.info(
+            `Enqueued notification ${notification.id} with adapter ${adapter.key} successfully`,
+          );
           continue;
         } catch (enqueueError) {
-          this.logger.error(`Error enqueuing notification ${notification.id}: ${enqueueError} with adapter ${adapter.key}`);
+          this.logger.error(
+            `Error enqueuing notification ${notification.id}: ${enqueueError} with adapter ${adapter.key}`,
+          );
           continue;
         }
       }
@@ -115,7 +121,6 @@ export class VintaSend<
       if (notification.contextUsed) {
         context = notification.contextUsed;
       } else {
-
         try {
           context = await this.getNotificationContext(
             notification.contextName,
@@ -123,7 +128,9 @@ export class VintaSend<
           );
           this.logger.info(`Generated context for notification ${notification.id}`);
         } catch (contextError) {
-          this.logger.error(`Error getting context for notification ${notification.id}: ${contextError}`);
+          this.logger.error(
+            `Error getting context for notification ${notification.id}: ${contextError}`,
+          );
           if (this.options.raiseErrorOnFailedSend) {
             throw contextError;
           }
@@ -134,7 +141,9 @@ export class VintaSend<
       try {
         this.logger.info(`Sending notification ${notification.id} with adapter ${adapter.key}`);
         await adapter.send(notification, context);
-        this.logger.info(`Sent notification ${notification.id} with adapter ${adapter.key} successfully`);
+        this.logger.info(
+          `Sent notification ${notification.id} with adapter ${adapter.key} successfully`,
+        );
       } catch (sendError) {
         this.logger.error(
           `Error sending notification ${notification.id} with adapter ${adapter.key}: ${sendError}`,
@@ -174,10 +183,14 @@ export class VintaSend<
     this.logger.error(`Notification ${createdNotification.id} created`);
 
     if (!notification.sendAfter || notification.sendAfter <= new Date()) {
-      this.logger.info(`Notification ${createdNotification.id} sent immediately because sendAfter is null or in the past`);
+      this.logger.info(
+        `Notification ${createdNotification.id} sent immediately because sendAfter is null or in the past`,
+      );
       await this.send(createdNotification);
     } else {
-      this.logger.info(`Notification ${createdNotification.id} scheduled for ${notification.sendAfter}`);
+      this.logger.info(
+        `Notification ${createdNotification.id} scheduled for ${notification.sendAfter}`,
+      );
     }
 
     return createdNotification;
@@ -185,11 +198,12 @@ export class VintaSend<
 
   async updateNotification(
     notificationId: Config['NotificationIdType'],
-    notification: Partial<
-      Omit<Notification<Config>, 'id'>
-    >,
+    notification: Partial<Omit<Notification<Config>, 'id'>>,
   ) {
-    const updatedNotification = this.backend.persistNotificationUpdate(notificationId, notification);
+    const updatedNotification = this.backend.persistNotificationUpdate(
+      notificationId,
+      notification,
+    );
     this.logger.info(`Notification ${notificationId} updated`);
     return updatedNotification;
   }
@@ -214,7 +228,9 @@ export class VintaSend<
       this.logger.info(`One-off notification ${createdNotification.id} sent immediately`);
       await this.send(createdNotification);
     } else {
-      this.logger.info(`One-off notification ${createdNotification.id} scheduled for ${notification.sendAfter}`);
+      this.logger.info(
+        `One-off notification ${createdNotification.id} scheduled for ${notification.sendAfter}`,
+      );
     }
 
     return createdNotification;
@@ -258,7 +274,9 @@ export class VintaSend<
    */
   private validateEmailOrPhone(emailOrPhone: string): void {
     // Basic non-empty check
-    if (emailOrPhone === '' || emailOrPhone.trim() === '') { throw new Error('emailOrPhone cannot be empty'); }
+    if (emailOrPhone === '' || emailOrPhone.trim() === '') {
+      throw new Error('emailOrPhone cannot be empty');
+    }
     // Check if it's an email (has @ with characters before and after)
     const isEmail = /^.+@.+\..+$/.test(emailOrPhone);
     // Check if it's a phone (10-15 digits, optionally starting with +)
@@ -277,7 +295,11 @@ export class VintaSend<
     return this.backend.getAllFutureNotificationsFromUser(userId);
   }
 
-  async getFutureNotificationsFromUser(userId: Config['NotificationIdType'], page: number, pageSize: number) {
+  async getFutureNotificationsFromUser(
+    userId: Config['NotificationIdType'],
+    page: number,
+    pageSize: number,
+  ) {
     return this.backend.getFutureNotificationsFromUser(userId, page, pageSize);
   }
 
@@ -287,7 +309,9 @@ export class VintaSend<
 
   async getNotificationContext<ContextName extends string & keyof Config['ContextMap']>(
     contextName: ContextName,
-    parameters: Parameters<ReturnType<typeof this.contextGeneratorsMap.getContextGenerator<ContextName>>['generate']>[0],
+    parameters: Parameters<
+      ReturnType<typeof this.contextGeneratorsMap.getContextGenerator<ContextName>>['generate']
+    >[0],
   ) {
     const context = this.contextGeneratorsMap.getContextGenerator(contextName).generate(parameters);
 
@@ -299,11 +323,7 @@ export class VintaSend<
 
   async sendPendingNotifications(): Promise<void> {
     const pendingNotifications = await this.backend.getAllPendingNotifications();
-    await Promise.all(
-      pendingNotifications.map((notification) =>
-        this.send(notification),
-      ),
-    );
+    await Promise.all(pendingNotifications.map((notification) => this.send(notification)));
   }
 
   async getPendingNotifications(page: number, pageSize: number) {
@@ -328,7 +348,10 @@ export class VintaSend<
     return this.backend.getOneOffNotification(notificationId, forUpdate);
   }
 
-  async markRead(notificationId: Config['NotificationIdType'], checkIsSent = true): Promise<DatabaseNotification<Config>> {
+  async markRead(
+    notificationId: Config['NotificationIdType'],
+    checkIsSent = true,
+  ): Promise<DatabaseNotification<Config>> {
     const notification = await this.backend.markAsRead(notificationId, checkIsSent);
     this.logger.info(`Notification ${notificationId} marked as read`);
     return notification;
@@ -343,7 +366,10 @@ export class VintaSend<
     this.logger.info(`Notification ${notificationId} cancelled`);
   }
 
-  async resendNotification(notificationId: Config['NotificationIdType'], useStoredContextIfAvailable = false): Promise<DatabaseNotification<Config> | undefined> {
+  async resendNotification(
+    notificationId: Config['NotificationIdType'],
+    useStoredContextIfAvailable = false,
+  ): Promise<DatabaseNotification<Config> | undefined> {
     const notification = await this.getNotification(notificationId, false);
 
     if (!notification) {
@@ -356,9 +382,13 @@ export class VintaSend<
 
     // Check if this is a one-off notification (which cannot be resent this way)
     if (isOneOffNotification(notification)) {
-      this.logger.error(`Cannot resend one-off notification ${notificationId} using resendNotification. One-off notifications are not supported.`);
+      this.logger.error(
+        `Cannot resend one-off notification ${notificationId} using resendNotification. One-off notifications are not supported.`,
+      );
       if (this.options.raiseErrorOnFailedSend) {
-        throw new Error(`Cannot resend one-off notification ${notificationId}. One-off notifications must be resent using a different method.`);
+        throw new Error(
+          `Cannot resend one-off notification ${notificationId}. One-off notifications must be resent using a different method.`,
+        );
       }
       return;
     }
@@ -409,10 +439,11 @@ export class VintaSend<
       createdNotification = await this.backend.persistNotification(notificationResendInput);
     }
 
-    this.logger.info(`Notification ${createdNotification.id} created for resending notification ${notificationId}`);
+    this.logger.info(
+      `Notification ${createdNotification.id} created for resending notification ${notificationId}`,
+    );
     this.send(createdNotification);
     return createdNotification;
-
   }
 
   async delayedSend(notificationId: Config['NotificationIdType']): Promise<void> {
@@ -466,7 +497,6 @@ export class VintaSend<
           `Error marking notification ${notification.id} as sent: ${markSentError}`,
         );
       }
-
     }
 
     try {
@@ -484,11 +514,15 @@ export class VintaSend<
     return this.backend.bulkPersistNotifications(notifications);
   }
 
-  async migrateToBackend<
-    DestinationBackend extends BaseNotificationBackend<Config>
-  >(destinationBackend: DestinationBackend, batchSize = 5000): Promise<void> {
+  async migrateToBackend<DestinationBackend extends BaseNotificationBackend<Config>>(
+    destinationBackend: DestinationBackend,
+    batchSize = 5000,
+  ): Promise<void> {
     let pageNumber = 0;
-    let allNotifications: AnyDatabaseNotification<Config>[] = await this.backend.getNotifications(pageNumber, batchSize);
+    let allNotifications: AnyDatabaseNotification<Config>[] = await this.backend.getNotifications(
+      pageNumber,
+      batchSize,
+    );
 
     while (allNotifications.length > 0) {
       pageNumber += 1;
