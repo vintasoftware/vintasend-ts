@@ -1,9 +1,13 @@
+import type { JsonObject, JsonValue } from '../../types/json-values';
+import type {
+  AnyDatabaseNotification,
+  DatabaseNotification,
+  DatabaseOneOffNotification,
+} from '../../types/notification';
 import type { NotificationType } from '../../types/notification-type';
-import type { DatabaseNotification, DatabaseOneOffNotification, AnyDatabaseNotification } from '../../types/notification';
-import type { BaseNotificationTemplateRenderer } from '../notification-template-renderers/base-notification-template-renderer';
-import type { JsonValue, JsonObject } from '../../types/json-values';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
+import type { BaseNotificationTemplateRenderer } from '../notification-template-renderers/base-notification-template-renderer';
 
 /**
  * Type guard to check if a notification is a one-off notification
@@ -11,7 +15,9 @@ import type { BaseNotificationBackend } from '../notification-backends/base-noti
 export function isOneOffNotification<Config extends BaseNotificationTypeConfig>(
   notification: AnyDatabaseNotification<Config>,
 ): notification is DatabaseOneOffNotification<Config> {
-  return 'emailOrPhone' in notification && 'firstName' in notification && 'lastName' in notification;
+  return (
+    'emailOrPhone' in notification && 'firstName' in notification && 'lastName' in notification
+  );
 }
 
 export abstract class BaseNotificationAdapter<
@@ -25,17 +31,14 @@ export abstract class BaseNotificationAdapter<
     protected templateRenderer: TemplateRenderer,
     public readonly notificationType: NotificationType,
     public readonly enqueueNotifications: boolean,
-  ) {};
+  ) {}
 
-  send(
-    notification: AnyDatabaseNotification<Config>,
-    context: JsonValue,
-  ): Promise<void> {
+  send(notification: AnyDatabaseNotification<Config>, context: JsonValue): Promise<void> {
     if (this.backend === null) {
       return Promise.reject(new Error('Backend not injected'));
     }
     return Promise.resolve();
-  };
+  }
 
   /**
    * Get the recipient email address from a notification.
@@ -94,9 +97,7 @@ export abstract class BaseNotificationAdapter<
     };
   }
 
-  injectBackend(
-    backend: BaseNotificationBackend<Config>,
-  ): void {
+  injectBackend(backend: BaseNotificationBackend<Config>): void {
     this.backend = backend;
-  };
+  }
 }

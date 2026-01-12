@@ -1,19 +1,20 @@
-import { BaseNotificationAdapter, isOneOffNotification } from '../base-notification-adapter';
+import type { JsonObject } from '../../../types/json-values';
+import type {
+  AnyDatabaseNotification,
+  DatabaseNotification,
+  DatabaseOneOffNotification,
+} from '../../../types/notification';
 import type { BaseNotificationBackend } from '../../notification-backends/base-notification-backend';
 import type { BaseNotificationTemplateRenderer } from '../../notification-template-renderers/base-notification-template-renderer';
-import type { DatabaseNotification, DatabaseOneOffNotification, AnyDatabaseNotification } from '../../../types/notification';
-import type { JsonObject } from '../../../types/json-values';
+import { BaseNotificationAdapter, isOneOffNotification } from '../base-notification-adapter';
 
 // Test adapter implementation
 class TestAdapter<
   TemplateRenderer extends BaseNotificationTemplateRenderer<Config>,
   // biome-ignore lint/suspicious/noExplicitAny: Testing with generic config
-  Config extends { ContextMap: any; NotificationIdType: string; UserIdType: string }
+  Config extends { ContextMap: any; NotificationIdType: string; UserIdType: string },
 > extends BaseNotificationAdapter<TemplateRenderer, Config> {
-  async send(
-    notification: AnyDatabaseNotification<Config>,
-    context: JsonObject,
-  ): Promise<void> {
+  async send(notification: AnyDatabaseNotification<Config>, context: JsonObject): Promise<void> {
     // Test implementation that uses helper methods
     const email = await this.getRecipientEmail(notification);
     const name = this.getRecipientName(notification, context);
@@ -22,13 +23,15 @@ class TestAdapter<
   }
 
   // Expose protected methods for testing
-  public async testGetRecipientEmail(notification: AnyDatabaseNotification<Config>): Promise<string> {
+  public async testGetRecipientEmail(
+    notification: AnyDatabaseNotification<Config>,
+  ): Promise<string> {
     return this.getRecipientEmail(notification);
   }
 
   public testGetRecipientName(
     notification: AnyDatabaseNotification<Config>,
-    context: JsonObject | null
+    context: JsonObject | null,
   ): { firstName: string; lastName: string } {
     // biome-ignore lint/suspicious/noExplicitAny: Test method needs flexibility
     return this.getRecipientName(notification, context as any);
@@ -209,7 +212,7 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
       mockBackend.getUserEmailFromNotification.mockResolvedValue(undefined);
 
       await expect(adapter.testGetRecipientEmail(regularNotification)).rejects.toThrow(
-        'User email not found for notification 123'
+        'User email not found for notification 123',
       );
     });
 
@@ -234,9 +237,9 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         sendAfter: null,
       };
 
-      await expect(adapterWithoutBackend.testGetRecipientEmail(regularNotification)).rejects.toThrow(
-        'Backend not injected'
-      );
+      await expect(
+        adapterWithoutBackend.testGetRecipientEmail(regularNotification),
+      ).rejects.toThrow('Backend not injected');
     });
   });
 
