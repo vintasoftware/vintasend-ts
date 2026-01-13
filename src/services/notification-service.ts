@@ -56,6 +56,15 @@ export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
   }
 }
 
+// Type guard to check if backend has attachment manager injection support
+function hasAttachmentManagerInjection<Config extends BaseNotificationTypeConfig>(
+  backend: BaseNotificationBackend<Config>,
+): backend is BaseNotificationBackend<Config> & {
+  injectAttachmentManager(manager: BaseAttachmentManager): void;
+} {
+  return 'injectAttachmentManager' in backend && typeof (backend as any).injectAttachmentManager === 'function';
+}
+
 export class VintaSend<
   Config extends BaseNotificationTypeConfig,
   AdaptersList extends BaseNotificationAdapter<BaseNotificationTemplateRenderer<Config>, Config>[],
@@ -82,8 +91,8 @@ export class VintaSend<
       adapter.injectLogger(logger);
     }
     // Inject attachment manager into backend if both exist
-    if (this.attachmentManager && 'injectAttachmentManager' in backend) {
-      (backend as any).injectAttachmentManager(this.attachmentManager);
+    if (this.attachmentManager && hasAttachmentManagerInjection(backend)) {
+      backend.injectAttachmentManager(this.attachmentManager);
     }
   }
 

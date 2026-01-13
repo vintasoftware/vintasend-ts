@@ -1543,6 +1543,15 @@ export type { S3AttachmentManagerConfig } from './s3-attachment-manager';
 Update constructor to accept AttachmentManager and pass it to backend:
 
 ```typescript
+// Type guard to check if backend has attachment manager injection support
+function hasAttachmentManagerInjection<Config extends BaseNotificationTypeConfig>(
+  backend: BaseNotificationBackend<Config>,
+): backend is BaseNotificationBackend<Config> & {
+  injectAttachmentManager(manager: BaseAttachmentManager): void;
+} {
+  return 'injectAttachmentManager' in backend && typeof (backend as any).injectAttachmentManager === 'function';
+}
+
 export class VintaSend<
   Config extends BaseNotificationTypeConfig,
   AdaptersList extends BaseNotificationAdapter<BaseNotificationTemplateRenderer<Config>, Config>[],
@@ -1567,8 +1576,8 @@ export class VintaSend<
       adapter.injectBackend(backend);
     }
     // Inject attachment manager into backend if both exist
-    if (this.attachmentManager && 'injectAttachmentManager' in backend) {
-      (backend as any).injectAttachmentManager(this.attachmentManager);
+    if (this.attachmentManager && hasAttachmentManagerInjection(backend)) {
+      backend.injectAttachmentManager(this.attachmentManager);
     }
   }
 
