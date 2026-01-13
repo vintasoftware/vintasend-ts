@@ -346,12 +346,6 @@ This document tracks the progress of implementing attachment support in VintaSen
 
 ---
 
-## Phase 9: Integration Example ⏳
-
-### Status: NOT STARTED
-
----
-
 ## Phase 10: Documentation and Polish ⏳
 
 ### Status: NOT STARTED
