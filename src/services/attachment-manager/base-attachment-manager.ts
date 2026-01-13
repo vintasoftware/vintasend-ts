@@ -1,5 +1,6 @@
 import * as crypto from 'node:crypto';
 import * as mime from 'mime-types';
+import type { Readable } from 'node:stream';
 import {
   type AttachmentFile,
   type AttachmentFileRecord,
@@ -50,8 +51,13 @@ export abstract class BaseAttachmentManager {
     if (Buffer.isBuffer(file)) {
       return file;
     }
-    if (file instanceof ReadableStream) {
-      return this.streamToBuffer(file);
+    // Support both Web ReadableStream and Node.js Readable streams
+    if (typeof ReadableStream !== 'undefined' && file instanceof ReadableStream) {
+      return this.webStreamToBuffer(file);
+    }
+    // Check for Node.js Readable stream
+    if (this.isNodeReadable(file)) {
+      return this.nodeStreamToBuffer(file);
     }
     if (typeof file === 'string') {
       const fs = await import('node:fs/promises');
@@ -60,7 +66,23 @@ export abstract class BaseAttachmentManager {
     throw new Error('Unsupported file type');
   }
 
-  private async streamToBuffer(stream: ReadableStream): Promise<Buffer> {
+  /**
+   * Type guard to check if value is a Node.js Readable stream
+   */
+  private isNodeReadable(value: unknown): value is Readable {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      typeof (value as any).read === 'function' &&
+      typeof (value as any).on === 'function' &&
+      typeof (value as any).pipe === 'function'
+    );
+  }
+
+  /**
+   * Convert Web ReadableStream to Buffer
+   */
+  private async webStreamToBuffer(stream: ReadableStream): Promise<Buffer> {
     const reader = stream.getReader();
     const chunks: Uint8Array[] = [];
 
@@ -71,5 +93,18 @@ export abstract class BaseAttachmentManager {
     }
 
     return Buffer.concat(chunks);
+  }
+
+  /**
+   * Convert Node.js Readable stream to Buffer
+   */
+  private async nodeStreamToBuffer(stream: Readable): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+
+    return new Promise((resolve, reject) => {
+      stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+      stream.on('error', reject);
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+    });
   }
 }

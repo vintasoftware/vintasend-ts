@@ -962,4 +962,111 @@ describe('NotificationService', () => {
       );
     });
   });
+
+  describe('VintaSend constructor wiring', () => {
+    it('injects logger into adapter when constructing VintaSend', () => {
+      const adapterMock = {
+        injectLogger: jest.fn(),
+        injectBackend: jest.fn(),
+        notificationType: 'EMAIL',
+        key: 'test-adapter',
+      } as any;
+
+      const backendMock = {
+        // basic backend stub
+      } as any;
+
+      new VintaSendFactory<Config>().create(
+        [adapterMock],
+        backendMock,
+        mockLogger,
+        notificationContextgenerators,
+        undefined,
+        undefined,
+        { raiseErrorOnFailedSend: true },
+      );
+
+      expect(adapterMock.injectLogger).toHaveBeenCalledTimes(1);
+      expect(adapterMock.injectLogger).toHaveBeenCalledWith(mockLogger);
+    });
+
+    it('injects attachment manager into backends that support it when constructing VintaSend', () => {
+      const adapterMock = {
+        injectLogger: jest.fn(),
+        injectBackend: jest.fn(),
+        notificationType: 'EMAIL',
+        key: 'test-adapter',
+      } as any;
+
+      const backendWithoutInjection = {
+        // basic backend stub without injectAttachmentManager
+      } as any;
+
+      const backendWithAttachmentInjection = {
+        injectAttachmentManager: jest.fn(),
+      } as any;
+
+      const mockAttachmentManager = {
+        uploadFile: jest.fn(),
+        deleteFile: jest.fn(),
+        reconstructAttachmentFile: jest.fn(),
+      } as any;
+
+      // Test backend without injection - should not throw
+      new VintaSendFactory<Config>().create(
+        [adapterMock],
+        backendWithoutInjection,
+        mockLogger,
+        notificationContextgenerators,
+        undefined,
+        mockAttachmentManager,
+        { raiseErrorOnFailedSend: true },
+      );
+
+      // Backend without the injection method should not be called
+      expect((backendWithoutInjection as any).injectAttachmentManager).toBeUndefined();
+
+      // Test backend with injection
+      new VintaSendFactory<Config>().create(
+        [adapterMock],
+        backendWithAttachmentInjection,
+        mockLogger,
+        notificationContextgenerators,
+        undefined,
+        mockAttachmentManager,
+        { raiseErrorOnFailedSend: true },
+      );
+
+      expect(backendWithAttachmentInjection.injectAttachmentManager).toHaveBeenCalledTimes(1);
+      expect(backendWithAttachmentInjection.injectAttachmentManager).toHaveBeenCalledWith(
+        mockAttachmentManager,
+      );
+    });
+
+    it('does not inject attachment manager when none is provided', () => {
+      const adapterMock = {
+        injectLogger: jest.fn(),
+        injectBackend: jest.fn(),
+        notificationType: 'EMAIL',
+        key: 'test-adapter',
+      } as any;
+
+      const backendWithAttachmentInjection = {
+        injectAttachmentManager: jest.fn(),
+      } as any;
+
+      new VintaSendFactory<Config>().create(
+        [adapterMock],
+        backendWithAttachmentInjection,
+        mockLogger,
+        notificationContextgenerators,
+        undefined,
+        undefined, // No attachment manager
+        { raiseErrorOnFailedSend: true },
+      );
+
+      // Should not be called when no attachment manager is provided
+      expect(backendWithAttachmentInjection.injectAttachmentManager).not.toHaveBeenCalled();
+    });
+  });
 });

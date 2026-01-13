@@ -1929,9 +1929,9 @@ Implement local filesystem storage for development:
 - No external dependencies
 - Quick setup for prototyping
 
-#### 11.3 Configure the example project to use local-stack
+#### 11.3 Configure the example project to use LocalStack
 
-Configure the example project to use local-stack for emulating S3 so we can upload files without accessing the internet in development.
+Configure the example project to use LocalStack for emulating S3 so we can upload files without accessing the internet in development.
 
 ---
 

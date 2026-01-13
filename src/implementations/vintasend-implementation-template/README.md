@@ -20,7 +20,7 @@ These errors are expected for the template and will resolve when you create an a
 The `TemplateAttachmentManager` provides a structure for implementing file attachment storage for notifications.
 
 **Supported Storage Backends:**
-- AWS S3 (see [`vintasend-s3-attachments`](../vintasend-s3-attachments))
+- AWS S3 (see [`vintasend-aws-s3-attachments`](../vintasend-aws-s3-attachments))
 - Azure Blob Storage
 - Google Cloud Storage
 - Local Filesystem (development only)

@@ -2,7 +2,7 @@
 export type FileAttachment =
   | Buffer // Raw bytes
   | ReadableStream // Stream
-  | string; // File path or URL
+  | string; // File path
 
 // For creating new attachments (inline upload)
 export interface NotificationAttachmentUpload {

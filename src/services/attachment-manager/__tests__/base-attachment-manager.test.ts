@@ -53,6 +53,11 @@ class TestAttachmentManager extends BaseAttachmentManager {
       delete: async () => {},
     };
   }
+
+  // Helper method for testing
+  hasFile(fileId: string): boolean {
+    return this.files.has(fileId);
+  }
 }
 
 describe('BaseAttachmentManager', () => {
@@ -145,6 +150,16 @@ describe('BaseAttachmentManager', () => {
         }
       });
 
+      it('should reject URL string inputs (URLs are not supported)', async () => {
+        // URLs are documented as not supported in FileAttachment type
+        const httpUrl = 'https://example.com/file.txt';
+        const httpsUrl = 'https://example.com/document.pdf';
+
+        // Should fail because fileToBuffer treats strings as file paths
+        await expect(manager.fileToBuffer(httpUrl)).rejects.toThrow();
+        await expect(manager.fileToBuffer(httpsUrl)).rejects.toThrow();
+      });
+
       it('should throw error for unsupported file types', async () => {
         // @ts-expect-error - Testing invalid input
         await expect(manager.fileToBuffer(123)).rejects.toThrow('Unsupported file type');
@@ -177,11 +192,14 @@ describe('BaseAttachmentManager', () => {
   describe('deleteFile', () => {
     it('should delete file', async () => {
       const uploaded = await manager.uploadFile(Buffer.from('test'), 'test.txt');
+      
+      // Verify file exists before deletion
+      expect(manager.hasFile(uploaded.id)).toBe(true);
+      
       await manager.deleteFile(uploaded.id);
 
-      // Verify file is deleted (no longer stored in our mock)
-      // Note: In real implementations, this would be verified differently
-      expect(uploaded.id).toBeDefined();
+      // Verify file is actually deleted from in-memory Maps
+      expect(manager.hasFile(uploaded.id)).toBe(false);
     });
   });
 
