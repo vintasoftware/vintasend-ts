@@ -8,6 +8,7 @@ import type {
   OneOffNotificationInput,
 } from '../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
+import type { AttachmentFileRecord, StoredAttachment } from '../../types/attachment';
 
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
   getAllPendingNotifications(): Promise<AnyDatabaseNotification<Config>[]>;
@@ -90,4 +91,35 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     page: number,
     pageSize: number,
   ): Promise<DatabaseOneOffNotification<Config>[]>;
+
+  // Attachment management methods
+  /**
+   * Get an attachment file record by ID
+   */
+  getAttachmentFile(fileId: string): Promise<AttachmentFileRecord | null>;
+
+  /**
+   * Delete an attachment file (only if not referenced by any notifications)
+   */
+  deleteAttachmentFile(fileId: string): Promise<void>;
+
+  /**
+   * Get all attachment files not referenced by any notifications (for cleanup)
+   */
+  getOrphanedAttachmentFiles(): Promise<AttachmentFileRecord[]>;
+
+  /**
+   * Get all attachments for a specific notification
+   */
+  getAttachments(
+    notificationId: Config['NotificationIdType'],
+  ): Promise<StoredAttachment[]>;
+
+  /**
+   * Delete a specific attachment from a notification
+   */
+  deleteNotificationAttachment(
+    notificationId: Config['NotificationIdType'],
+    attachmentId: string,
+  ): Promise<void>;
 }

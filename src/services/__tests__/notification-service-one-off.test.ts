@@ -34,6 +34,13 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   getOneOffNotification: jest.fn(),
   getAllOneOffNotifications: jest.fn(),
   getOneOffNotifications: jest.fn(),
+
+  // Attachment methods
+  getAttachmentFile: jest.fn().mockResolvedValue(null),
+  deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
+  getOrphanedAttachmentFiles: jest.fn().mockResolvedValue([]),
+  getAttachments: jest.fn().mockResolvedValue([]),
+  deleteNotificationAttachment: jest.fn().mockResolvedValue(undefined),
 };
 
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
@@ -109,6 +116,7 @@ describe('NotificationService - One-Off Notifications', () => {
       readAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
+      attachments: undefined, // Override to match DatabaseOneOffNotification type
     };
 
     notificationContextgenerators.testContext.generate.mockReturnValue({ test: 'context' });

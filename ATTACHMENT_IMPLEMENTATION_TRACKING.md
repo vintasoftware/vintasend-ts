@@ -83,16 +83,63 @@ This document tracks the progress of implementing attachment support in VintaSen
 
 ---
 
-## Phase 3: Backend Integration ⏳
+## Phase 3: Backend Integration ✅
 
-### Status: NOT STARTED
+### Status: COMPLETED
 
-### Planned Tasks:
-- ⏳ Update base backend interface for attachment handling
-- ⏳ Update Prisma schema example with AttachmentFile and NotificationAttachment models
-- ⏳ Implement Prisma backend attachment support
-- ⏳ Create migration for attachment tables
-- ⏳ Create tests for backend attachment operations
+### Files Updated:
+- ✅ `src/services/notification-backends/base-notification-backend.ts` - Added attachment method signatures
+- ✅ `src/implementations/vintasend-prisma/schema.prisma.example` - Added AttachmentFile and NotificationAttachment models
+- ✅ `src/implementations/vintasend-prisma/src/prisma-notification-backend.ts` - Full attachment implementation
+- ✅ `src/implementations/vintasend-prisma/src/__tests__/prisma-notification-backend-attachments.test.ts` - Created comprehensive attachment tests
+- ✅ `src/implementations/vintasend-prisma/src/__tests__/prisma-notification-backend.test.ts` - Updated existing tests
+- ✅ `src/services/notification-backends/__tests__/base-backend-interface.test.ts` - Updated mock backends
+- ✅ `src/services/notification-adapters/__tests__/base-adapter-one-off.test.ts` - Updated mock backend
+- ✅ `src/services/__tests__/notification-service.test.ts` - Updated mock backend
+- ✅ `src/services/__tests__/notification-service-one-off.test.ts` - Updated mock backend and fixed type issues
+
+### Backend Interface Updates:
+- ✅ Added `getAttachmentFile(fileId: string)` - Retrieves an attachment file record by ID
+- ✅ Added `deleteAttachmentFile(fileId: string)` - Deletes an attachment file
+- ✅ Added `getOrphanedAttachmentFiles()` - Finds attachment files not linked to any notifications
+- ✅ Added `getAttachments(notificationId)` - Retrieves all attachments for a notification
+- ✅ Added `deleteNotificationAttachment(attachmentId: string)` - Deletes a notification attachment link
+
+### Prisma Schema Updates:
+- ✅ Created `AttachmentFile` model with fields: id, filename, contentType, size, checksum, storageMetadata, timestamps
+- ✅ Created `NotificationAttachment` model (join table) with relations to Notification and AttachmentFile
+- ✅ Added `attachments` relation to Notification model
+- ✅ Configured cascade delete rules (AttachmentFile: Restrict, NotificationAttachment: Cascade)
+
+### Prisma Backend Implementation:
+- ✅ Updated constructor to accept optional `attachmentManager` parameter
+- ✅ Added type interfaces: `PrismaAttachmentFileModel`, `PrismaNotificationAttachmentModel`
+- ✅ Updated `NotificationPrismaClientInterface` with attachment operations
+- ✅ Implemented all 5 attachment methods from base interface
+- ✅ Added private helper: `processAndStoreAttachments()` - handles inline uploads and references
+- ✅ Added private helper: `serializeAttachmentFileRecord()` - converts Prisma models to records
+- ✅ Added private helper: `serializeStoredAttachment()` - reconstructs full attachment interface
+- ✅ Updated `persistNotification()` - extract attachments → create notification → process attachments → re-fetch
+- ✅ Updated `persistOneOffNotification()` - same pattern as persistNotification
+- ✅ Updated `serializeAnyNotification()` - includes attachment serialization
+- ✅ Updated `getNotification()` - includes attachments in query
+- ✅ Updated factory to accept `attachmentManager` parameter
+
+### Test Coverage:
+- ✅ 13 comprehensive attachment tests created (all passing)
+- ✅ Tests for `getAttachmentFile()` with existing and non-existent files
+- ✅ Tests for `deleteAttachmentFile()` success
+- ✅ Tests for `getOrphanedAttachmentFiles()` with various scenarios
+- ✅ Tests for `getAttachments()` with file details
+- ✅ Tests for `deleteNotificationAttachment()` success
+- ✅ Tests for `persistNotification()` with inline uploads, file references, and no attachments
+- ✅ Tests for `persistOneOffNotification()` with attachments
+- ✅ Tests for `getNotification()` including attachments
+- ✅ Tests for error handling when AttachmentManager is missing
+- ✅ Updated 4 test files with mock backend attachment methods (31 mock instances updated)
+- ✅ Fixed type compatibility issue in one-off notification tests
+- ✅ Updated 3 existing Prisma tests to expect attachment includes in queries
+- ✅ All 174 core tests passing + 72 Prisma tests passing = 246 total tests passing
 
 ---
 
