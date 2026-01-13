@@ -2,6 +2,7 @@ import type { InputJsonValue, JsonValue } from './json-values';
 import type { NotificationStatus } from './notification-status';
 import type { NotificationType } from './notification-type';
 import type { BaseNotificationTypeConfig } from './notification-type-config';
+import type { NotificationAttachment, StoredAttachment } from './attachment';
 
 /**
  * Input type for creating a one-off notification.
@@ -21,6 +22,7 @@ export type OneOffNotificationInput<Config extends BaseNotificationTypeConfig> =
   sendAfter: Date | null;
   subjectTemplate: string | null;
   extraParams: InputJsonValue | null;
+  attachments?: NotificationAttachment[];
 };
 
 /**
@@ -48,6 +50,7 @@ export type OneOffNotificationResendWithContextInput<Config extends BaseNotifica
   sendAfter: Date | null;
   subjectTemplate: string | null;
   extraParams: InputJsonValue | null;
+  attachments?: NotificationAttachment[];
 };
 
 /**
@@ -84,6 +87,7 @@ export type DatabaseOneOffNotification<Config extends BaseNotificationTypeConfig
   readAt: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
+  attachments?: StoredAttachment[];
 };
 
 /**

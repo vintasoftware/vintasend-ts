@@ -53,16 +53,33 @@ This document tracks the progress of implementing attachment support in VintaSen
 
 ---
 
-## Phase 2: Update Notification Types ⏳
+## Phase 2: Update Notification Types ✅
 
-### Status: NOT STARTED
+### Status: COMPLETED
 
-### Planned Tasks:
-- ⏳ Update `src/types/notification.ts` - Add `attachments?` field to NotificationInput
-- ⏳ Update `src/types/notification.ts` - Add `attachments?` field to DatabaseNotification
-- ⏳ Update `src/types/one-off-notification.ts` - Add `attachments?` field to OneOffNotificationInput
-- ⏳ Update `src/types/one-off-notification.ts` - Add `attachments?` field to DatabaseOneOffNotification
-- ⏳ Create tests for updated notification types
+### Files Updated:
+- ✅ `src/types/notification.ts` - Added `attachments?` field to NotificationInput, NotificationResendWithContextInput, and DatabaseNotification
+- ✅ `src/types/one-off-notification.ts` - Added `attachments?` field to OneOffNotificationInput, OneOffNotificationResendWithContextInput, and DatabaseOneOffNotification
+- ✅ `src/types/__tests__/notification.test.ts` - Created comprehensive tests for notification types with attachments
+- ✅ `src/types/__tests__/one-off-notification.test.ts` - Added attachment tests to existing one-off notification tests
+
+### Changes Made:
+- ✅ Imported `NotificationAttachment` and `StoredAttachment` types in notification.ts
+- ✅ Added optional `attachments?: NotificationAttachment[]` field to all input types
+- ✅ Added optional `attachments?: StoredAttachment[]` field to all database types
+- ✅ Created 12 comprehensive tests for notification types with attachments
+- ✅ Added 3 additional tests for one-off notification types with attachments
+- ✅ All 42 type tests passing
+
+### Test Coverage:
+- ✅ Notifications without attachments
+- ✅ Notifications with inline file uploads
+- ✅ Notifications with file references
+- ✅ Mixing inline uploads and references
+- ✅ Database notifications with stored attachments
+- ✅ Multiple attachments support
+- ✅ Type inference verification
+- ✅ Optional field compilation checks
 
 ---
 
@@ -130,5 +147,6 @@ This document tracks the progress of implementing attachment support in VintaSen
 ## Notes
 
 - Phase 1 completed on: January 12, 2026
-- All tests passing for Phase 1
-- Ready to proceed to Phase 2: Update Notification Types
+- Phase 2 completed on: January 12, 2026
+- All tests passing for Phase 1 and Phase 2
+- Ready to proceed to Phase 3: Backend Integration
