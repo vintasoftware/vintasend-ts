@@ -33,6 +33,18 @@ This plan outlines the implementation of attachment support in vintasend-ts, all
 
 ### Design Decisions
 
+**Separation of Concerns:**
+- **AttachmentManager** - Storage operations only (S3, Azure, etc.)
+  - Handles file upload, download, deletion
+  - Provides public utility methods (calculateChecksum, fileToBuffer, detectContentType)
+  - Does NOT access database directly
+- **Backend** - Database operations and orchestration
+  - Stores attachment metadata in database
+  - Calls attachmentManager methods for storage operations
+  - Handles deduplication using attachmentManager.calculateChecksum()
+  - Queries database for attachment records by checksum
+- This clear separation allows custom implementations to override utility strategies while maintaining flexibility
+
 **Attachments as Part of Notification Types:**
 - Attachments are included directly in `NotificationInput` and `DatabaseNotification` types
 - This provides a cleaner API where everything related to a notification is in one object
@@ -171,11 +183,6 @@ export abstract class BaseAttachmentManager {
   ): Promise<AttachmentFileRecord>;
 
   /**
-   * Get file record by ID
-   */
-  abstract getFile(fileId: string): Promise<AttachmentFileRecord | null>;
-
-  /**
    * Delete a file (only if not referenced by any notifications)
    */
   abstract deleteFile(fileId: string): Promise<void>;
@@ -186,83 +193,26 @@ export abstract class BaseAttachmentManager {
   abstract reconstructAttachmentFile(storageMetadata: Record<string, unknown>): AttachmentFile;
 
   /**
-   * Check if a file with the same checksum already exists
-   * Returns existing file record to avoid duplicate uploads
-   */
-  async findFileByChecksum(checksum: string): Promise<AttachmentFileRecord | null> {
-    return null; // Override in implementation if backend supports checksum lookup
-  }
-
-  /**
-   * Process attachments (upload new files or reference existing ones)
-   */
-  async processAttachments(
-    attachments: NotificationAttachment[],
-    notificationId: string,
-  ): Promise<{ 
-    fileRecords: AttachmentFileRecord[], 
-    attachmentData: Array<{ fileId: string, description?: string }> 
-  }> {
-    const results = await Promise.all(
-      attachments.map(async (att) => {
-        if (isAttachmentReference(att)) {
-          // Reference existing file
-          const fileRecord = await this.getFile(att.fileId);
-          if (!fileRecord) {
-            throw new Error(`Referenced file ${att.fileId} not found`);
-          }
-          return {
-            fileRecord,
-            attachmentData: {
-              fileId: att.fileId,
-              description: att.description,
-            },
-          };
-        } else {
-          // Upload new file
-          const buffer = await this.fileToBuffer(att.file);
-          const checksum = this.calculateChecksum(buffer);
-          
-          // Check if file already exists
-          let fileRecord = await this.findFileByChecksum(checksum);
-          
-          if (!fileRecord) {
-            // Upload new file
-            fileRecord = await this.uploadFile(att.file, att.filename, att.contentType);
-          }
-          
-          return {
-            fileRecord,
-            attachmentData: {
-              fileId: fileRecord.id,
-              description: att.description,
-            },
-          };
-        }
-      })
-    );
-    
-    return {
-      fileRecords: results.map(r => r.fileRecord),
-      attachmentData: results.map(r => r.attachmentData),
-    };
-  }
-
-  /**
    * Detect content type from filename
+   * Public to allow backends and custom implementations to use it
    */
-  protected detectContentType(filename: string): string {
+  public detectContentType(filename: string): string {
     return mime.lookup(filename) || 'application/octet-stream';
   }
 
   /**
    * Calculate checksum for file data
+   * Public to allow backends to perform deduplication checks
    */
-  protected calculateChecksum(data: Buffer): string {
+  public calculateChecksum(data: Buffer): string {
     return crypto.createHash('sha256').update(data).digest('hex');
   }
 
-  protected async fileToBuffer(file: FileAttachment): Promise<Buffer> {
+  /**
+   * Convert various file formats to Buffer
+   * Public to allow backends and custom implementations to use it
+   */
+  public async fileToBuffer(file: FileAttachment): Promise<Buffer> {
     if (Buffer.isBuffer(file)) {
       return file;
     }
@@ -291,9 +241,14 @@ export abstract class BaseAttachmentManager {
 }
 ```
 
+**Key Changes:**
+- Removed `getFile()`, `findFileByChecksum()`, and `processAttachments()` methods (these are database operations, not storage)
+- Made `detectContentType()`, `calculateChecksum()`, and `fileToBuffer()` public
+- Backend now handles deduplication by querying database and calling attachmentManager.calculateChecksum()
+
 **Test:** `src/services/attachment-manager/__tests__/base-attachment-manager.test.ts`
-- Test bulk upload functionality
-- Test helper methods (detectContentType, calculateChecksum)
+- Test public utility methods (detectContentType, calculateChecksum, fileToBuffer)
+
 
 ---
 
@@ -479,6 +434,12 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
   // Attachment file management (reusable files)
   getAttachmentFile(fileId: string): Promise<AttachmentFileRecord | null>;
   
+  /**
+   * Find attachment file by checksum for deduplication
+   * Backend queries database, not AttachmentManager
+   */
+  findAttachmentFileByChecksum(checksum: string): Promise<AttachmentFileRecord | null>;
+  
   deleteAttachmentFile(fileId: string): Promise<void>;
   
   // Get all files not referenced by any notifications (for cleanup)
@@ -601,29 +562,24 @@ export class PrismaNotificationBackend<Config extends BaseNotificationTypeConfig
       include: { user: true },
     });
     
-    // Upload and store attachments if present
+    // Process and store attachments if present
     let storedAttachments: StoredAttachment[] = [];
     if (attachments && attachments.length > 0) {
       if (!this.attachmentManager) {
         throw new Error('AttachmentManager not configured but attachments were provided');
       }
       
-      storedAttachments = await this.attachmentManager.bulkUpload(
+      storedAttachments = await this.processAndStoreAttachments(
         attachments,
         String(createdNotification.id),
       );
       
-      // Store attachment metadata in database
-      await this.prisma.attachment.createMany({
+      // Link attachments to notification in database
+      await this.prisma.notificationAttachment.createMany({
         data: storedAttachments.map(att => ({
-          id: att.id,
           notificationId: createdNotification.id,
-          filename: att.filename,
-          contentType: att.contentType,
-          size: att.size,
-          checksum: att.checksum,
+          fileId: att.fileId,
           description: att.description,
-          storageMetadata: att.storageMetadata,
         })),
       });
     }
@@ -633,6 +589,98 @@ export class PrismaNotificationBackend<Config extends BaseNotificationTypeConfig
       ...this.mapPrismaNotificationToDatabaseNotification(createdNotification),
       attachments: storedAttachments,
     };
+  }
+
+  /**
+   * Process attachments: upload new files or reference existing ones
+   * Handles deduplication using attachmentManager.calculateChecksum()
+   */
+  private async processAndStoreAttachments(
+    attachments: NotificationAttachment[],
+    notificationId: string,
+  ): Promise<StoredAttachment[]> {
+    const results = await Promise.all(
+      attachments.map(async (att) => {
+        if (isAttachmentReference(att)) {
+          // Reference existing file from database
+          const fileRecord = await this.getAttachmentFile(att.fileId);
+          if (!fileRecord) {
+            throw new Error(`Referenced file ${att.fileId} not found`);
+          }
+          return {
+            id: crypto.randomUUID(),
+            fileId: fileRecord.id,
+            filename: fileRecord.filename,
+            contentType: fileRecord.contentType,
+            size: fileRecord.size,
+            checksum: fileRecord.checksum,
+            createdAt: fileRecord.createdAt,
+            description: att.description,
+            storageMetadata: fileRecord.storageMetadata,
+            file: this.attachmentManager!.reconstructAttachmentFile(fileRecord.storageMetadata),
+          };
+        } else {
+          // Upload new file with deduplication
+          const buffer = await this.attachmentManager!.fileToBuffer(att.file);
+          const checksum = this.attachmentManager!.calculateChecksum(buffer);
+          
+          // Check if file already exists in database
+          let fileRecord = await this.findAttachmentFileByChecksum(checksum);
+          
+          if (!fileRecord) {
+            // Upload new file to storage
+            fileRecord = await this.attachmentManager!.uploadFile(
+              att.file,
+              att.filename,
+              att.contentType,
+            );
+            
+            // Store file record in database
+            await this.prisma.attachmentFile.create({
+              data: {
+                id: fileRecord.id,
+                filename: fileRecord.filename,
+                contentType: fileRecord.contentType,
+                size: fileRecord.size,
+                checksum: fileRecord.checksum,
+                storageMetadata: fileRecord.storageMetadata,
+              },
+            });
+          }
+          
+          return {
+            id: crypto.randomUUID(),
+            fileId: fileRecord.id,
+            filename: fileRecord.filename,
+            contentType: fileRecord.contentType,
+            size: fileRecord.size,
+            checksum: fileRecord.checksum,
+            createdAt: fileRecord.createdAt,
+            description: att.description,
+            storageMetadata: fileRecord.storageMetadata,
+            file: this.attachmentManager!.reconstructAttachmentFile(fileRecord.storageMetadata),
+          };
+        }
+      })
+    );
+    
+    return results;
+  }
+
+  async findAttachmentFileByChecksum(checksum: string): Promise<AttachmentFileRecord | null> {
+    const file = await this.prisma.attachmentFile.findUnique({
+      where: { checksum },
+    });
+    return file ? {
+      id: file.id,
+      filename: file.filename,
+      contentType: file.contentType,
+      size: file.size,
+      checksum: file.checksum,
+      storageMetadata: file.storageMetadata as Record<string, unknown>,
+      createdAt: file.createdAt,
+      updatedAt: file.updatedAt,
+    } : null;
   }
 
   async getNotification(

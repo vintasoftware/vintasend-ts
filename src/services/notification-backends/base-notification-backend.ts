@@ -99,6 +99,13 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
   getAttachmentFile(fileId: string): Promise<AttachmentFileRecord | null>;
 
   /**
+   * Find an attachment file by checksum for deduplication.
+   * Backend queries its database for files with matching checksums.
+   * Used during file upload to avoid storing duplicate files.
+   */
+  findAttachmentFileByChecksum(checksum: string): Promise<AttachmentFileRecord | null>;
+
+  /**
    * Delete an attachment file (only if not referenced by any notifications)
    */
   deleteAttachmentFile(fileId: string): Promise<void>;

@@ -1,5 +1,4 @@
 import { TemplateAttachmentManager } from '../attachment-manager';
-import type { NotificationAttachment } from 'vintasend/dist/types/attachment';
 
 describe('TemplateAttachmentManager', () => {
   let manager: TemplateAttachmentManager;
@@ -40,25 +39,6 @@ describe('TemplateAttachmentManager', () => {
     });
   });
 
-  describe('getFile', () => {
-    it('should retrieve an existing file record', async () => {
-      // TODO: Implement test once getFile is implemented
-      // 1. Upload a file first
-      // 2. Get the file by ID
-      // 3. Verify the returned record matches
-
-      await expect(manager.getFile('test-id')).rejects.toThrow('not implemented');
-    });
-
-    it('should return null for non-existent file', async () => {
-      // TODO: Implement test once getFile is implemented
-      // const result = await manager.getFile('non-existent-id');
-      // expect(result).toBeNull();
-
-      await expect(manager.getFile('non-existent')).rejects.toThrow('not implemented');
-    });
-  });
-
   describe('deleteFile', () => {
     it('should delete an existing file', async () => {
       // TODO: Implement test once deleteFile is implemented
@@ -88,90 +68,33 @@ describe('TemplateAttachmentManager', () => {
     });
   });
 
-  describe('findFileByChecksum', () => {
-    it('should find existing file by checksum', async () => {
-      // TODO: Implement if your storage backend supports checksum lookup
-      // 1. Upload a file (which calculates checksum)
-      // 2. Find file by same checksum
-      // 3. Verify it returns the same file record
-
-      const result = await manager.findFileByChecksum('test-checksum');
-      expect(result).toBeNull(); // Default implementation
-    });
-
-    it('should return null for non-existent checksum', async () => {
-      const result = await manager.findFileByChecksum('non-existent-checksum');
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('processAttachments', () => {
-    it('should process inline file uploads', async () => {
-      const attachments: NotificationAttachment[] = [
-        {
-          file: Buffer.from('test content'),
-          filename: 'test.txt',
-          contentType: 'text/plain',
-        },
-      ];
-
-      // TODO: Implement test once upload methods are implemented
-      // const result = await manager.processAttachments(attachments, 'notification-123');
-      // expect(result.fileRecords).toHaveLength(1);
-      // expect(result.attachmentData).toHaveLength(1);
-
-      await expect(manager.processAttachments(attachments, 'notification-123')).rejects.toThrow();
-    });
-
-    it('should process file references', async () => {
-      // TODO: Implement test once getFile is implemented
-      // 1. Upload a file first
-      // 2. Create attachment reference using fileId
-      // 3. Process attachments
-      // 4. Verify it returns existing file record
-
-      const attachments: NotificationAttachment[] = [
-        {
-          fileId: 'existing-file-id',
-          description: 'Referenced file',
-        },
-      ];
-
-      await expect(manager.processAttachments(attachments, 'notification-123')).rejects.toThrow();
-    });
-
-    it('should handle mix of uploads and references', async () => {
-      // TODO: Implement comprehensive test with both upload and reference types
-      const attachments: NotificationAttachment[] = [
-        {
-          file: Buffer.from('new file'),
-          filename: 'new.txt',
-        },
-        {
-          fileId: 'existing-file-id',
-        },
-      ];
-
-      await expect(manager.processAttachments(attachments, 'notification-123')).rejects.toThrow();
-    });
-  });
-
-  describe('helper methods', () => {
+  describe('public utility methods', () => {
     it('should detect content type from filename', () => {
-      // These methods are protected, so test them indirectly through uploadFile
-      // or make them public in your implementation for testing
+      // These methods are now public and can be tested directly
 
-      // TODO: Test detectContentType if made accessible
-      // expect(manager.detectContentType('document.pdf')).toBe('application/pdf');
-      // expect(manager.detectContentType('image.png')).toBe('image/png');
-      // expect(manager.detectContentType('unknown.xyz')).toBe('application/octet-stream');
+      // TODO: Test detectContentType once you verify it works in your implementation
+      expect(manager.detectContentType('document.pdf')).toBe('application/pdf');
+      expect(manager.detectContentType('image.png')).toBe('image/png');
+      expect(manager.detectContentType('data.json')).toBe('application/json');
+      expect(manager.detectContentType('unknown.xyz')).toBe('application/octet-stream');
     });
 
     it('should calculate SHA-256 checksum', () => {
-      // TODO: Test calculateChecksum if made accessible
-      // const buffer = Buffer.from('test content');
-      // const checksum = manager.calculateChecksum(buffer);
-      // expect(checksum).toMatch(/^[a-f0-9]{64}$/);
+      // TODO: Test calculateChecksum once you verify it works in your implementation
+      const buffer = Buffer.from('test content');
+      const checksum = manager.calculateChecksum(buffer);
+      expect(checksum).toMatch(/^[a-f0-9]{64}$/);
+
+      // Verify consistency
+      const checksum2 = manager.calculateChecksum(buffer);
+      expect(checksum).toBe(checksum2);
+    });
+
+    it('should convert file to buffer', async () => {
+      // TODO: Test fileToBuffer once you verify it works in your implementation
+      const buffer = Buffer.from('test content');
+      const result = await manager.fileToBuffer(buffer);
+      expect(result).toEqual(buffer);
     });
   });
 
