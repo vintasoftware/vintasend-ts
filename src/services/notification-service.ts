@@ -8,6 +8,7 @@ import type {
 } from '../types/notification';
 import type { BaseNotificationTypeConfig } from '../types/notification-type-config';
 import type { OneOffNotificationInput } from '../types/one-off-notification';
+import type { BaseAttachmentManager } from './attachment-manager/base-attachment-manager';
 import type { BaseLogger } from './loggers/base-logger';
 import {
   type BaseNotificationAdapter,
@@ -31,22 +32,25 @@ export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
     Backend extends BaseNotificationBackend<Config>,
     Logger extends BaseLogger,
     QueueService extends BaseNotificationQueueService<Config>,
+    AttachmentMgr extends BaseAttachmentManager,
   >(
     adapters: AdaptersList,
     backend: Backend,
     logger: Logger,
     contextGeneratorsMap: BaseNotificationTypeConfig['ContextMap'],
     queueService?: QueueService,
+    attachmentManager?: AttachmentMgr,
     options: VintaSendOptions = {
       raiseErrorOnFailedSend: false,
     },
   ) {
-    return new VintaSend<Config, AdaptersList, Backend, Logger, QueueService>(
+    return new VintaSend<Config, AdaptersList, Backend, Logger, QueueService, AttachmentMgr>(
       adapters,
       backend,
       logger,
       contextGeneratorsMap,
       queueService,
+      attachmentManager,
       options,
     );
   }
@@ -58,6 +62,7 @@ export class VintaSend<
   Backend extends BaseNotificationBackend<Config>,
   Logger extends BaseLogger,
   QueueService extends BaseNotificationQueueService<Config>,
+  AttachmentMgr extends BaseAttachmentManager,
 > {
   private contextGeneratorsMap: NotificationContextGeneratorsMap<Config['ContextMap']>;
   constructor(
@@ -66,6 +71,7 @@ export class VintaSend<
     private logger: Logger,
     contextGeneratorsMap: Config['ContextMap'],
     private queueService?: QueueService,
+    private attachmentManager?: AttachmentMgr,
     private options: VintaSendOptions = {
       raiseErrorOnFailedSend: false,
     },
@@ -73,6 +79,10 @@ export class VintaSend<
     this.contextGeneratorsMap = new NotificationContextGeneratorsMap(contextGeneratorsMap);
     for (const adapter of adapters) {
       adapter.injectBackend(backend);
+    }
+    // Inject attachment manager into backend if both exist
+    if (this.attachmentManager && 'injectAttachmentManager' in backend) {
+      (backend as any).injectAttachmentManager(this.attachmentManager);
     }
   }
 

@@ -37,6 +37,7 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
 
   // Attachment methods
   getAttachmentFile: jest.fn().mockResolvedValue(null),
+  findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
   deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
   getOrphanedAttachmentFiles: jest.fn().mockResolvedValue([]),
   getAttachments: jest.fn().mockResolvedValue([]),
@@ -422,6 +423,7 @@ describe('NotificationService', () => {
         mockLogger,
         notificationContextgenerators,
         undefined,
+        undefined,
         { raiseErrorOnFailedSend: true },
       );
 
@@ -728,6 +730,7 @@ describe('NotificationService', () => {
       mockLogger,
       notificationContextgenerators,
       undefined,
+      undefined,
       { raiseErrorOnFailedSend: true },
     );
 
@@ -771,6 +774,7 @@ describe('NotificationService', () => {
         mockBackend,
         mockLogger,
         notificationContextgenerators,
+        undefined,
         undefined,
         { raiseErrorOnFailedSend: true },
       );
@@ -888,6 +892,7 @@ describe('NotificationService', () => {
         mockLogger,
         notificationContextgenerators,
         undefined,
+        undefined,
         { raiseErrorOnFailedSend: true },
       );
       mockBackend.getNotification.mockResolvedValue(null);
@@ -918,6 +923,7 @@ describe('NotificationService', () => {
         mockLogger,
         notificationContextgenerators,
         undefined,
+        undefined,
         { raiseErrorOnFailedSend: true },
       );
 
@@ -937,6 +943,7 @@ describe('NotificationService', () => {
         mockBackend,
         mockLogger,
         notificationContextgenerators,
+        undefined,
         undefined,
         { raiseErrorOnFailedSend: true },
       );

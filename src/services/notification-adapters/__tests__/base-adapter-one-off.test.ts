@@ -69,6 +69,7 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
 
   // Attachment methods
   getAttachmentFile: jest.fn().mockResolvedValue(null),
+  findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
   deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
   getOrphanedAttachmentFiles: jest.fn().mockResolvedValue([]),
   getAttachments: jest.fn().mockResolvedValue([]),
