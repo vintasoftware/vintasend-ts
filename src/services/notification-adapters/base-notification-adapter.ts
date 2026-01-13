@@ -6,8 +6,10 @@ import type {
 } from '../../types/notification';
 import type { NotificationType } from '../../types/notification-type';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
+import type { StoredAttachment } from '../../types/attachment';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseNotificationTemplateRenderer } from '../notification-template-renderers/base-notification-template-renderer';
+import type { BaseLogger } from '../loggers/base-logger';
 
 /**
  * Type guard to check if a notification is a one-off notification
@@ -26,6 +28,7 @@ export abstract class BaseNotificationAdapter<
 > {
   key: string | null = null;
   backend: BaseNotificationBackend<Config> | null = null;
+  logger: BaseLogger | null = null;
 
   constructor(
     protected templateRenderer: TemplateRenderer,
@@ -38,6 +41,26 @@ export abstract class BaseNotificationAdapter<
       return Promise.reject(new Error('Backend not injected'));
     }
     return Promise.resolve();
+  }
+
+  /**
+   * Check if this adapter supports attachments
+   */
+  get supportsAttachments(): boolean {
+    return false;
+  }
+
+  /**
+   * Prepare attachments for sending
+   * Override in adapters that support attachments
+   */
+  protected async prepareAttachments(
+    attachments: StoredAttachment[],
+  ): Promise<unknown> {
+    if (this.supportsAttachments && attachments.length > 0) {
+      this.logger?.warn?.(`Adapter ${this.key} claims to support attachments but prepareAttachments is not implemented`);
+    }
+    return null;
   }
 
   /**
@@ -99,5 +122,9 @@ export abstract class BaseNotificationAdapter<
 
   injectBackend(backend: BaseNotificationBackend<Config>): void {
     this.backend = backend;
+  }
+
+  injectLogger(logger: BaseLogger): void {
+    this.logger = logger;
   }
 }

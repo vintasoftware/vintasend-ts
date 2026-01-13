@@ -49,6 +49,12 @@ const mockTemplateRenderer: jest.Mocked<BaseEmailTemplateRenderer<any>> = {
   render: jest.fn(),
 };
 
+const mockLogger: jest.Mocked<BaseLogger> = {
+  info: jest.fn(),
+  error: jest.fn(),
+  warn: jest.fn(),
+};
+
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
 const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any>> = {
   notificationType: 'EMAIL',
@@ -56,16 +62,13 @@ const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any>> = {
   enqueueNotifications: false,
   send: jest.fn(),
   injectBackend: jest.fn(),
+  injectLogger: jest.fn(),
   backend: mockBackend,
   templateRenderer: mockTemplateRenderer,
+  logger: mockLogger,
+  supportsAttachments: false,
   // biome-ignore lint/suspicious/noExplicitAny: <explanation>
 } as any;
-
-const mockLogger: jest.Mocked<BaseLogger> = {
-  info: jest.fn(),
-  error: jest.fn(),
-  warn: jest.fn(),
-};
 
 // biome-ignore lint/suspicious/noExplicitAny: <explanation>
 const mockQueueService: jest.Mocked<BaseNotificationQueueService<any>> = {

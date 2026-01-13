@@ -79,6 +79,7 @@ export class VintaSend<
     this.contextGeneratorsMap = new NotificationContextGeneratorsMap(contextGeneratorsMap);
     for (const adapter of adapters) {
       adapter.injectBackend(backend);
+      adapter.injectLogger(logger);
     }
     // Inject attachment manager into backend if both exist
     if (this.attachmentManager && 'injectAttachmentManager' in backend) {
