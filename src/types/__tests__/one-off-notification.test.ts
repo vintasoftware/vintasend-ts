@@ -1,8 +1,4 @@
-import type {
-  AnyDatabaseNotification,
-  AnyNotification,
-  AnyNotificationInput,
-} from '../notification';
+import type { AnyDatabaseNotification } from '../notification';
 import type { NotificationStatus } from '../notification-status';
 import type { NotificationType } from '../notification-type';
 import type {
@@ -467,6 +463,163 @@ describe('OneOffNotification Types', () => {
 
       expect(welcomeNotif.contextName).toBe('welcomeContext');
       expect(reminderNotif.contextName).toBe('reminderContext');
+    });
+  });
+
+  describe('OneOffNotification with Attachments', () => {
+    describe('OneOffNotificationInput with attachments', () => {
+      it('should allow creating one-off notification without attachments', () => {
+        const input: OneOffNotificationInput<TestConfig> = {
+          emailOrPhone: 'test@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          notificationType: 'EMAIL' as NotificationType,
+          title: 'Welcome',
+          bodyTemplate: '/templates/welcome.pug',
+          contextName: 'welcomeContext',
+          contextParameters: { companyName: 'Acme Corp' },
+          sendAfter: null,
+          subjectTemplate: 'Welcome',
+          extraParams: null,
+        };
+
+        expect(input.attachments).toBeUndefined();
+      });
+
+      it('should allow creating one-off notification with inline file attachments', () => {
+        const input: OneOffNotificationInput<TestConfig> = {
+          emailOrPhone: 'test@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          notificationType: 'EMAIL' as NotificationType,
+          title: 'Welcome',
+          bodyTemplate: '/templates/welcome.pug',
+          contextName: 'welcomeContext',
+          contextParameters: { companyName: 'Acme Corp' },
+          sendAfter: null,
+          subjectTemplate: 'Welcome',
+          extraParams: null,
+          attachments: [
+            {
+              file: Buffer.from('test content'),
+              filename: 'welcome.pdf',
+              contentType: 'application/pdf',
+            },
+          ],
+        };
+
+        expect(input.attachments).toBeDefined();
+        expect(input.attachments).toHaveLength(1);
+        expect(input.attachments?.[0]).toHaveProperty('file');
+        expect(input.attachments?.[0]).toHaveProperty('filename', 'welcome.pdf');
+      });
+
+      it('should allow creating one-off notification with file references', () => {
+        const input: OneOffNotificationInput<TestConfig> = {
+          emailOrPhone: 'test@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          notificationType: 'EMAIL' as NotificationType,
+          title: 'Welcome',
+          bodyTemplate: '/templates/welcome.pug',
+          contextName: 'welcomeContext',
+          contextParameters: { companyName: 'Acme Corp' },
+          sendAfter: null,
+          subjectTemplate: 'Welcome',
+          extraParams: null,
+          attachments: [
+            {
+              fileId: 'file-123',
+              description: 'Company brochure',
+            },
+          ],
+        };
+
+        expect(input.attachments).toBeDefined();
+        expect(input.attachments).toHaveLength(1);
+        expect(input.attachments?.[0]).toHaveProperty('fileId', 'file-123');
+      });
+    });
+
+    describe('DatabaseOneOffNotification with attachments', () => {
+      it('should allow database one-off notification without attachments', () => {
+        const notification: DatabaseOneOffNotification<TestConfig> = {
+          id: '123',
+          emailOrPhone: 'test@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          notificationType: 'EMAIL' as NotificationType,
+          title: 'Welcome',
+          bodyTemplate: '/templates/welcome.pug',
+          contextName: 'welcomeContext',
+          contextParameters: { companyName: 'Acme Corp' },
+          sendAfter: null,
+          subjectTemplate: 'Welcome',
+          status: 'PENDING' as NotificationStatus,
+          // @ts-expect-error - contextUsed should match welcomeContext return type
+          contextUsed: { greeting: 'Hello' },
+          extraParams: {},
+          adapterUsed: 'nodemailer',
+          sentAt: null,
+          readAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        expect(notification.attachments).toBeUndefined();
+      });
+
+      it('should allow database one-off notification with stored attachments', () => {
+        const mockAttachmentFile = {
+          read: async () => Buffer.from('test'),
+          stream: async () => new ReadableStream(),
+          url: async () => 'https://example.com/file',
+          delete: async () => {},
+        };
+
+        const notification: DatabaseOneOffNotification<TestConfig> = {
+          id: '123',
+          emailOrPhone: 'test@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          notificationType: 'EMAIL' as NotificationType,
+          title: 'Welcome',
+          bodyTemplate: '/templates/welcome.pug',
+          contextName: 'welcomeContext',
+          contextParameters: { companyName: 'Acme Corp' },
+          sendAfter: null,
+          subjectTemplate: 'Welcome',
+          status: 'PENDING' as NotificationStatus,
+          // @ts-expect-error - contextUsed should match welcomeContext return type
+          contextUsed: { greeting: 'Hello' },
+          extraParams: {},
+          adapterUsed: 'nodemailer',
+          sentAt: null,
+          readAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          attachments: [
+            {
+              id: 'att-1',
+              fileId: 'file-123',
+              filename: 'brochure.pdf',
+              contentType: 'application/pdf',
+              size: 5000,
+              checksum: 'abc123',
+              createdAt: new Date(),
+              file: mockAttachmentFile,
+              description: 'Company brochure',
+              storageMetadata: { key: 'attachments/file-123.pdf' },
+            },
+          ],
+        };
+
+        expect(notification.attachments).toBeDefined();
+        expect(notification.attachments).toHaveLength(1);
+        expect(notification.attachments?.[0]).toHaveProperty('id', 'att-1');
+        expect(notification.attachments?.[0]).toHaveProperty('fileId', 'file-123');
+        expect(notification.attachments?.[0].file).toHaveProperty('read');
+      });
     });
   });
 });

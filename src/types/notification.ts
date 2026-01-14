@@ -1,4 +1,5 @@
-import type { InputJsonValue, JsonObject, JsonValue } from './json-values';
+import type { NotificationAttachment, StoredAttachment } from './attachment';
+import type { InputJsonValue, JsonValue } from './json-values';
 import type { NotificationStatus } from './notification-status';
 import type { NotificationType } from './notification-type';
 import type { BaseNotificationTypeConfig } from './notification-type-config';
@@ -10,10 +11,10 @@ import type {
 
 // Export one-off notification types
 export type {
-  OneOffNotificationInput,
-  OneOffNotificationResendWithContextInput,
   DatabaseOneOffNotification,
   OneOffNotification,
+  OneOffNotificationInput,
+  OneOffNotificationResendWithContextInput,
 } from './one-off-notification';
 
 export type NotificationInput<Config extends BaseNotificationTypeConfig> = {
@@ -28,6 +29,7 @@ export type NotificationInput<Config extends BaseNotificationTypeConfig> = {
   sendAfter: Date | null;
   subjectTemplate: string | null;
   extraParams: InputJsonValue | null;
+  attachments?: NotificationAttachment[];
 };
 
 export type NotificationResendWithContextInput<Config extends BaseNotificationTypeConfig> = {
@@ -49,6 +51,7 @@ export type NotificationResendWithContextInput<Config extends BaseNotificationTy
   sendAfter: Date | null;
   subjectTemplate: string | null;
   extraParams: InputJsonValue | null;
+  attachments?: NotificationAttachment[];
 };
 
 export type DatabaseNotification<Config extends BaseNotificationTypeConfig> = {
@@ -79,6 +82,7 @@ export type DatabaseNotification<Config extends BaseNotificationTypeConfig> = {
   readAt: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
+  attachments?: StoredAttachment[];
 };
 
 export type Notification<Config extends BaseNotificationTypeConfig> =

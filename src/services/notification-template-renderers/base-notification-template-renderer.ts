@@ -1,5 +1,5 @@
 import type { JsonObject } from '../../types/json-values';
-import type { AnyNotification, Notification } from '../../types/notification';
+import type { AnyNotification } from '../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
 
 export interface BaseNotificationTemplateRenderer<

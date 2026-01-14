@@ -1,6 +1,6 @@
 import type { Buffer } from 'node:buffer';
 import type { JsonObject } from '../../types/json-values';
-import type { AnyNotification, Notification } from '../../types/notification';
+import type { AnyNotification } from '../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
 import type { BaseNotificationTemplateRenderer } from './base-notification-template-renderer';
 

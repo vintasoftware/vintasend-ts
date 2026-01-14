@@ -1,13 +1,15 @@
 import { VintaSendFactory } from '../../index';
-import type { DatabaseOneOffNotification } from '../../types/one-off-notification';
-import type { OneOffNotificationInput } from '../../types/one-off-notification';
+import type {
+  DatabaseOneOffNotification,
+  OneOffNotificationInput,
+} from '../../types/one-off-notification';
 import type { BaseLogger } from '../loggers/base-logger';
 import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
 
 // Mock implementations
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+// biome-ignore lint/suspicious/noExplicitAny: any for testing
 const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   persistNotification: jest.fn(),
   persistNotificationUpdate: jest.fn(),
@@ -34,30 +36,41 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   getOneOffNotification: jest.fn(),
   getAllOneOffNotifications: jest.fn(),
   getOneOffNotifications: jest.fn(),
+
+  // Attachment methods
+  getAttachmentFile: jest.fn().mockResolvedValue(null),
+  findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
+  deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
+  getOrphanedAttachmentFiles: jest.fn().mockResolvedValue([]),
+  getAttachments: jest.fn().mockResolvedValue([]),
+  deleteNotificationAttachment: jest.fn().mockResolvedValue(undefined),
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+// biome-ignore lint/suspicious/noExplicitAny: any for testing
 const mockTemplateRenderer: jest.Mocked<BaseEmailTemplateRenderer<any>> = {
   render: jest.fn(),
 };
-
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
-const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any>> = {
-  notificationType: 'EMAIL',
-  key: 'test-adapter',
-  enqueueNotifications: false,
-  send: jest.fn(),
-  injectBackend: jest.fn(),
-  backend: mockBackend,
-  templateRenderer: mockTemplateRenderer,
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
-} as any;
 
 const mockLogger: jest.Mocked<BaseLogger> = {
   info: jest.fn(),
   error: jest.fn(),
   warn: jest.fn(),
 };
+
+// biome-ignore lint/suspicious/noExplicitAny: any for testing
+const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any>> = {
+  notificationType: 'EMAIL',
+  key: 'test-adapter',
+  enqueueNotifications: false,
+  send: jest.fn(),
+  injectBackend: jest.fn(),
+  injectLogger: jest.fn(),
+  backend: mockBackend,
+  templateRenderer: mockTemplateRenderer,
+  logger: mockLogger,
+  supportsAttachments: false,
+  // biome-ignore lint/suspicious/noExplicitAny: any for testing
+} as any;
 
 const notificationContextgenerators = {
   testContext: {
@@ -73,9 +86,9 @@ type Config = {
 
 describe('NotificationService - One-Off Notifications', () => {
   let service: ReturnType<VintaSendFactory<Config>['create']>;
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  // biome-ignore lint/suspicious/noExplicitAny: any just for testing
   let mockOneOffNotification: DatabaseOneOffNotification<any>;
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  // biome-ignore lint/suspicious/noExplicitAny: any just for testing
   let mockOneOffNotificationInput: Omit<OneOffNotificationInput<any>, 'id'>;
 
   beforeEach(() => {
@@ -109,6 +122,7 @@ describe('NotificationService - One-Off Notifications', () => {
       readAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
+      attachments: undefined, // Override to match DatabaseOneOffNotification type
     };
 
     notificationContextgenerators.testContext.generate.mockReturnValue({ test: 'context' });

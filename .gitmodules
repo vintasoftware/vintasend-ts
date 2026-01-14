@@ -13,3 +13,6 @@
 [submodule "src/examples"]
 	path = src/examples
 	url = git@github.com:vintasoftware/vintasend-ts-examples.git
+[submodule "src/implementations/vintasend-aws-s3-attachments"]
+	path = src/implementations/vintasend-aws-s3-attachments
+	url = git@github.com:vintasoftware/vintasend-aws-s3-attachements.git

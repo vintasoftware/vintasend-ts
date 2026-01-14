@@ -8,6 +8,7 @@ import type {
 } from '../types/notification';
 import type { BaseNotificationTypeConfig } from '../types/notification-type-config';
 import type { OneOffNotificationInput } from '../types/one-off-notification';
+import type { BaseAttachmentManager } from './attachment-manager/base-attachment-manager';
 import type { BaseLogger } from './loggers/base-logger';
 import {
   type BaseNotificationAdapter,
@@ -23,6 +24,32 @@ type VintaSendOptions = {
 };
 
 export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
+  /**
+   * Creates a new VintaSend notification service instance
+   *
+   * @param adapters - Array of notification adapters (email, SMS, push, etc.)
+   * @param backend - Notification storage backend
+   * @param logger - Logger instance
+   * @param contextGeneratorsMap - Map of context generators for notification rendering
+   * @param queueService - Optional queue service for background notification processing
+   * @param attachmentManager - Optional attachment manager for file handling
+   * @param options - Optional configuration options
+   *
+   * @example
+   * // Without attachments or options
+   * factory.create(adapters, backend, logger, contextGeneratorsMap);
+   *
+   * @example
+   * // With queue service and options (note: pass undefined for attachmentManager)
+   * factory.create(adapters, backend, logger, contextGeneratorsMap, queueService, undefined, { raiseErrorOnFailedSend: true });
+   *
+   * @example
+   * // With attachments and options
+   * factory.create(adapters, backend, logger, contextGeneratorsMap, queueService, attachmentManager, { raiseErrorOnFailedSend: true });
+   *
+   * @since v0.4.0 - BREAKING CHANGE: attachmentManager parameter added before options
+   * @see https://github.com/vintasoftware/vintasend-ts/blob/main/README.md#migrating-to-v040-attachment-support
+   */
   create<
     AdaptersList extends BaseNotificationAdapter<
       BaseNotificationTemplateRenderer<Config>,
@@ -31,25 +58,41 @@ export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
     Backend extends BaseNotificationBackend<Config>,
     Logger extends BaseLogger,
     QueueService extends BaseNotificationQueueService<Config>,
+    AttachmentMgr extends BaseAttachmentManager,
   >(
     adapters: AdaptersList,
     backend: Backend,
     logger: Logger,
     contextGeneratorsMap: BaseNotificationTypeConfig['ContextMap'],
     queueService?: QueueService,
+    attachmentManager?: AttachmentMgr,
     options: VintaSendOptions = {
       raiseErrorOnFailedSend: false,
     },
   ) {
-    return new VintaSend<Config, AdaptersList, Backend, Logger, QueueService>(
+    return new VintaSend<Config, AdaptersList, Backend, Logger, QueueService, AttachmentMgr>(
       adapters,
       backend,
       logger,
       contextGeneratorsMap,
       queueService,
+      attachmentManager,
       options,
     );
   }
+}
+
+// Type guard to check if backend has attachment manager injection support
+function hasAttachmentManagerInjection<Config extends BaseNotificationTypeConfig>(
+  backend: BaseNotificationBackend<Config>,
+): backend is BaseNotificationBackend<Config> & {
+  injectAttachmentManager(manager: BaseAttachmentManager): void;
+} {
+  return (
+    'injectAttachmentManager' in backend &&
+    // biome-ignore lint/suspicious/noExplicitAny:: this is a necessary check
+    typeof (backend as any).injectAttachmentManager === 'function'
+  );
 }
 
 export class VintaSend<
@@ -58,6 +101,7 @@ export class VintaSend<
   Backend extends BaseNotificationBackend<Config>,
   Logger extends BaseLogger,
   QueueService extends BaseNotificationQueueService<Config>,
+  AttachmentMgr extends BaseAttachmentManager,
 > {
   private contextGeneratorsMap: NotificationContextGeneratorsMap<Config['ContextMap']>;
   constructor(
@@ -66,6 +110,7 @@ export class VintaSend<
     private logger: Logger,
     contextGeneratorsMap: Config['ContextMap'],
     private queueService?: QueueService,
+    private attachmentManager?: AttachmentMgr,
     private options: VintaSendOptions = {
       raiseErrorOnFailedSend: false,
     },
@@ -73,6 +118,11 @@ export class VintaSend<
     this.contextGeneratorsMap = new NotificationContextGeneratorsMap(contextGeneratorsMap);
     for (const adapter of adapters) {
       adapter.injectBackend(backend);
+      adapter.injectLogger(logger);
+    }
+    // Inject attachment manager into backend if both exist
+    if (this.attachmentManager && hasAttachmentManagerInjection(backend)) {
+      backend.injectAttachmentManager(this.attachmentManager);
     }
   }
 

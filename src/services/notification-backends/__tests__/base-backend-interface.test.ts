@@ -1,9 +1,7 @@
-import type { InputJsonValue } from '../../../types/json-values';
 import type {
   AnyDatabaseNotification,
   DatabaseNotification,
   DatabaseOneOffNotification,
-  Notification,
   OneOffNotificationInput,
 } from '../../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../../types/notification-type-config';
@@ -61,6 +59,14 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotification: jest.fn().mockResolvedValue(null),
         getAllOneOffNotifications: jest.fn().mockResolvedValue([]),
         getOneOffNotifications: jest.fn().mockResolvedValue([]),
+
+        // Attachment methods
+        getAttachmentFile: jest.fn().mockResolvedValue(null),
+        findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
+        deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
+        getOrphanedAttachmentFiles: jest.fn().mockResolvedValue([]),
+        getAttachments: jest.fn().mockResolvedValue([]),
+        deleteNotificationAttachment: jest.fn().mockResolvedValue(undefined),
       };
 
       expect(mockBackend).toBeDefined();
@@ -133,6 +139,14 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotification: jest.fn(),
         getAllOneOffNotifications: jest.fn(),
         getOneOffNotifications: jest.fn(),
+
+        // Attachment methods
+        getAttachmentFile: jest.fn().mockResolvedValue(null),
+        findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
+        deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
+        getOrphanedAttachmentFiles: jest.fn().mockResolvedValue([]),
+        getAttachments: jest.fn().mockResolvedValue([]),
+        deleteNotificationAttachment: jest.fn().mockResolvedValue(undefined),
       };
 
       const result = await mockBackend.getAllPendingNotifications();
@@ -188,6 +202,14 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotification: jest.fn(),
         getAllOneOffNotifications: jest.fn(),
         getOneOffNotifications: jest.fn(),
+
+        // Attachment methods
+        getAttachmentFile: jest.fn().mockResolvedValue(null),
+        findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
+        deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
+        getOrphanedAttachmentFiles: jest.fn().mockResolvedValue([]),
+        getAttachments: jest.fn().mockResolvedValue([]),
+        deleteNotificationAttachment: jest.fn().mockResolvedValue(undefined),
       };
 
       const result = await mockBackend.getNotification('2', false);
@@ -255,6 +277,14 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotification: jest.fn(),
         getAllOneOffNotifications: jest.fn(),
         getOneOffNotifications: jest.fn(),
+
+        // Attachment methods
+        getAttachmentFile: jest.fn().mockResolvedValue(null),
+        findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
+        deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
+        getOrphanedAttachmentFiles: jest.fn().mockResolvedValue([]),
+        getAttachments: jest.fn().mockResolvedValue([]),
+        deleteNotificationAttachment: jest.fn().mockResolvedValue(undefined),
       };
 
       const result = await mockBackend.persistOneOffNotification(input);
@@ -296,6 +326,14 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotification: jest.fn(),
         getAllOneOffNotifications: jest.fn(),
         getOneOffNotifications: jest.fn(),
+
+        // Attachment methods
+        getAttachmentFile: jest.fn().mockResolvedValue(null),
+        findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
+        deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
+        getOrphanedAttachmentFiles: jest.fn().mockResolvedValue([]),
+        getAttachments: jest.fn().mockResolvedValue([]),
+        deleteNotificationAttachment: jest.fn().mockResolvedValue(undefined),
       };
 
       await mockBackend.persistOneOffNotificationUpdate('1', update);
@@ -349,6 +387,14 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotification: jest.fn(),
         getAllOneOffNotifications: jest.fn(),
         getOneOffNotifications: jest.fn(),
+
+        // Attachment methods
+        getAttachmentFile: jest.fn().mockResolvedValue(null),
+        findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
+        deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
+        getOrphanedAttachmentFiles: jest.fn().mockResolvedValue([]),
+        getAttachments: jest.fn().mockResolvedValue([]),
+        deleteNotificationAttachment: jest.fn().mockResolvedValue(undefined),
       };
 
       const sentResult = await mockBackend.markAsSent('1', true);
@@ -390,12 +436,12 @@ describe('BaseNotificationBackend Interface', () => {
     it('should have correct return types for methods that now return union types', () => {
       // Type-only test - if this compiles, the types are correct
       const testReturnTypes = async (backend: BaseNotificationBackend<TestConfig>) => {
-        const pending: AnyDatabaseNotification<TestConfig>[] =
+        const _pending: AnyDatabaseNotification<TestConfig>[] =
           await backend.getAllPendingNotifications();
         const notification: AnyDatabaseNotification<TestConfig> | null =
           await backend.getNotification('1', false);
-        const sent: AnyDatabaseNotification<TestConfig> = await backend.markAsSent('1', true);
-        const failed: AnyDatabaseNotification<TestConfig> = await backend.markAsFailed('1', true);
+        const _sent: AnyDatabaseNotification<TestConfig> = await backend.markAsSent('1', true);
+        const _failed: AnyDatabaseNotification<TestConfig> = await backend.markAsFailed('1', true);
 
         // Type guards should work
         if (notification && 'emailOrPhone' in notification) {
@@ -459,6 +505,14 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotification: jest.fn(),
         getAllOneOffNotifications: jest.fn(),
         getOneOffNotifications: jest.fn(),
+
+        // Attachment methods
+        getAttachmentFile: jest.fn().mockResolvedValue(null),
+        findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
+        deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
+        getOrphanedAttachmentFiles: jest.fn().mockResolvedValue([]),
+        getAttachments: jest.fn().mockResolvedValue([]),
+        deleteNotificationAttachment: jest.fn().mockResolvedValue(undefined),
       };
 
       // All existing methods should work as before
