@@ -244,7 +244,60 @@ One-off notifications are stored in the same table as regular notifications usin
 - **Regular notifications**: Have `userId` set, `emailOrPhone` is null
 - **One-off notifications**: Have `emailOrPhone` set, `userId` is null
 
-### Migration Guide
+### Migration Guides
+
+#### Migrating to v0.4.0 (Attachment Support)
+
+Version 0.4.0 introduces file attachment support with a **breaking change** to the `VintaSendFactory.create()` method signature.
+
+**Breaking Change**: The `attachmentManager` parameter now comes **before** the `options` parameter.
+
+- **Old signature (v0.3.x)**: `create(adapters, backend, logger, contextGeneratorsMap, queueService?, options?)`
+- **New signature (v0.4.0)**: `create(adapters, backend, logger, contextGeneratorsMap, queueService?, attachmentManager?, options?)`
+
+**Migration Steps**:
+
+1. **If you're NOT passing `options`** - No changes needed:
+   ```typescript
+   // This still works in v0.4.0
+   factory.create(adapters, backend, logger, contextGeneratorsMap);
+   factory.create(adapters, backend, logger, contextGeneratorsMap, queueService);
+   ```
+
+2. **If you ARE passing `options` as the 6th argument** - Add `undefined` for `attachmentManager`:
+   ```typescript
+   // Before (v0.3.x) - THIS WILL BREAK
+   factory.create(adapters, backend, logger, contextGeneratorsMap, queueService, { 
+     raiseErrorOnFailedSend: true 
+   });
+   
+   // After (v0.4.0) - CORRECT
+   factory.create(adapters, backend, logger, contextGeneratorsMap, queueService, undefined, { 
+     raiseErrorOnFailedSend: true 
+   });
+   ```
+
+3. **If you want to use attachments** - Pass the `attachmentManager`:
+   ```typescript
+   import { LocalFileAttachmentManager } from 'vintasend';
+   
+   const attachmentManager = new LocalFileAttachmentManager({ uploadDir: './uploads' });
+   
+   factory.create(adapters, backend, logger, contextGeneratorsMap, queueService, attachmentManager, {
+     raiseErrorOnFailedSend: true
+   });
+   ```
+
+4. **For Prisma users**: Add attachment models to your schema (optional, only if you want attachment support):
+   ```bash
+   # Add AttachmentFile and NotificationAttachment models to schema.prisma
+   # See ATTACHMENTS.md for the complete schema
+   prisma migrate dev --name add-attachment-support
+   ```
+
+**Note**: Attachment methods in `BaseNotificationBackend` are now **optional**. Existing backend implementations continue to work without changes. See [ATTACHMENTS.md](ATTACHMENTS.md) for full documentation.
+
+#### Migrating to v0.3.0 (One-off Notifications)
 
 If you're adding one-off notification support to an existing installation:
 

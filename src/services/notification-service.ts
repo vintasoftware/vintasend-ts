@@ -24,6 +24,32 @@ type VintaSendOptions = {
 };
 
 export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
+  /**
+   * Creates a new VintaSend notification service instance
+   *
+   * @param adapters - Array of notification adapters (email, SMS, push, etc.)
+   * @param backend - Notification storage backend
+   * @param logger - Logger instance
+   * @param contextGeneratorsMap - Map of context generators for notification rendering
+   * @param queueService - Optional queue service for background notification processing
+   * @param attachmentManager - Optional attachment manager for file handling
+   * @param options - Optional configuration options
+   *
+   * @example
+   * // Without attachments or options
+   * factory.create(adapters, backend, logger, contextGeneratorsMap);
+   *
+   * @example
+   * // With queue service and options (note: pass undefined for attachmentManager)
+   * factory.create(adapters, backend, logger, contextGeneratorsMap, queueService, undefined, { raiseErrorOnFailedSend: true });
+   *
+   * @example
+   * // With attachments and options
+   * factory.create(adapters, backend, logger, contextGeneratorsMap, queueService, attachmentManager, { raiseErrorOnFailedSend: true });
+   *
+   * @since v0.4.0 - BREAKING CHANGE: attachmentManager parameter added before options
+   * @see https://github.com/vintasoftware/vintasend-ts/blob/main/README.md#migrating-to-v040-attachment-support
+   */
   create<
     AdaptersList extends BaseNotificationAdapter<
       BaseNotificationTemplateRenderer<Config>,

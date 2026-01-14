@@ -21,7 +21,21 @@
   * `deleteNotificationAttachment()` - Remove notification-attachment links
 * **Prisma Backend**: Full attachment support with database models and cascade delete rules
 * **Type System Updates**: Added attachment types to notification inputs and database types
-* **Breaking Changes**: None - all attachment features are optional and backward compatible
+* **Backend Interface**: Attachment methods are now **optional** in `BaseNotificationBackend` - existing backends continue to work without implementing them
+* **Breaking Changes**:
+  * ⚠️ **BREAKING**: `VintaSendFactory.create()` signature changed - `attachmentManager` parameter now comes before `options`
+    * **Old signature**: `create(adapters, backend, logger, contextGeneratorsMap, queueService?, options?)`
+    * **New signature**: `create(adapters, backend, logger, contextGeneratorsMap, queueService?, attachmentManager?, options?)`
+    * **Migration**: If you were passing 6 arguments with `options` as the last parameter, you must now pass `undefined` for `attachmentManager`:
+      ```typescript
+      // Before (v0.3.x):
+      factory.create(adapters, backend, logger, contextGeneratorsMap, queueService, { raiseErrorOnFailedSend: true });
+      
+      // After (v0.4.0):
+      factory.create(adapters, backend, logger, contextGeneratorsMap, queueService, undefined, { raiseErrorOnFailedSend: true });
+      // Or with attachment manager:
+      factory.create(adapters, backend, logger, contextGeneratorsMap, queueService, attachmentManager, { raiseErrorOnFailedSend: true });
+      ```
 
 ## Version 0.3.0
 
