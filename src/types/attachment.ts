@@ -1,7 +1,10 @@
+import type { Readable } from 'node:stream';
+
 // Input types for creating attachments
 export type FileAttachment =
   | Buffer // Raw bytes
-  | ReadableStream // Stream
+  | ReadableStream // Web ReadableStream
+  | Readable // Node.js Readable stream
   | string; // File path
 
 // For creating new attachments (inline upload)
