@@ -170,6 +170,44 @@ model Notification {
 }
 ```
 
+### Backend Implementation Requirements
+
+**Important:** The attachment-related methods in `BaseNotificationBackend` are **optional**. This means existing backend implementations don't need to implement them unless they want to support attachments.
+
+#### Optional Methods
+
+The following methods are optional and only needed if your backend supports attachments:
+
+- `getAttachmentFile(fileId: string): Promise<AttachmentFileRecord | null>`
+- `findAttachmentFileByChecksum(checksum: string): Promise<AttachmentFileRecord | null>`
+- `deleteAttachmentFile(fileId: string): Promise<void>`
+- `getOrphanedAttachmentFiles(): Promise<AttachmentFileRecord[]>`
+- `getAttachments(notificationId): Promise<StoredAttachment[]>`
+- `deleteNotificationAttachment(notificationId, attachmentId): Promise<void>`
+
+#### Checking for Attachment Support
+
+Use the `supportsAttachments` type guard to check if a backend implements attachment methods:
+
+```typescript
+import { supportsAttachments } from 'vintasend';
+
+if (supportsAttachments(backend)) {
+  // Backend supports attachments - safe to call attachment methods
+  const orphanedFiles = await backend.getOrphanedAttachmentFiles();
+  for (const file of orphanedFiles) {
+    await backend.deleteAttachmentFile(file.id);
+  }
+} else {
+  // Backend doesn't support attachments
+  console.warn('Attachment operations not supported by this backend');
+}
+```
+
+#### Implementing Attachment Support
+
+If you want to add attachment support to your backend, implement all six methods. See the [PrismaNotificationBackend](src/implementations/vintasend-prisma/src/prisma-notification-backend.ts) for a complete reference implementation.
+
 ---
 
 ## Usage Examples

@@ -92,41 +92,67 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     pageSize: number,
   ): Promise<DatabaseOneOffNotification<Config>[]>;
 
-  // Attachment management methods
+  // Attachment management methods (optional - only needed if backend supports attachments)
   /**
    * Get an attachment file record by ID
    */
-  getAttachmentFile(fileId: string): Promise<AttachmentFileRecord | null>;
+  getAttachmentFile?(fileId: string): Promise<AttachmentFileRecord | null>;
 
   /**
    * Find an attachment file by checksum for deduplication.
    * Backend queries its database for files with matching checksums.
    * Used during file upload to avoid storing duplicate files.
    */
-  findAttachmentFileByChecksum(checksum: string): Promise<AttachmentFileRecord | null>;
+  findAttachmentFileByChecksum?(checksum: string): Promise<AttachmentFileRecord | null>;
 
   /**
    * Delete an attachment file (only if not referenced by any notifications)
    */
-  deleteAttachmentFile(fileId: string): Promise<void>;
+  deleteAttachmentFile?(fileId: string): Promise<void>;
 
   /**
    * Get all attachment files not referenced by any notifications (for cleanup)
    */
-  getOrphanedAttachmentFiles(): Promise<AttachmentFileRecord[]>;
+  getOrphanedAttachmentFiles?(): Promise<AttachmentFileRecord[]>;
 
   /**
    * Get all attachments for a specific notification
    */
-  getAttachments(
+  getAttachments?(
     notificationId: Config['NotificationIdType'],
   ): Promise<StoredAttachment[]>;
 
   /**
    * Delete a specific attachment from a notification
    */
+  deleteNotificationAttachment?(
+    notificationId: Config['NotificationIdType'],
+    attachmentId: string,
+  ): Promise<void>;
+}
+
+/**
+ * Type guard to check if backend supports attachment operations
+ */
+export function supportsAttachments<Config extends BaseNotificationTypeConfig>(
+  backend: BaseNotificationBackend<Config>,
+): backend is BaseNotificationBackend<Config> & {
+  getAttachmentFile(fileId: string): Promise<AttachmentFileRecord | null>;
+  findAttachmentFileByChecksum(checksum: string): Promise<AttachmentFileRecord | null>;
+  deleteAttachmentFile(fileId: string): Promise<void>;
+  getOrphanedAttachmentFiles(): Promise<AttachmentFileRecord[]>;
+  getAttachments(notificationId: Config['NotificationIdType']): Promise<StoredAttachment[]>;
   deleteNotificationAttachment(
     notificationId: Config['NotificationIdType'],
     attachmentId: string,
   ): Promise<void>;
+} {
+  return (
+    typeof backend.getAttachmentFile === 'function' &&
+    typeof backend.findAttachmentFileByChecksum === 'function' &&
+    typeof backend.deleteAttachmentFile === 'function' &&
+    typeof backend.getOrphanedAttachmentFiles === 'function' &&
+    typeof backend.getAttachments === 'function' &&
+    typeof backend.deleteNotificationAttachment === 'function'
+  );
 }
