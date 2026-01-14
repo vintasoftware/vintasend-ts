@@ -1,9 +1,7 @@
-import type { InputJsonValue } from '../../../types/json-values';
 import type {
   AnyDatabaseNotification,
   DatabaseNotification,
   DatabaseOneOffNotification,
-  Notification,
   OneOffNotificationInput,
 } from '../../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../../types/notification-type-config';
@@ -438,12 +436,12 @@ describe('BaseNotificationBackend Interface', () => {
     it('should have correct return types for methods that now return union types', () => {
       // Type-only test - if this compiles, the types are correct
       const testReturnTypes = async (backend: BaseNotificationBackend<TestConfig>) => {
-        const pending: AnyDatabaseNotification<TestConfig>[] =
+        const _pending: AnyDatabaseNotification<TestConfig>[] =
           await backend.getAllPendingNotifications();
         const notification: AnyDatabaseNotification<TestConfig> | null =
           await backend.getNotification('1', false);
-        const sent: AnyDatabaseNotification<TestConfig> = await backend.markAsSent('1', true);
-        const failed: AnyDatabaseNotification<TestConfig> = await backend.markAsFailed('1', true);
+        const _sent: AnyDatabaseNotification<TestConfig> = await backend.markAsSent('1', true);
+        const _failed: AnyDatabaseNotification<TestConfig> = await backend.markAsFailed('1', true);
 
         // Type guards should work
         if (notification && 'emailOrPhone' in notification) {

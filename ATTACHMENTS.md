@@ -217,7 +217,7 @@ If you want to add attachment support to your backend, implement all six methods
 Upload a file directly when sending a notification:
 
 ```typescript
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 
 await vintaSend.sendNotification({
   notificationTypeId: 'invoice-ready',

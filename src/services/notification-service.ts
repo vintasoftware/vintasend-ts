@@ -88,7 +88,11 @@ function hasAttachmentManagerInjection<Config extends BaseNotificationTypeConfig
 ): backend is BaseNotificationBackend<Config> & {
   injectAttachmentManager(manager: BaseAttachmentManager): void;
 } {
-  return 'injectAttachmentManager' in backend && typeof (backend as any).injectAttachmentManager === 'function';
+  return (
+    'injectAttachmentManager' in backend &&
+    // biome-ignore lint/suspicious/noExplicitAny:: this is a necessary check
+    typeof (backend as any).injectAttachmentManager === 'function'
+  );
 }
 
 export class VintaSend<

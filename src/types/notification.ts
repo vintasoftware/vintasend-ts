@@ -1,8 +1,8 @@
-import type { InputJsonValue, JsonObject, JsonValue } from './json-values';
+import type { NotificationAttachment, StoredAttachment } from './attachment';
+import type { InputJsonValue, JsonValue } from './json-values';
 import type { NotificationStatus } from './notification-status';
 import type { NotificationType } from './notification-type';
 import type { BaseNotificationTypeConfig } from './notification-type-config';
-import type { NotificationAttachment, StoredAttachment } from './attachment';
 import type {
   DatabaseOneOffNotification,
   OneOffNotification,
@@ -11,10 +11,10 @@ import type {
 
 // Export one-off notification types
 export type {
-  OneOffNotificationInput,
-  OneOffNotificationResendWithContextInput,
   DatabaseOneOffNotification,
   OneOffNotification,
+  OneOffNotificationInput,
+  OneOffNotificationResendWithContextInput,
 } from './one-off-notification';
 
 export type NotificationInput<Config extends BaseNotificationTypeConfig> = {

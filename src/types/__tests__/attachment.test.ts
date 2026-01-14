@@ -1,9 +1,9 @@
 import {
   type AttachmentFile,
+  isAttachmentReference,
   type NotificationAttachment,
   type NotificationAttachmentReference,
   type NotificationAttachmentUpload,
-  isAttachmentReference,
 } from '../attachment';
 
 describe('Attachment Type Definitions', () => {
@@ -97,7 +97,7 @@ describe('Attachment Type Definitions', () => {
       const file: AttachmentFile = {
         read: async () => Buffer.from('test'),
         stream: async () => new ReadableStream(),
-        url: async (expiresIn?: number) => 'https://example.com/file.txt',
+        url: async (_expiresIn?: number) => 'https://example.com/file.txt',
         delete: async () => {},
       };
 

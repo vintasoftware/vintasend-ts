@@ -1,10 +1,10 @@
+import type { NotificationAttachment, StoredAttachment } from '../attachment';
 import type {
+  DatabaseNotification,
   NotificationInput,
   NotificationResendWithContextInput,
-  DatabaseNotification,
 } from '../notification';
 import type { BaseNotificationTypeConfig } from '../notification-type-config';
-import type { NotificationAttachment, StoredAttachment } from '../attachment';
 
 // Mock configuration for testing
 type MockContextMap = {

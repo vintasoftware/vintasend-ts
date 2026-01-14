@@ -1,3 +1,4 @@
+import type { AttachmentFileRecord, StoredAttachment } from '../../types/attachment';
 import type { InputJsonValue } from '../../types/json-values';
 import type {
   AnyDatabaseNotification,
@@ -8,7 +9,6 @@ import type {
   OneOffNotificationInput,
 } from '../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
-import type { AttachmentFileRecord, StoredAttachment } from '../../types/attachment';
 
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
   getAllPendingNotifications(): Promise<AnyDatabaseNotification<Config>[]>;
@@ -118,9 +118,7 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
   /**
    * Get all attachments for a specific notification
    */
-  getAttachments?(
-    notificationId: Config['NotificationIdType'],
-  ): Promise<StoredAttachment[]>;
+  getAttachments?(notificationId: Config['NotificationIdType']): Promise<StoredAttachment[]>;
 
   /**
    * Delete a specific attachment from a notification

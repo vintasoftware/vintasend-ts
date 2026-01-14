@@ -1,8 +1,8 @@
+import type { NotificationAttachment, StoredAttachment } from './attachment';
 import type { InputJsonValue, JsonValue } from './json-values';
 import type { NotificationStatus } from './notification-status';
 import type { NotificationType } from './notification-type';
 import type { BaseNotificationTypeConfig } from './notification-type-config';
-import type { NotificationAttachment, StoredAttachment } from './attachment';
 
 /**
  * Input type for creating a one-off notification.

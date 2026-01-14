@@ -7,7 +7,7 @@ import type { BaseNotificationQueueService } from '../notification-queue-service
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
 
 // Mock implementations
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+// biome-ignore lint/suspicious/noExplicitAny: any just for testing
 const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   persistNotification: jest.fn(),
   persistNotificationUpdate: jest.fn(),
@@ -44,7 +44,7 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   deleteNotificationAttachment: jest.fn().mockResolvedValue(undefined),
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+// biome-ignore lint/suspicious/noExplicitAny: any just for testing
 const mockTemplateRenderer: jest.Mocked<BaseEmailTemplateRenderer<any>> = {
   render: jest.fn(),
 };
@@ -55,7 +55,7 @@ const mockLogger: jest.Mocked<BaseLogger> = {
   warn: jest.fn(),
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+// biome-ignore lint/suspicious/noExplicitAny: any just for testing
 const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any>> = {
   notificationType: 'EMAIL',
   key: 'test-adapter',
@@ -67,10 +67,10 @@ const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any>> = {
   templateRenderer: mockTemplateRenderer,
   logger: mockLogger,
   supportsAttachments: false,
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  // biome-ignore lint/suspicious/noExplicitAny: any just for testing
 } as any;
 
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+// biome-ignore lint/suspicious/noExplicitAny: any just for testing
 const mockQueueService: jest.Mocked<BaseNotificationQueueService<any>> = {
   enqueueNotification: jest.fn(),
 };
@@ -89,7 +89,7 @@ type Config = {
 
 describe('NotificationService', () => {
   let service: ReturnType<VintaSendFactory<Config>['create']>;
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  // biome-ignore lint/suspicious/noExplicitAny: any just for testing
   let mockNotification: DatabaseNotification<any> = {
     id: '123',
     notificationType: 'EMAIL' as const,
@@ -148,7 +148,7 @@ describe('NotificationService', () => {
 
     it('should handle missing adapter', async () => {
       const invalidNotification = { ...mockNotification, notificationType: 'invalid' };
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       await service.send(invalidNotification as unknown as DatabaseNotification<any>);
 
       expect(mockLogger.error).toHaveBeenCalled();
@@ -170,7 +170,7 @@ describe('NotificationService', () => {
     it('should throw error when notification has no ID', async () => {
       const { id: _id, ...notificationWithoutId } = mockNotification;
 
-      // @ts-ignore - testing invalid input
+      // @ts-expect-error - testing invalid input
       await expect(service.send(notificationWithoutId)).rejects.toThrow(
         "Notification wasn't created in the database",
       );
@@ -178,7 +178,7 @@ describe('NotificationService', () => {
 
     it('should handle queue service integration with enqueue adapter', async () => {
       const serviceWithQueue = new VintaSendFactory<Config>().create(
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
         [{ ...mockAdapter, enqueueNotifications: true } as any],
         mockBackend,
         mockLogger,
@@ -205,7 +205,7 @@ describe('NotificationService', () => {
 
     it('should handle missing queue service for distributed adapter', async () => {
       const serviceWithDistributedAdapter = new VintaSendFactory<Config>().create(
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
         [{ ...mockAdapter, enqueueNotifications: true } as any],
         mockBackend,
         mockLogger,
@@ -222,7 +222,7 @@ describe('NotificationService', () => {
 
     it('should handle queue service enqueue error', async () => {
       const serviceWithQueue = new VintaSendFactory<Config>().create(
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
         [{ ...mockAdapter, enqueueNotifications: true } as any],
         mockBackend,
         mockLogger,
@@ -389,7 +389,7 @@ describe('NotificationService', () => {
     };
 
     it('should handle delayed send with distributed adapter', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       const distributedAdapter = { ...mockAdapter, enqueueNotifications: true } as any;
       const serviceWithQueue = new VintaSendFactory<Config>().create(
         [distributedAdapter],
@@ -436,7 +436,7 @@ describe('NotificationService', () => {
     });
 
     it('should handle error when marking notification as sent in delayedSend', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       const distributedAdapter = { ...mockAdapter, enqueueNotifications: true } as any;
       const serviceWithQueue = new VintaSendFactory<Config>().create(
         [distributedAdapter],
@@ -459,7 +459,7 @@ describe('NotificationService', () => {
     });
 
     it('should handle send error and mark as failed in delayedSend', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       const distributedAdapter = { ...mockAdapter, enqueueNotifications: true } as any;
       const serviceWithQueue = new VintaSendFactory<Config>().create(
         [distributedAdapter],
@@ -482,7 +482,7 @@ describe('NotificationService', () => {
     });
 
     it('should handle error when marking as failed in delayedSend', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       const distributedAdapter = { ...mockAdapter, enqueueNotifications: true } as any;
       const serviceWithQueue = new VintaSendFactory<Config>().create(
         [distributedAdapter],
@@ -519,7 +519,7 @@ describe('NotificationService', () => {
         ...mockNotification,
         id: '123',
         ...updates,
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       } as unknown as DatabaseNotification<any>);
 
       const result = await service.updateNotification('123', updates);
@@ -575,19 +575,19 @@ describe('NotificationService', () => {
 
   describe('pending notifications', () => {
     it('should send all pending notifications', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       const mockPendingNotifications: DatabaseNotification<any>[] = [
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
         {
           ...mockNotification,
           id: '1',
           notificationType: 'EMAIL',
+          // biome-ignore lint/suspicious/noExplicitAny: any just for testing
         } as unknown as DatabaseNotification<any>,
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
         {
           ...mockNotification,
           id: '2',
           notificationType: 'EMAIL',
+          // biome-ignore lint/suspicious/noExplicitAny: any just for testing
         } as unknown as DatabaseNotification<any>,
       ];
       mockBackend.getAllPendingNotifications.mockResolvedValue(mockPendingNotifications);
@@ -606,11 +606,11 @@ describe('NotificationService', () => {
     });
 
     it('should handle failed notifications in sendPendingNotifications', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       const mockPendingNotifications: DatabaseNotification<any>[] = [
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
         { ...mockNotification, id: '1' } as unknown as DatabaseNotification<any>,
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
         { ...mockNotification, id: '2' } as unknown as DatabaseNotification<any>,
       ];
       mockBackend.getAllPendingNotifications.mockResolvedValue(mockPendingNotifications);
@@ -627,11 +627,11 @@ describe('NotificationService', () => {
     });
 
     it('should log success for each pending notification sent', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       const mockPendingNotifications: DatabaseNotification<any>[] = [
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
         { ...mockNotification, id: '1' } as unknown as DatabaseNotification<any>,
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
         { ...mockNotification, id: '2' } as unknown as DatabaseNotification<any>,
       ];
       mockBackend.getAllPendingNotifications.mockResolvedValue(mockPendingNotifications);
@@ -661,11 +661,11 @@ describe('NotificationService', () => {
     });
 
     it('should continue processing other notifications after failure', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       const notifications: DatabaseNotification<any>[] = [
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
         { ...mockNotification, id: '1' } as unknown as DatabaseNotification<any>,
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
         { ...mockNotification, id: '2' } as unknown as DatabaseNotification<any>,
       ];
       mockBackend.getAllPendingNotifications.mockResolvedValue(notifications);
@@ -683,11 +683,11 @@ describe('NotificationService', () => {
     });
 
     it('should log info for each notification context generation', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       const mockPendingNotifications: DatabaseNotification<any>[] = [
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
         { ...mockNotification, id: '1' } as unknown as DatabaseNotification<any>,
-        // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
         { ...mockNotification, id: '2' } as unknown as DatabaseNotification<any>,
       ];
       mockBackend.getAllPendingNotifications.mockResolvedValue(mockPendingNotifications);
@@ -702,11 +702,11 @@ describe('NotificationService', () => {
 
   describe('notification status management', () => {
     it('should mark notification as read', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
       mockBackend.markAsRead.mockResolvedValue({
         ...mockNotification,
         id: '123',
         readAt: new Date(),
+        // biome-ignore lint/suspicious/noExplicitAny:any just for testing
       } as unknown as DatabaseNotification<any>);
       await service.markRead('123');
       expect(mockBackend.markAsRead).toHaveBeenCalledWith('123', true);
@@ -745,7 +745,7 @@ describe('NotificationService', () => {
         contextParameters: {},
       };
 
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+      // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       await expect(serviceWithError.send(invalidNotification as any)).rejects.toThrow(
         'No adapter found for notification type INVALID',
       );
@@ -761,7 +761,7 @@ describe('NotificationService', () => {
 
     it('should log error when notification not found in delayed send with raiseErrorOnFailedSend disabled', async () => {
       mockBackend.getNotification.mockResolvedValue(null);
-      // biome-ignore lint/complexity/useLiteralKeys: <explanation>
+      // biome-ignore lint/complexity/useLiteralKeys:any just for testing
       serviceWithError['options']['raiseErrorOnFailedSend'] = false;
 
       await serviceWithError.delayedSend('nonexistent');
@@ -791,11 +791,11 @@ describe('NotificationService', () => {
 
   describe('notification retrieval', () => {
     it('should get a single notification', async () => {
-      // biome-ignore lint/suspicious/noExplicitAny: <explanation>
       const mockNotif = {
         ...mockAdapter,
         id: '123',
         title: 'Test',
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       } as unknown as DatabaseNotification<any>;
       mockBackend.getNotification.mockResolvedValue(mockNotif);
 
@@ -970,10 +970,12 @@ describe('NotificationService', () => {
         injectBackend: jest.fn(),
         notificationType: 'EMAIL',
         key: 'test-adapter',
+        // biome-ignore lint/suspicious/noExplicitAny:any just for testing
       } as any;
 
       const backendMock = {
         // basic backend stub
+        // biome-ignore lint/suspicious/noExplicitAny:any just for testing
       } as any;
 
       new VintaSendFactory<Config>().create(
@@ -996,20 +998,24 @@ describe('NotificationService', () => {
         injectBackend: jest.fn(),
         notificationType: 'EMAIL',
         key: 'test-adapter',
+        // biome-ignore lint/suspicious/noExplicitAny:any just for testing
       } as any;
 
       const backendWithoutInjection = {
         // basic backend stub without injectAttachmentManager
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       } as any;
 
       const backendWithAttachmentInjection = {
         injectAttachmentManager: jest.fn(),
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       } as any;
 
       const mockAttachmentManager = {
         uploadFile: jest.fn(),
         deleteFile: jest.fn(),
         reconstructAttachmentFile: jest.fn(),
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       } as any;
 
       // Test backend without injection - should not throw
@@ -1024,6 +1030,7 @@ describe('NotificationService', () => {
       );
 
       // Backend without the injection method should not be called
+      // biome-ignore lint/suspicious/noExplicitAny:any just for testing
       expect((backendWithoutInjection as any).injectAttachmentManager).toBeUndefined();
 
       // Test backend with injection
@@ -1049,10 +1056,12 @@ describe('NotificationService', () => {
         injectBackend: jest.fn(),
         notificationType: 'EMAIL',
         key: 'test-adapter',
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       } as any;
 
       const backendWithAttachmentInjection = {
         injectAttachmentManager: jest.fn(),
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       } as any;
 
       new VintaSendFactory<Config>().create(

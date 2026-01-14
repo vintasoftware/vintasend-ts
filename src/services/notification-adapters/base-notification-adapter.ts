@@ -1,15 +1,11 @@
+import type { StoredAttachment } from '../../types/attachment';
 import type { JsonObject, JsonValue } from '../../types/json-values';
-import type {
-  AnyDatabaseNotification,
-  DatabaseNotification,
-  DatabaseOneOffNotification,
-} from '../../types/notification';
+import type { AnyDatabaseNotification, DatabaseOneOffNotification } from '../../types/notification';
 import type { NotificationType } from '../../types/notification-type';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
-import type { StoredAttachment } from '../../types/attachment';
+import type { BaseLogger } from '../loggers/base-logger';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseNotificationTemplateRenderer } from '../notification-template-renderers/base-notification-template-renderer';
-import type { BaseLogger } from '../loggers/base-logger';
 
 /**
  * Type guard to check if a notification is a one-off notification
@@ -36,7 +32,7 @@ export abstract class BaseNotificationAdapter<
     public readonly enqueueNotifications: boolean,
   ) {}
 
-  send(notification: AnyDatabaseNotification<Config>, context: JsonValue): Promise<void> {
+  send(_notification: AnyDatabaseNotification<Config>, _context: JsonValue): Promise<void> {
     if (this.backend === null) {
       return Promise.reject(new Error('Backend not injected'));
     }
@@ -54,11 +50,11 @@ export abstract class BaseNotificationAdapter<
    * Prepare attachments for sending
    * Override in adapters that support attachments
    */
-  protected async prepareAttachments(
-    attachments: StoredAttachment[],
-  ): Promise<unknown> {
+  protected async prepareAttachments(attachments: StoredAttachment[]): Promise<unknown> {
     if (this.supportsAttachments && attachments.length > 0) {
-      this.logger?.warn?.(`Adapter ${this.key} claims to support attachments but prepareAttachments is not implemented`);
+      this.logger?.warn?.(
+        `Adapter ${this.key} claims to support attachments but prepareAttachments is not implemented`,
+      );
     }
     return null;
   }

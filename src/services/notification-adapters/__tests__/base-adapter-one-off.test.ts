@@ -16,8 +16,8 @@ class TestAdapter<
 > extends BaseNotificationAdapter<TemplateRenderer, Config> {
   async send(notification: AnyDatabaseNotification<Config>, context: JsonObject): Promise<void> {
     // Test implementation that uses helper methods
-    const email = await this.getRecipientEmail(notification);
-    const name = this.getRecipientName(notification, context);
+    const _email = await this.getRecipientEmail(notification);
+    const _name = this.getRecipientName(notification, context);
     // In a real adapter, this would send the notification
     return Promise.resolve();
   }
@@ -39,7 +39,7 @@ class TestAdapter<
 }
 
 // Mock implementations
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+// biome-ignore lint/suspicious/noExplicitAny: any config for testing
 const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   persistNotification: jest.fn(),
   persistNotificationUpdate: jest.fn(),
@@ -76,7 +76,7 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   deleteNotificationAttachment: jest.fn().mockResolvedValue(undefined),
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+// biome-ignore lint/suspicious/noExplicitAny: any config for testing
 const mockTemplateRenderer: jest.Mocked<BaseNotificationTemplateRenderer<any>> = {
   render: jest.fn(),
 };

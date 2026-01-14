@@ -1,11 +1,7 @@
 import * as crypto from 'node:crypto';
-import * as mime from 'mime-types';
 import type { Readable } from 'node:stream';
-import {
-  type AttachmentFile,
-  type AttachmentFileRecord,
-  type FileAttachment,
-} from '../../types/attachment';
+import * as mime from 'mime-types';
+import type { AttachmentFile, AttachmentFileRecord, FileAttachment } from '../../types/attachment';
 
 export abstract class BaseAttachmentManager {
   /**
@@ -73,8 +69,11 @@ export abstract class BaseAttachmentManager {
     return (
       typeof value === 'object' &&
       value !== null &&
+      // biome-ignore lint/suspicious/noExplicitAny: checking for stream methods
       typeof (value as any).read === 'function' &&
+      // biome-ignore lint/suspicious/noExplicitAny: checking for stream methods
       typeof (value as any).on === 'function' &&
+      // biome-ignore lint/suspicious/noExplicitAny: checking for stream methods
       typeof (value as any).pipe === 'function'
     );
   }

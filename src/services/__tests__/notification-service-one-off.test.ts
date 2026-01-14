@@ -1,13 +1,15 @@
 import { VintaSendFactory } from '../../index';
-import type { DatabaseOneOffNotification } from '../../types/one-off-notification';
-import type { OneOffNotificationInput } from '../../types/one-off-notification';
+import type {
+  DatabaseOneOffNotification,
+  OneOffNotificationInput,
+} from '../../types/one-off-notification';
 import type { BaseLogger } from '../loggers/base-logger';
 import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
 
 // Mock implementations
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+// biome-ignore lint/suspicious/noExplicitAny: any for testing
 const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   persistNotification: jest.fn(),
   persistNotificationUpdate: jest.fn(),
@@ -44,7 +46,7 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   deleteNotificationAttachment: jest.fn().mockResolvedValue(undefined),
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+// biome-ignore lint/suspicious/noExplicitAny: any for testing
 const mockTemplateRenderer: jest.Mocked<BaseEmailTemplateRenderer<any>> = {
   render: jest.fn(),
 };
@@ -55,7 +57,7 @@ const mockLogger: jest.Mocked<BaseLogger> = {
   warn: jest.fn(),
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: <explanation>
+// biome-ignore lint/suspicious/noExplicitAny: any for testing
 const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any>> = {
   notificationType: 'EMAIL',
   key: 'test-adapter',
@@ -67,7 +69,7 @@ const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any>> = {
   templateRenderer: mockTemplateRenderer,
   logger: mockLogger,
   supportsAttachments: false,
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  // biome-ignore lint/suspicious/noExplicitAny: any for testing
 } as any;
 
 const notificationContextgenerators = {
@@ -84,9 +86,9 @@ type Config = {
 
 describe('NotificationService - One-Off Notifications', () => {
   let service: ReturnType<VintaSendFactory<Config>['create']>;
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  // biome-ignore lint/suspicious/noExplicitAny: any just for testing
   let mockOneOffNotification: DatabaseOneOffNotification<any>;
-  // biome-ignore lint/suspicious/noExplicitAny: <explanation>
+  // biome-ignore lint/suspicious/noExplicitAny: any just for testing
   let mockOneOffNotificationInput: Omit<OneOffNotificationInput<any>, 'id'>;
 
   beforeEach(() => {

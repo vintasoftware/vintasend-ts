@@ -1,11 +1,9 @@
-import * as crypto from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type {
   AttachmentFile,
   AttachmentFileRecord,
   FileAttachment,
-  NotificationAttachment,
 } from '../../../types/attachment';
 import { BaseAttachmentManager } from '../base-attachment-manager';
 
@@ -45,7 +43,7 @@ class TestAttachmentManager extends BaseAttachmentManager {
     this.fileContents.delete(fileId);
   }
 
-  reconstructAttachmentFile(storageMetadata: Record<string, unknown>): AttachmentFile {
+  reconstructAttachmentFile(_storageMetadata: Record<string, unknown>): AttachmentFile {
     return {
       read: async () => Buffer.from('test content'),
       stream: async () => new ReadableStream(),
@@ -192,10 +190,10 @@ describe('BaseAttachmentManager', () => {
   describe('deleteFile', () => {
     it('should delete file', async () => {
       const uploaded = await manager.uploadFile(Buffer.from('test'), 'test.txt');
-      
+
       // Verify file exists before deletion
       expect(manager.hasFile(uploaded.id)).toBe(true);
-      
+
       await manager.deleteFile(uploaded.id);
 
       // Verify file is actually deleted from in-memory Maps

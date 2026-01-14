@@ -1,8 +1,4 @@
-import type {
-  AnyDatabaseNotification,
-  AnyNotification,
-  AnyNotificationInput,
-} from '../notification';
+import type { AnyDatabaseNotification } from '../notification';
 import type { NotificationStatus } from '../notification-status';
 import type { NotificationType } from '../notification-type';
 import type {
@@ -11,7 +7,6 @@ import type {
   OneOffNotificationInput,
   OneOffNotificationResendWithContextInput,
 } from '../one-off-notification';
-import type { NotificationAttachment, StoredAttachment } from '../attachment';
 
 // Test configuration
 type TestContextMap = {
