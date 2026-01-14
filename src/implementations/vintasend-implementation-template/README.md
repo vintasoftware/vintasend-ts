@@ -97,7 +97,7 @@ The `TemplateAttachmentManager` provides a structure for implementing file attac
 
 **Example Implementation:**
 
-See [`vintasend-s3-attachments`](../vintasend-s3-attachments) for a complete AWS S3 implementation that follows this pattern.
+See [`vintasend-aws-s3-attachments`](../vintasend-aws-s3-attachments) for a complete AWS S3 implementation that follows this pattern.
 
 **Key Design Patterns:**
 

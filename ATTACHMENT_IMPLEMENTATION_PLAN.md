@@ -18,7 +18,7 @@ This plan outlines the implementation of attachment support in vintasend-ts, all
 ### Implementation Phases Overview
 1. **Phase 1-3:** Core types, notification updates, and backend interface
 2. **Phase 4:** Update vintasend-implementation-template with AttachmentManager template
-3. **Phase 5:** Generate vintasend-s3-attachments project structure from template
+3. **Phase 5:** Generate vintasend-aws-s3-attachments project structure from template
 4. **Phase 6:** Implement S3AttachmentManager with full AWS SDK integration
 5. **Phase 7-8:** Service and adapter integration
 6. **Phase 9-10:** Examples and documentation
@@ -944,7 +944,7 @@ This template provides a starting point for creating VintaSend implementations w
 The `TemplateAttachmentManager` provides a structure for implementing file attachment storage.
 
 **Supported Storage Backends:**
-- AWS S3 (see `vintasend-s3-attachments`)
+- AWS S3 (see `vintasend-aws-s3-attachments`)
 - Azure Blob Storage
 - Google Cloud Storage
 - Local Filesystem (development only)
@@ -952,7 +952,7 @@ The `TemplateAttachmentManager` provides a structure for implementing file attac
 
 **Implementation Steps:**
 
-1. Copy this template to a new package (e.g., `vintasend-s3-attachments`)
+1. Copy this template to a new package (e.g., `vintasend-aws-s3-attachments`)
 2. Rename `TemplateAttachmentManager` to your implementation name
 3. Add storage-specific dependencies to `package.json`
 4. Implement the required methods:
@@ -964,7 +964,7 @@ The `TemplateAttachmentManager` provides a structure for implementing file attac
 
 **Example:**
 
-See `src/implementations/vintasend-s3-attachments` for a complete AWS S3 implementation.
+See `src/implementations/vintasend-aws-s3-attachments` for a complete AWS S3 implementation.
 
 ## Other Components
 
@@ -984,7 +984,7 @@ See `src/implementations/vintasend-s3-attachments` for a complete AWS S3 impleme
 ## Phase 5: Setup S3 AttachmentManager Project Structure
 
 ### Objectives
-- Create project structure for vintasend-s3-attachments package
+- Create project structure for vintasend-aws-s3-attachments package
 - Setup build configuration, tests, and dependencies
 - Prepare for implementation based on template
 
@@ -992,15 +992,15 @@ See `src/implementations/vintasend-s3-attachments` for a complete AWS S3 impleme
 
 #### 5.1 Create Package Directory Structure
 ```bash
-mkdir -p src/implementations/vintasend-s3-attachments/src/__tests__
+mkdir -p src/implementations/vintasend-aws-s3-attachments/src/__tests__
 ```
 
 #### 5.2 Create package.json
-**File:** `src/implementations/vintasend-s3-attachments/package.json`
+**File:** `src/implementations/vintasend-aws-s3-attachments/package.json`
 
 ```json
 {
-  "name": "vintasend-s3-attachments",
+  "name": "vintasend-aws-s3-attachments",
   "version": "0.1.0",
   "description": "AWS S3 attachment manager for VintaSend",
   "main": "dist/index.js",
@@ -1045,7 +1045,7 @@ mkdir -p src/implementations/vintasend-s3-attachments/src/__tests__
 ```
 
 #### 5.3 Create TypeScript Configuration
-**File:** `src/implementations/vintasend-s3-attachments/tsconfig.json`
+**File:** `src/implementations/vintasend-aws-s3-attachments/tsconfig.json`
 
 ```json
 {
@@ -1062,7 +1062,7 @@ mkdir -p src/implementations/vintasend-s3-attachments/src/__tests__
 ```
 
 #### 5.4 Create Jest Configuration
-**File:** `src/implementations/vintasend-s3-attachments/jest.config.js`
+**File:** `src/implementations/vintasend-aws-s3-attachments/jest.config.js`
 
 ```javascript
 module.exports = {
@@ -1087,7 +1087,7 @@ module.exports = {
 ```
 
 #### 5.5 Create Biome Configuration
-**File:** `src/implementations/vintasend-s3-attachments/biome.json`
+**File:** `src/implementations/vintasend-aws-s3-attachments/biome.json`
 
 ```json
 {
@@ -1125,7 +1125,7 @@ module.exports = {
 ```
 
 #### 5.6 Create README
-**File:** `src/implementations/vintasend-s3-attachments/README.md`
+**File:** `src/implementations/vintasend-aws-s3-attachments/README.md`
 
 ```markdown
 # VintaSend S3 Attachments
@@ -1135,7 +1135,7 @@ AWS S3 attachment manager for VintaSend. Provides production-ready file storage 
 ## Installation
 
 ```bash
-npm install vintasend-s3-attachments
+npm install vintasend-aws-s3-attachments
 ```
 
 ## Features
@@ -1150,7 +1150,7 @@ npm install vintasend-s3-attachments
 ## Quick Start
 
 ```typescript
-import { S3AttachmentManager } from 'vintasend-s3-attachments';
+import { S3AttachmentManager } from 'vintasend-aws-s3-attachments';
 import { VintaSendFactory } from 'vintasend';
 
 const attachmentManager = new S3AttachmentManager({
@@ -1197,7 +1197,7 @@ MIT
 ```
 
 #### 5.7 Create Placeholder Implementation File
-**File:** `src/implementations/vintasend-s3-attachments/src/s3-attachment-manager.ts`
+**File:** `src/implementations/vintasend-aws-s3-attachments/src/s3-attachment-manager.ts`
 
 ```typescript
 // Implementation will be added in Phase 6
@@ -1207,7 +1207,7 @@ export class S3AttachmentManager {
 ```
 
 #### 5.8 Create Index File
-**File:** `src/implementations/vintasend-s3-attachments/src/index.ts`
+**File:** `src/implementations/vintasend-aws-s3-attachments/src/index.ts`
 
 ```typescript
 export { S3AttachmentManager } from './s3-attachment-manager';
@@ -1216,7 +1216,7 @@ export type { S3AttachmentManagerConfig } from './s3-attachment-manager';
 
 #### 5.9 Install Dependencies
 ```bash
-cd src/implementations/vintasend-s3-attachments
+cd src/implementations/vintasend-aws-s3-attachments
 npm install
 ```
 
@@ -1246,7 +1246,7 @@ npm install --save-dev @types/node
 ```
 
 #### 6.2 Create S3 AttachmentManager
-**File:** `src/implementations/vintasend-s3-attachments/src/s3-attachment-manager.ts`
+**File:** `src/implementations/vintasend-aws-s3-attachments/src/s3-attachment-manager.ts`
 
 Implement S3-based storage:
 
@@ -1492,10 +1492,10 @@ class S3AttachmentFile implements AttachmentFile {
 
 **Package Files:**
 
-`src/implementations/vintasend-s3-attachments/package.json`:
+`src/implementations/vintasend-aws-s3-attachments/package.json`:
 ```json
 {
-  "name": "vintasend-s3-attachments",
+  "name": "vintasend-aws-s3-attachments",
   "version": "1.0.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -1510,13 +1510,13 @@ class S3AttachmentFile implements AttachmentFile {
 }
 ```
 
-`src/implementations/vintasend-s3-attachments/src/index.ts`:
+`src/implementations/vintasend-aws-s3-attachments/src/index.ts`:
 ```typescript
 export { S3AttachmentManager } from './s3-attachment-manager';
 export type { S3AttachmentManagerConfig } from './s3-attachment-manager';
 ```
 
-**Test:** `src/implementations/vintasend-s3-attachments/src/__tests__/s3-attachment-manager.test.ts`
+**Test:** `src/implementations/vintasend-aws-s3-attachments/src/__tests__/s3-attachment-manager.test.ts`
 - Test uploading various file types to S3
 - Test file retrieval from S3
 - Test file deletion from S3
@@ -1735,7 +1735,7 @@ export class NodemailerNotificationAdapter<
 
 ```typescript
 import { VintaSendFactory } from '../services/notification-service';
-import { S3AttachmentManager } from '../implementations/vintasend-s3-attachments';
+import { S3AttachmentManager } from '../implementations/vintasend-aws-s3-attachments';
 import { NotificationAttachment } from '../types/attachment';
 import * as fs from 'fs';
 
@@ -1802,7 +1802,7 @@ Add attachment support to the Next.js example application with examples of:
 
 ```typescript
 import { VintaSendFactory } from '../services/notification-service';
-import { S3AttachmentManager } from '../implementations/vintasend-s3-attachments';
+import { S3AttachmentManager } from '../implementations/vintasend-aws-s3-attachments';
 
 async function attachmentManagementExample() {
   // ... setup vintaSend
@@ -1911,16 +1911,8 @@ Document the new attachment feature.
 
 ### Tasks
 
-#### 11.1 S3 Multipart Upload Support
-**File:** `src/implementations/vintasend-s3-attachments/src/multipart-upload.ts`
 
-Add support for large file uploads:
-- Implement multipart upload for files > 5MB
-- Add progress tracking callbacks
-- Enable parallel chunk uploads
-- Handle upload retries
-
-#### 11.2 Local File AttachmentManager (Development/Testing)
+#### 11.1 Local File AttachmentManager (Development/Testing)
 **Package:** `src/services/attachment-manager/local-file-attachment-manager.ts`
 
 Implement local filesystem storage for development:
@@ -1929,7 +1921,7 @@ Implement local filesystem storage for development:
 - No external dependencies
 - Quick setup for prototyping
 
-#### 11.3 Configure the example project to use LocalStack
+#### 11.2 Configure the example project to use LocalStack
 
 Configure the example project to use LocalStack for emulating S3 so we can upload files without accessing the internet in development.
 
@@ -1969,7 +1961,7 @@ Configure the example project to use LocalStack for emulating S3 so we can uploa
 
 3. **Setup S3 AttachmentManager:**
    ```typescript
-   import { S3AttachmentManager } from 'vintasend-s3-attachments';
+   import { S3AttachmentManager } from 'vintasend-aws-s3-attachments';
 
    const attachmentManager = new S3AttachmentManager({
      bucket: process.env.S3_BUCKET!,

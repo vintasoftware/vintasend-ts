@@ -167,7 +167,7 @@ This document tracks the progress of implementing attachment support in VintaSen
 ### Documentation:
 - ✅ Step-by-step implementation guide
 - ✅ List of supported storage backends
-- ✅ Example implementation reference (vintasend-s3-attachments)
+- ✅ Example implementation reference (vintasend-aws-s3-attachments)
 - ✅ Key design patterns explained (reusable files, deduplication, presigned URLs, streaming)
 - ✅ Other component templates mentioned (Adapter, Backend, Template Renderer, Logger)
 - ✅ Best practices for type safety, testing, documentation, and security
@@ -340,15 +340,125 @@ This document tracks the progress of implementing attachment support in VintaSen
 
 ---
 
-## Phase 9: Integration Example ⏳
+## Phase 9: Integration Example ✅
 
-### Status: NOT STARTED
+### Status: COMPLETED
+
+### Files Created:
+- ✅ `src/examples/notification-with-attachments-example.ts` - Comprehensive example with 8 usage scenarios
+- ✅ `src/examples/attachment-management-example.ts` - Attachment lifecycle management examples
+- ✅ `src/examples/nextjs-prisma-nodemailer-pug-temporal/src/lib/notification-attachments.ts` - Next.js integration utilities
+- ✅ `src/examples/nextjs-prisma-nodemailer-pug-temporal/ATTACHMENTS_GUIDE.md` - Complete guide for Next.js example
+
+### Examples Implemented:
+
+#### notification-with-attachments-example.ts:
+- ✅ Example 1: Inline file upload with notifications
+- ✅ Example 2: Multiple attachments in single notification
+- ✅ Example 3: Reusing uploaded files across notifications
+- ✅ Example 4: Mixing inline uploads and file references
+- ✅ Example 5: Using streams for large files
+- ✅ Example 6: Accessing attachment URLs (presigned URLs)
+- ✅ Example 7: Automatic file deduplication demonstration
+- ✅ Example 8: Error handling scenarios
+
+#### attachment-management-example.ts:
+- ✅ Example 1: Pre-uploading common assets for reuse
+- ✅ Example 2: Bulk notifications with reusable attachments
+- ✅ Example 3: Finding and cleaning orphaned files
+- ✅ Example 4: Managing attachment metadata
+- ✅ Example 5: Attachment storage statistics
+- ✅ Example 6: Batch uploading with progress tracking
+- ✅ Example 7: Exporting attachment metadata
+- ✅ Example 8: Attachment lifecycle best practices
+
+#### Next.js Example Integration:
+- ✅ `createAttachmentManager()` - S3 configuration helper
+- ✅ `uploadReusableFile()` - Upload and store file metadata
+- ✅ `uploadCommonAssets()` - Batch upload common files
+- ✅ `getAttachmentFile()` - Retrieve file by ID
+- ✅ `createAttachmentReference()` - Create file reference
+- ✅ `createInlineAttachment()` - Create inline upload
+- ✅ `cleanupOrphanedFiles()` - Automated cleanup utility
+- ✅ `getAttachmentStats()` - Storage statistics
+- ✅ `setupCommonAssets()` - Initialize common assets
+- ✅ Example API route patterns included
+- ✅ Complete ATTACHMENTS_GUIDE.md with:
+  - Environment setup instructions
+  - S3 bucket configuration
+  - IAM policy examples
+  - LocalStack development setup
+  - Usage examples
+  - API route examples
+  - Best practices
+  - Troubleshooting guide
+  - Security considerations
+  - Performance tips
+
+### Key Features Demonstrated:
+- ✅ S3AttachmentManager configuration and setup
+- ✅ Inline file uploads vs. file references
+- ✅ File deduplication via checksums
+- ✅ Reusing files across multiple notifications
+- ✅ Presigned URL generation for secure access
+- ✅ Streaming support for large files
+- ✅ Orphaned file cleanup
+- ✅ Storage statistics and monitoring
+- ✅ Error handling patterns
+- ✅ LocalStack setup for local development
+- ✅ S3-compatible services configuration
+- ✅ Security best practices
+- ✅ Performance optimization tips
 
 ---
 
-## Phase 10: Documentation and Polish ⏳
+## Phase 10: Documentation and Polish ✅
 
-### Status: NOT STARTED
+### Status: COMPLETED
+
+### Files Created:
+- ✅ `ATTACHMENTS.md` - Comprehensive attachment documentation
+- ✅ Updated `README.md` - Added attachment support section and quick start
+- ✅ Updated `CHANGELOG.md` - Documented attachment feature in v0.4.0
+
+### Documentation Coverage:
+
+#### ATTACHMENTS.md - Complete Guide:
+- ✅ Quick Start with S3
+- ✅ Architecture Overview
+- ✅ S3 Configuration (bucket setup, IAM policies, lifecycle policies)
+- ✅ Usage Examples (inline uploads, pre-uploaded files, multiple attachments, streaming, URLs, deduplication, cleanup)
+- ✅ Security Best Practices (10+ security recommendations)
+- ✅ Custom Storage Backends (complete implementation guide with Azure example)
+- ✅ S3-Compatible Storage Providers (MinIO, DigitalOcean Spaces, Cloudflare R2, Wasabi, Backblaze B2, LocalStack)
+- ✅ Performance Optimization (8+ optimization techniques)
+- ✅ Troubleshooting (common issues and solutions)
+- ✅ Additional Resources and Support
+
+#### README.md Updates:
+- ✅ Added "File Attachments" to Features section
+- ✅ Added comprehensive "Attachment Support" section with quick start
+- ✅ Added link to ATTACHMENTS.md for detailed documentation
+- ✅ Updated Glossary with AttachmentManager and Attachment definitions
+- ✅ Added vintasend-aws-s3-attachments to Officially Supported Packages
+
+#### CHANGELOG.md Updates:
+- ✅ Added Version 0.4.0 entry
+- ✅ Documented all attachment features
+- ✅ Listed backend updates
+- ✅ Noted backward compatibility
+- ✅ Listed breaking changes (none)
+
+### Key Documentation Features:
+- ✅ Production-ready examples with real-world scenarios
+- ✅ Security best practices including IAM roles, encryption, access control
+- ✅ Complete S3 setup guide (bucket creation, policies, lifecycle rules)
+- ✅ Custom storage backend implementation guide with full Azure example
+- ✅ Support for S3-compatible services with configuration examples
+- ✅ Performance optimization techniques
+- ✅ Comprehensive troubleshooting section
+- ✅ Clear API examples for all major use cases
+- ✅ LocalStack setup for local development
 
 ---
 
@@ -368,6 +478,9 @@ This document tracks the progress of implementing attachment support in VintaSen
 - Phase 6 completed on: January 12, 2026
 - Phase 7 completed on: January 13, 2026
 - Phase 8 completed on: January 13, 2026
+- Phase 9 completed on: January 13, 2026
+- Phase 10 completed on: January 14, 2026
 - All tests passing for Phases 1-8 (255 tests total: 164 core + 19 nodemailer + 72 Prisma)
-- Ready to proceed to Phase 9: Integration Example
+- All core attachment features implemented and documented
+- Ready for production use with comprehensive documentation
 

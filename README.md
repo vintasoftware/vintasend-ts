@@ -6,6 +6,7 @@ A flexible package for implementing transactional notifications in TypeScript.
 
 * **Storing notifications in a Database**: This package relies on a data store to record all the notifications that will be sent. It also keeps its state column up to date.
 * **One-off notifications**: Send notifications directly to email addresses or phone numbers without requiring a user account. Perfect for prospects, guests, or external contacts.
+* **File Attachments**: Attach files to notifications with flexible storage backend support (S3, Azure, GCS, local filesystem, etc.), automatic deduplication, and reusable file references.
 * **Scheduling notifications**: Storing notifications to be sent in the future. The notification's context for rendering the template is only evaluated at the moment the notification is sent due to the lib's context generation registry.
 * **Notification context fetched at send time**: On scheduled notifications, the package only gets the notification context (information to render the templates) at the send time, so we always get the most up-to-date information.
 * **Flexible backend**: Your project's database is getting slow after you created the first million notifications? You can migrate to a faster NoSQL database in the blink of an eye without affecting how you send the notifications.
@@ -105,6 +106,81 @@ export function sendWelcomeEmail(userId: number) {
 } 
 ```
 
+## Attachment Support
+
+VintaSend supports file attachments for notifications with an extensible architecture that allows you to choose your preferred storage backend.
+
+### Key Features
+
+- ✅ **Flexible Storage** - Support for multiple backends (AWS S3, Azure Blob, Google Cloud Storage, local filesystem, etc.)
+- ✅ **Reusable Files** - Upload once, attach to multiple notifications
+- ✅ **Automatic Deduplication** - Files with identical content stored only once
+- ✅ **Streaming Support** - Efficient handling of large files
+- ✅ **Presigned URLs** - Secure, time-limited file access (backend-dependent)
+- ✅ **Custom Backends** - Extensible interface to implement any storage service
+
+### Quick Start
+
+```typescript
+// Example using S3 AttachmentManager (see available implementations below)
+import { S3AttachmentManager } from 'vintasend-aws-s3-attachments';
+
+// Create attachment manager (configuration varies by implementation)
+const attachmentManager = new S3AttachmentManager({
+  bucket: 'my-app-notifications',
+  region: 'us-east-1',
+  keyPrefix: 'attachments/',
+});
+
+// Create VintaSend with attachment support
+const vintaSend = factory.create(
+  adapters,
+  backend,
+  templateRenderer,
+  contextGeneratorsMap,
+  logger,
+  attachmentManager, // Pass your chosen attachment manager
+);
+
+// Send notification with inline file upload
+await vintaSend.sendNotification({
+  notificationTypeId: 'order-confirmation',
+  userId: '123',
+  context: { orderNumber: 'ORD-12345' },
+  attachments: [
+    {
+      file: invoiceBuffer,
+      filename: 'invoice.pdf',
+      contentType: 'application/pdf',
+    },
+  ],
+});
+
+// Send notification with pre-uploaded file reference
+await vintaSend.sendNotification({
+  notificationTypeId: 'welcome-email',
+  userId: '456',
+  context: { userName: 'John' },
+  attachments: [
+    {
+      fileId: 'file-abc-123', // Reference to existing file
+      description: 'Company brochure',
+    },
+  ],
+});
+```
+
+### Complete Documentation
+
+For comprehensive guides on attachment support, storage backends, security, and best practices, see [ATTACHMENTS.md](ATTACHMENTS.md).
+
+Topics covered:
+- Available storage backend implementations
+- Creating custom AttachmentManagers for any storage service
+- Security best practices and performance optimization
+- Adapter support for sending attachments
+- Usage examples and patterns
+
 ## One-Off Notifications
 
 One-off notifications allow you to send notifications directly to an email address or phone number without requiring a user account in your system. This is particularly useful for:
@@ -195,7 +271,9 @@ If you're adding one-off notification support to an existing installation:
 * **Queue service**: Service for enqueueing notifications so they are sent by an external service.
 * **Logger**: A class that allows the `NotificationService` to create logs following a format defined by its users.
 * **One-off Notification**: A notification sent directly to an email address or phone number without requiring a user account. Used for prospects, guests, or external contacts.
-* **Regular Notification**: A notification associated with a user account (via userId). Used for registered users in your system.  
+* **Regular Notification**: A notification associated with a user account (via userId). Used for registered users in your system.
+* **AttachmentManager**: A class that handles file storage operations (upload, download, delete) for notification attachments. Supports S3, Azure, GCS, and custom storage backends.
+* **Attachment**: A file attached to a notification, either uploaded inline or referenced from previously uploaded files. Supports automatic deduplication and reuse across multiple notifications.  
 
 
 ## Implementations
@@ -212,7 +290,11 @@ VintaSend has many backend, adapter, and template renderer implementations. If y
 
 ##### Adapters
 
-* **[vintasend-nodemailer](https://github.com/vintasoftware/vintasend-nodemailer/)**: Uses nodemailer to send transactional emails to users. 
+* **[vintasend-nodemailer](https://github.com/vintasoftware/vintasend-nodemailer/)**: Uses nodemailer to send transactional emails to users.
+
+##### Attachment Managers
+
+* **[vintasend-aws-s3-attachments](https://github.com/vintasoftware/vintasend-aws-s3-attachments/)**: AWS S3 storage backend with presigned URLs and streaming support. Also works with S3-compatible services (MinIO, DigitalOcean Spaces, Cloudflare R2, etc.).
 
 ##### Template Renderers
 * **[vintasend-pug](https://github.com/vintasoftware/vintasend-pug/)**: Renders emails using Pug.
