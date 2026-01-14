@@ -22,3 +22,20 @@ export {
   BaseNotificationAdapter,
   isOneOffNotification,
 } from './services/notification-adapters/base-notification-adapter';
+
+// Attachment Manager
+export { BaseAttachmentManager } from './services/attachment-manager/base-attachment-manager';
+export { LocalFileAttachmentManager } from './services/attachment-manager/local-file-attachment-manager';
+export type { LocalFileAttachmentManagerConfig } from './services/attachment-manager/local-file-attachment-manager';
+
+// Attachment Types
+export type {
+  FileAttachment,
+  NotificationAttachmentUpload,
+  NotificationAttachmentReference,
+  NotificationAttachment,
+  AttachmentFile,
+  AttachmentFileRecord,
+  StoredAttachment,
+} from './types/attachment';
+export { isAttachmentReference } from './types/attachment';
