@@ -340,20 +340,24 @@ VintaSend has many backend, adapter, and template renderer implementations. If y
 ##### Backends
 
 * **[vintasend-prisma](https://github.com/vintasoftware/vintasend-prisma/)**: Uses Prisma Client to manage the notifications in the database.
+* **[vintasend-medplum](./src/implementations/vintasend-medplum/)**: Uses Medplum FHIR resources (Communication, Binary, Media) to manage notifications in healthcare applications.
 
 ##### Adapters
 
 * **[vintasend-nodemailer](https://github.com/vintasoftware/vintasend-nodemailer/)**: Uses nodemailer to send transactional emails to users.
+* **[vintasend-medplum](./src/implementations/vintasend-medplum/)**: Uses Medplum's email API to send notifications in healthcare applications.
 
 ##### Attachment Managers
 
 * **[vintasend-aws-s3-attachments](https://github.com/vintasoftware/vintasend-aws-s3-attachments/)**: AWS S3 storage backend with presigned URLs and streaming support. Also works with S3-compatible services (MinIO, DigitalOcean Spaces, Cloudflare R2, etc.).
+* **[vintasend-medplum](./src/implementations/vintasend-medplum/)**: FHIR-compliant file storage using Binary and Media resources for healthcare applications.
 
 ##### Template Renderers
 * **[vintasend-pug](https://github.com/vintasoftware/vintasend-pug/)**: Renders emails using Pug.
 
 ##### Loggers
 * **[vintasend-winston](https://github.com/vintasoftware/vintasend-winston/)**: Uses Winston to allow `NotificationService` to create log entries.
+* **[vintasend-medplum](./src/implementations/vintasend-medplum/)**: Simple console-based logger for Medplum applications.
 
 ## Examples
 
