@@ -119,6 +119,12 @@ export class VintaSend<
     for (const adapter of adapters) {
       adapter.injectBackend(backend);
       adapter.injectLogger(logger);
+      // Inject logger into template renderer if it supports it
+      // biome-ignore lint/suspicious/noExplicitAny: accessing protected templateRenderer property
+      const templateRenderer = (adapter as any).templateRenderer;
+      if (templateRenderer && typeof templateRenderer.injectLogger === 'function') {
+        templateRenderer.injectLogger(logger);
+      }
     }
     // Inject attachment manager into backend if both exist
     if (this.attachmentManager && hasAttachmentManagerInjection(backend)) {
