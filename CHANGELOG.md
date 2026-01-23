@@ -5,7 +5,7 @@
 * **Template Renderer Logger Injection**: Template renderers now support optional logger injection for better error handling and debugging:
   * Added optional `injectLogger()` method to `BaseEmailTemplateRenderer` interface
   * `PugEmailTemplateRenderer` now supports logger injection
-  * `InlineTemplateRenderer` now uses injected logger instead of `console.error`
+  * `PugInlineEmailTemplateRenderer` now uses injected logger instead of `console.error`
   * VintaSend automatically injects logger into template renderers that support it
   * Template renderers continue to work without implementing logger injection (backward compatible)
 
