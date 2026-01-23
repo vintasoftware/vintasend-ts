@@ -1,6 +1,6 @@
 {
   "name": "vintasend-implementation-template",
-  "version": "0.3.0",
+  "version": "0.4.3",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
@@ -14,7 +14,7 @@
   "author": "Hugo Bessa",
   "license": "MIT",
   "dependencies": {
-    "vintasend": "^0.3.0"
+    "vintasend": "^0.4.3"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
