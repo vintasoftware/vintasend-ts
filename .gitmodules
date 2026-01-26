@@ -20,3 +20,6 @@
 [submodule "src/implementations/vintasend-medplum"]
 	path = src/implementations/vintasend-medplum
 	url = git@github.com:vintasoftware/vintasend-medplum.git
+[submodule "src/implementations/vintasend-ts-sendgrid"]
+	path = src/implementations/vintasend-ts-sendgrid
+	url = git@github.com:vintasoftware/vintasend-ts-sendgrid.git

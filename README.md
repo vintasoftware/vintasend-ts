@@ -345,6 +345,7 @@ VintaSend has many backend, adapter, and template renderer implementations. If y
 ##### Adapters
 
 * **[vintasend-nodemailer](https://github.com/vintasoftware/vintasend-nodemailer/)**: Uses nodemailer to send transactional emails to users.
+* **[vintasend-sendgrid](https://github.com/vintasoftware/vintasend-ts-sendgrid/)**: Uses SendGrid's API to send transactional emails with attachment support.
 * **[vintasend-medplum](https://github.com/vintasoftware/vintasend-medplum/)**: Uses Medplum's email API to send notifications in healthcare applications.
 
 ##### Attachment Managers
