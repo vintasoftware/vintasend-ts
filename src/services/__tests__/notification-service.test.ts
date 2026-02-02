@@ -340,12 +340,12 @@ describe('NotificationService', () => {
       expect(mockLogger.info).toHaveBeenCalledWith(`Notification 123 scheduled for ${futureDate}`);
     });
 
-    it('should log error when notification is created', async () => {
+    it('should log info when notification is created', async () => {
       mockBackend.persistNotification.mockResolvedValue({ ...mockNewNotification, id: '123' });
 
       await service.createNotification(mockNewNotification);
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Notification 123 created');
+      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 created');
     });
 
     it('should handle notification with null sendAfter date', async () => {
