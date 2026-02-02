@@ -1,7 +1,7 @@
 root = true
 
 [{src,scripts}/**.{ts,json,js}]
-end_of_line = crlf
+end_of_line = lf
 charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
@@ -9,7 +9,7 @@ indent_style = space
 indent_size = 2
 
 [{src,scripts}/**.{md,html,css,scss}]
-end_of_line = crlf
+end_of_line = lf
 charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
@@ -17,7 +17,7 @@ indent_style = space
 indent_size = 2
 
 [{src,scripts}/**.{yml,yaml}]
-end_of_line = crlf
+end_of_line = lf
 charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
@@ -25,7 +25,7 @@ indent_style = space
 indent_size = 2
 
 [{src,scripts}/**.{sh}]
-end_of_line = crlf
+end_of_line = lf
 charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
