@@ -9,6 +9,7 @@ import type {
   OneOffNotificationInput,
 } from '../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
+import type { BaseLogger } from '../loggers/base-logger';
 
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
   getAllPendingNotifications(): Promise<AnyDatabaseNotification<Config>[]>;
@@ -91,6 +92,12 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     page: number,
     pageSize: number,
   ): Promise<DatabaseOneOffNotification<Config>[]>;
+
+  // Optional logger injection for debugging and monitoring
+  /**
+   * Inject logger into backend for debugging and monitoring
+   */
+  injectLogger?(logger: BaseLogger): void;
 
   // Attachment management methods (optional - only needed if backend supports attachments)
   /**

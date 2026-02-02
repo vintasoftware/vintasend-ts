@@ -126,6 +126,10 @@ export class VintaSend<
         templateRenderer.injectLogger(logger);
       }
     }
+    // Inject logger into backend if it supports it
+    if (typeof backend.injectLogger === 'function') {
+      backend.injectLogger(logger);
+    }
     // Inject attachment manager into backend if both exist
     if (this.attachmentManager && hasAttachmentManagerInjection(backend)) {
       backend.injectAttachmentManager(this.attachmentManager);
@@ -236,7 +240,7 @@ export class VintaSend<
     notification: Omit<Notification<Config>, 'id'>,
   ): Promise<DatabaseNotification<Config>> {
     const createdNotification = await this.backend.persistNotification(notification);
-    this.logger.error(`Notification ${createdNotification.id} created`);
+    this.logger.info(`Notification ${createdNotification.id} created`);
 
     if (!notification.sendAfter || notification.sendAfter <= new Date()) {
       this.logger.info(
