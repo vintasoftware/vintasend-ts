@@ -1,5 +1,9 @@
 # Changelog
 
+## Version 0.4.7
+
+* Inject logger into backend (optional)
+
 ## Version 0.4.3
 
 * **Template Renderer Logger Injection**: Template renderers now support optional logger injection for better error handling and debugging:
