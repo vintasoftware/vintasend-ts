@@ -77,25 +77,25 @@ async function main() {
 
     // Step 1: Find highest version (including main package)
     logStep('1', 'Finding highest version...');
-    
+
     // Get main package version
     const mainPackage = readPackageJson(rootPackageJsonPath);
     const mainVersion = mainPackage.version;
     logInfo(`Main package (vintasend) version: ${mainVersion}`);
-    
+
     // Get highest implementation version
     const { version: highestImplVersion, packageName: highestImplPackage } = findHighestVersion(implementationsDir);
     logInfo(`Highest implementation version: ${highestImplVersion} (${highestImplPackage})`);
-    
+
     // Compare and find the true highest
     let highestVersion = mainVersion;
     let highestPackage = 'vintasend';
-    
+
     if (compareVersions(highestImplVersion, mainVersion) > 0) {
       highestVersion = highestImplVersion;
       highestPackage = highestImplPackage;
     }
-    
+
     log('');
     logInfo(`Starting from highest version: ${highestVersion} (${highestPackage})`);
 
