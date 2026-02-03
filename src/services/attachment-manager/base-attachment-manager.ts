@@ -14,6 +14,11 @@ export abstract class BaseAttachmentManager {
   ): Promise<AttachmentFileRecord>;
 
   /**
+   * Get file metadata by ID
+   */
+  abstract getFile(fileId: string): Promise<AttachmentFileRecord | null>;
+
+  /**
    * Delete a file (only if not referenced by any notifications)
    */
   abstract deleteFile(fileId: string): Promise<void>;

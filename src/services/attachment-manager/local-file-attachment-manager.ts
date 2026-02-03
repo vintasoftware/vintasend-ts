@@ -9,6 +9,7 @@ const writeFile = promisify(fs.writeFile);
 const readFile = promisify(fs.readFile);
 const unlink = promisify(fs.unlink);
 const access = promisify(fs.access);
+const stat = promisify(fs.stat);
 
 /**
  * Configuration options for LocalFileAttachmentManager
@@ -93,11 +94,24 @@ export class LocalFileAttachmentManager extends BaseAttachmentManager {
     // Create file path
     const filePath = path.join(this.baseDirectory, fileId);
 
+    // Get file size
+    const size = buffer.length;
+
     // Write file to disk
     await writeFile(filePath, buffer);
 
-    // Get file size
-    const size = buffer.length;
+    // Write metadata file
+    const metadataPath = `${filePath}.metadata.json`;
+    const metadata = {
+      id: fileId,
+      filename: sanitizedFilename,
+      contentType: finalContentType,
+      size,
+      checksum,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
 
     // Return file record
     return {
@@ -116,12 +130,81 @@ export class LocalFileAttachmentManager extends BaseAttachmentManager {
   }
 
   /**
+   * Get file metadata by ID
+   */
+  async getFile(fileId: string): Promise<AttachmentFileRecord | null> {
+    const filePath = path.join(this.baseDirectory, fileId);
+    const metadataPath = `${filePath}.metadata.json`;
+
+    try {
+      // Check if metadata file exists
+      await access(metadataPath, fs.constants.F_OK);
+
+      // Read metadata
+      const metadataContent = await readFile(metadataPath, 'utf-8');
+      const metadata = JSON.parse(metadataContent);
+
+      // Verify the actual file exists
+      await access(filePath, fs.constants.F_OK);
+
+      return {
+        id: metadata.id,
+        filename: metadata.filename,
+        contentType: metadata.contentType,
+        size: metadata.size,
+        checksum: metadata.checksum,
+        storageMetadata: {
+          path: filePath,
+          backend: 'local-filesystem',
+        },
+        createdAt: new Date(metadata.createdAt),
+        updatedAt: new Date(metadata.updatedAt),
+      };
+    } catch (error) {
+      // If metadata file doesn't exist, try to reconstruct from file
+      try {
+        await access(filePath, fs.constants.F_OK);
+        const stats = await stat(filePath);
+        const buffer = await readFile(filePath);
+        const checksum = this.calculateChecksum(buffer);
+
+        // Return minimal metadata
+        return {
+          id: fileId,
+          filename: fileId, // Use fileId as filename since we don't have the original
+          contentType: 'application/octet-stream', // Unknown
+          size: stats.size,
+          checksum,
+          storageMetadata: {
+            path: filePath,
+            backend: 'local-filesystem',
+          },
+          createdAt: stats.birthtime,
+          updatedAt: stats.mtime,
+        };
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  /**
    * Delete a file from the local filesystem
    */
   async deleteFile(fileId: string): Promise<void> {
     const filePath = path.join(this.baseDirectory, fileId);
+    const metadataPath = `${filePath}.metadata.json`;
 
     try {
+      // Delete the metadata file if it exists
+      try {
+        await access(metadataPath, fs.constants.F_OK);
+        await unlink(metadataPath);
+      } catch {
+        // Metadata file doesn't exist, continue
+      }
+
+      // Delete the actual file
       await access(filePath, fs.constants.F_OK);
       await unlink(filePath);
     } catch (error) {

@@ -42,3 +42,6 @@ yarn.lock
 
 .vscode
 package-lock.json
+
+# Release automation state
+.release-state.json

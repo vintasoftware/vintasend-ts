@@ -38,6 +38,10 @@ class TestAttachmentManager extends BaseAttachmentManager {
     return fileRecord;
   }
 
+  async getFile(fileId: string): Promise<AttachmentFileRecord | null> {
+    return this.files.get(fileId) || null;
+  }
+
   async deleteFile(fileId: string): Promise<void> {
     this.files.delete(fileId);
     this.fileContents.delete(fileId);

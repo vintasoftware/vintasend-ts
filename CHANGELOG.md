@@ -1,5 +1,25 @@
 # Changelog
 
+## Version 0.4.17
+
+* **Release Automation**: Introduced a comprehensive two-step release automation system for managing vintasend-ts and all implementation packages:
+  * **Two-step release process**: Separate version bumping from publishing for better control
+  * **Version bump step** (`npm run release:bump`): Updates all package.json files, then prompts for CHANGELOG updates
+  * **Publish step** (`npm run release:publish`): Individual commit messages for each package (main + 8 implementations)
+  * **2FA Support**: Browser-based npm 2FA authentication with 5-minute authorization window
+  * **Automatic dependency management**: Runs `npm install` for each implementation to ensure correct vintasend version
+  * **Includes all changes**: Commits all modified and untracked files (no clean working directory required)
+  * **State tracking**: Uses `.release-state.json` to maintain context between steps
+  * **Comprehensive documentation**: Release guide, quick reference, and technical documentation
+  * **Safety features**: Confirmation prompts, test execution before publish, error handling
+* **Attachment Manager Improvements**:
+  * **BaseAttachmentManager**: Created mandatory getFile method and implemented in both AWS S3 and Medplum attachment managers.
+* **Developer Experience**: 
+  * New npm scripts: `release:bump`, `release:bump:patch`, `release:bump:minor`, `release:publish`
+  * Complete workflow: bump versions → update CHANGELOG → publish all packages
+  * Each package gets its own descriptive commit message
+  * Documentation linked in README.md under Contributing section
+
 ## Version 0.4.7
 
 * Inject logger into backend (optional)
