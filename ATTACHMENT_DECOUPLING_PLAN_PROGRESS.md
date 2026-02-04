@@ -744,3 +744,198 @@ const binaryId = identifiers.medplumBinaryId;
 - Backends should not call these methods directly - they should use `reconstructAttachmentFile()` and `deleteFileByIdentifiers()` instead
 - The dual resource model (Binary + Media) is maintained: Binary stores file data, Media stores metadata and links to Binary
 
+---
+
+## Phase 4 Progress Report: S3AttachmentManager Implementation
+
+**Status**: ✅ COMPLETE
+**Date**: February 4, 2026
+**Phase**: 4 of 7
+
+---
+
+### Summary
+
+Phase 4 fully implemented the `S3AttachmentManager` to use the new `S3StorageIdentifiers` type with proper field names. The manager now returns storage identifiers with `awsS3Bucket`, `awsS3Key`, and `awsS3Region` fields instead of generic field names, providing explicit type safety and making the attachment manager's contract clear.
+
+---
+
+### Files Modified
+
+#### 1. S3AttachmentManager Implementation
+
+##### [src/implementations/vintasend-aws-s3-attachments/src/aws-s3-attachment-manager.ts](src/implementations/vintasend-aws-s3-attachments/src/aws-s3-attachment-manager.ts)
+**Changes**:
+- Added `S3StorageIdentifiers` import from `./types`
+- Updated `uploadFile()` to return `S3StorageIdentifiers` with proper field names:
+  - `id`: File ID (universal identifier)
+  - `awsS3Bucket`: S3 bucket name
+  - `awsS3Key`: S3 object key/path
+  - `awsS3Region`: AWS region where bucket exists
+- Updated `getFile()` to return `S3StorageIdentifiers` with proper field names
+- Updated `reconstructAttachmentFile()` to use `awsS3Bucket` and `awsS3Key` instead of generic `bucket` and `key`
+- Updated error messages to reference proper field names (`awsS3Bucket`, `awsS3Key`)
+- Removed deprecated `deleteFile()` method (was throwing error for S3)
+- Removed deprecated `deleteFileWithMetadata()` helper method
+- Replaced with single `deleteFileByIdentifiers(storageIdentifiers: StorageIdentifiers)` implementation
+
+**Before**:
+```typescript
+storageIdentifiers: {
+  id: fileId,
+  bucket: this.bucket,  // ❌ Generic field name
+  key,                   // ❌ Generic field name
+  region: this.s3Client.config.region,  // ❌ Generic field name
+}
+```
+
+**After**:
+```typescript
+const storageIdentifiers: S3StorageIdentifiers = {
+  id: fileId,
+  awsS3Bucket: this.bucket,  // ✅ AWS S3-specific field
+  awsS3Key: key,              // ✅ AWS S3-specific field
+  awsS3Region: this.s3Client.config.region as string,  // ✅ AWS S3-specific field
+};
+```
+
+#### 2. S3AttachmentManager Tests
+
+##### [src/implementations/vintasend-aws-s3-attachments/src/__tests__/attachment-manager.test.ts](src/implementations/vintasend-aws-s3-attachments/src/__tests__/attachment-manager.test.ts)
+**Changes**:
+- Updated `uploadFile` test to verify `S3StorageIdentifiers` structure (7 locations):
+  - Changed `bucket` → `awsS3Bucket`
+  - Changed `key` → `awsS3Key`
+  - Changed `region` → `awsS3Region`
+- Updated `deleteFile` test → replaced with proper `deleteFileByIdentifiers` tests (2 tests added):
+  - Test for successful deletion with valid identifiers
+  - Test for error when `awsS3Key` is missing
+- Removed deprecated `deleteFileWithMetadata` test suite (was using old structure)
+- Updated `reconstructAttachmentFile` tests to use new field names (3 tests):
+  - Updated error messages to reference `awsS3Bucket` and `awsS3Key`
+  - Renamed test from "if metadata is missing" → "if identifiers missing"
+- Updated `S3AttachmentFile` test setup to use `storageIdentifiers` variable with proper field names
+
+**Test Coverage**:
+```
+✅ 23 tests passing
+  - constructor: 3 tests
+  - uploadFile: 8 tests
+  - deleteFileByIdentifiers: 2 tests
+  - reconstructAttachmentFile: 3 tests
+  - S3AttachmentFile: 7 tests (read, stream, url, delete)
+```
+
+---
+
+### Test Results
+
+#### Root Package
+```
+Test Suites: 10 passed, 10 total
+Tests:       196 passed, 196 total
+Time:        2.762 s
+```
+
+#### S3 Package
+```
+Test Suites: 1 passed, 1 total
+Tests:       23 passed, 23 total
+Time:        1.597 s
+```
+
+#### Build Output
+```
+> tsc
+[No errors]
+```
+
+---
+
+### Architecture Changes
+
+#### Before Phase 4
+```typescript
+async uploadFile(...): Promise<AttachmentFileRecord> {
+  return {
+    id, filename, contentType, size, checksum, createdAt, updatedAt,
+    storageIdentifiers: {
+      id: fileId,
+      bucket: this.bucket,        // ❌ Ambiguous field name
+      key,                         // ❌ Ambiguous field name
+      region: this.s3Client.config.region,  // ❌ Ambiguous field name
+    },
+  };
+}
+```
+
+**Problem**: Generic field names (`bucket`, `key`, `region`) don't convey that these are AWS S3-specific. No type safety for implementation-specific identifiers.
+
+#### After Phase 4
+```typescript
+async uploadFile(...): Promise<AttachmentFileRecord> {
+  const storageIdentifiers: S3StorageIdentifiers = {
+    id: fileId,
+    awsS3Bucket: this.bucket,      // ✅ Clear S3-specific field
+    awsS3Key: key,                  // ✅ Clear S3-specific field
+    awsS3Region: this.s3Client.config.region as string,  // ✅ Clear S3-specific field
+  };
+  
+  return {
+    id, filename, contentType, size, checksum, createdAt, updatedAt,
+    storageIdentifiers,
+  };
+}
+```
+
+**Benefit**: Full type safety and explicit contract - callers know exactly which fields are required for S3 file reconstruction.
+
+---
+
+### Key Design Decisions
+
+1. **S3-specific field names in StorageIdentifiers**
+   - `awsS3Bucket` instead of `bucket` - clear that this is AWS S3-specific
+   - `awsS3Key` instead of `key` - consistent naming convention
+   - `awsS3Region` instead of `region` - explicit about being AWS region
+   - Matches Medplum's pattern (`medplumBinaryId`, `medplumMediaId`, etc.)
+
+2. **Single deleteFileByIdentifiers() method**
+   - Removed error-throwing `deleteFile(fileId)` method
+   - Removed helper `deleteFileWithMetadata()` method
+   - Single clear interface: `deleteFileByIdentifiers(storageIdentifiers)`
+   - Backends pass identifiers from their database records
+
+3. **Type-safe reconstructAttachmentFile()**
+   - Parameter type: `StorageIdentifiers` (generic base type)
+   - Cast to `S3StorageIdentifiers` inside implementation
+   - Validates required fields (`awsS3Bucket`, `awsS3Key`)
+   - Clear error messages mentioning S3-specific field names
+
+4. **Consistency across attachment managers**
+   - Same pattern as MedplumAttachmentManager (Phase 3)
+   - Implementation-specific field names make contracts explicit
+   - Enables static type checking and better IDE autocompletion
+   - Clearer domain models (S3-specific vs Medplum-specific fields)
+
+---
+
+### Verification Checklist
+
+- ✅ S3AttachmentManager updated to use S3StorageIdentifiers type
+- ✅ All S3StorageIdentifiers field names use `awsS3*` prefix
+- ✅ S3AttachmentManager.uploadFile() returns typed S3StorageIdentifiers
+- ✅ S3AttachmentManager.getFile() returns typed S3StorageIdentifiers
+- ✅ S3AttachmentManager.reconstructAttachmentFile() uses proper field names
+- ✅ S3AttachmentManager.deleteFileByIdentifiers() implemented correctly
+- ✅ Deprecated deleteFile() and deleteFileWithMetadata() removed
+- ✅ All test fixtures updated to use S3StorageIdentifiers
+- ✅ All error messages reference S3-specific field names
+- ✅ All 23 S3 tests passing
+- ✅ All 196 root package tests passing
+- ✅ TypeScript compilation succeeds with no errors
+- ✅ Consistent with Phase 3 (MedplumAttachmentManager) design
+- ✅ No breaking changes to public APIs (internal implementation only)
+
+---
+
