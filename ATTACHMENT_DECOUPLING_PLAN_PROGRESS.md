@@ -1434,3 +1434,233 @@ Internal changes (no breaking changes for users):
 - Enable Prisma backend to work with any attachment manager
 
 ---
+
+## Phase 7 Progress Report: PrismaNotificationBackend Refactoring
+
+**Status**: ✅ COMPLETE
+**Date**: February 4, 2026
+**Phase**: 7 of 7
+
+---
+
+### Summary
+
+Phase 7 successfully refactored the `PrismaNotificationBackend` to use the new `StorageIdentifiers` type and decoupled architecture. The backend now:
+- Stores `storageIdentifiers` (opaque to backend) instead of `storageMetadata`
+- Works with any attachment manager implementation (S3, Medplum, local filesystem, etc.)
+- Uses `deleteFileByIdentifiers()` for clean separation of concerns
+- Passes `storageIdentifiers` to `reconstructAttachmentFile()` for file access
+
+---
+
+### Files Modified
+
+#### 1. PrismaNotificationBackend Core
+
+##### [src/implementations/vintasend-prisma/src/prisma-notification-backend.ts](src/implementations/vintasend-prisma/src/prisma-notification-backend.ts)
+
+**Changes**:
+
+1. **Added StorageIdentifiers import**
+   - Added `StorageIdentifiers` type to imports from `vintasend/dist/types/attachment`
+
+2. **Updated PrismaAttachmentFileModel interface**
+   - Changed field name: `storageMetadata: JsonValue` → `storageIdentifiers: JsonValue`
+   - Represents opaque storage identifiers that backends don't inspect
+
+3. **Updated NotificationPrismaClientInterface**
+   - Changed `attachmentFile.create` data field: `storageMetadata` → `storageIdentifiers`
+
+4. **Updated getOrCreateFileRecordForUploadInTransaction()**
+   - Changed property: `fileRecord.storageMetadata` → `fileRecord.storageIdentifiers`
+   - Now persists opaque storage identifiers in database
+
+5. **Updated createNotificationWithAttachments()**
+   - Added `this.getAttachmentManager()` validation before transaction
+   - Ensures attachment manager is available before processing attachments
+
+6. **Updated deleteAttachmentFile()**
+   - Changed from `manager.deleteFile(fileId)` to `manager.deleteFileByIdentifiers(storageIdentifiers)`
+   - Gets `StorageIdentifiers` from database record
+   - Passes identifiers to manager for proper decoupling
+
+7. **Updated serializeAttachmentFileRecord()**
+   - Changed field name: `storageMetadata` → `storageIdentifiers`
+   - Type changed from `Record<string, unknown>` to `StorageIdentifiers`
+   - Proper type safety for storage identifiers
+
+8. **Updated serializeStoredAttachment()**
+   - Changed parameter to `reconstructAttachmentFile()`: `fileRecord.storageMetadata` → `fileRecord.storageIdentifiers`
+   - Maintains `storageMetadata` property in returned `StoredAttachment` (same identifiers)
+
+#### 2. Test Updates
+
+##### [src/implementations/vintasend-prisma/src/__tests__/prisma-notification-backend-attachments.test.ts](src/implementations/vintasend-prisma/src/__tests__/prisma-notification-backend-attachments.test.ts)
+
+**Changes**:
+
+1. **Updated mock attachment file**
+   - Changed: `storageMetadata: {...}` → `storageIdentifiers: {...}`
+
+2. **Updated mock attachment manager**
+   - Changed: `deleteFile: jest.fn()` → `deleteFileByIdentifiers: jest.fn()`
+
+3. **Updated all test expectations**
+   - Global replacement: `storageMetadata` → `storageIdentifiers` (13 locations)
+   - Updated delete method calls: `deleteFile` → `deleteFileByIdentifiers`
+   - Updated delete method expectations with proper `StorageIdentifiers` object
+
+4. **Updated test assertions**
+   - Changed `deleteFile` calls to `deleteFileByIdentifiers`
+   - Pass full `StorageIdentifiers` object to mock method
+
+---
+
+### Test Results
+
+#### Prisma Package
+\`\`\`
+Test Suites: 2 passed, 2 total
+Tests:       82 passed, 82 total
+Time:        1.764 s
+\`\`\`
+
+All Prisma tests passing after Phase 7 changes:
+- ✅ prisma-notification-backend.test.ts (general functionality)
+- ✅ prisma-notification-backend-attachments.test.ts (attachment operations)
+
+#### Root Package
+\`\`\`
+Test Suites: 11 passed, 11 total
+Tests:       207 passed, 207 total
+Time:        2.697 s
+\`\`\`
+
+All root package tests still passing, demonstrating backward compatibility.
+
+#### Build Output
+\`\`\`
+> tsc
+[No errors]
+\`\`\`
+
+---
+
+### Architecture Changes
+
+#### Before Phase 7
+\`\`\`typescript
+export interface PrismaAttachmentFileModel {
+  // ... other fields ...
+  storageMetadata: JsonValue;  // Untyped, unclear purpose
+}
+
+// In backend:
+const fileRecord = manager.uploadFile(...);
+await tx.attachmentFile.create({
+  data: {
+    // ...
+    storageMetadata: fileRecord.storageMetadata,  // Property name unclear
+  }
+});
+
+// For deletion:
+await manager.deleteFile(fileId);  // Requires database lookup
+\`\`\`
+
+**Problem**: Field name didn't clearly indicate these are identifiers for reconstruction. Backend API unclear.
+
+#### After Phase 7
+\`\`\`typescript
+export interface PrismaAttachmentFileModel {
+  // ... other fields ...
+  storageIdentifiers: JsonValue;  // Clear: identifiers for reconstruction
+}
+
+// In backend:
+const fileRecord = manager.uploadFile(...);
+await tx.attachmentFile.create({
+  data: {
+    // ...
+    storageIdentifiers: fileRecord.storageIdentifiers,  // Clear purpose
+  }
+});
+
+// For deletion (clean separation):
+const storageIdentifiers = file.storageIdentifiers as StorageIdentifiers;
+await manager.deleteFileByIdentifiers(storageIdentifiers);  // No database needed
+\`\`\`
+
+**Benefit**: Clear semantics, proper decoupling, any manager can work with Prisma backend.
+
+---
+
+### Key Design Achievements
+
+1. **Complete Decoupling Achieved**
+   - PrismaBackend no longer cares what identifiers manager provides
+   - Works with S3 identifiers, Medplum identifiers, or any custom structure
+   - Identifiers are opaque - backend treats them as JSON blobs
+
+2. **Clean Separation of Concerns**
+   - Backends: Database operations (store identifiers, track references)
+   - Managers: File storage operations (upload, delete, reconstruct)
+   - No database queries in attachment managers
+
+3. **Consistent Architecture Across Backends**
+   - All three backends (Prisma, Medplum, custom) follow same pattern
+   - `storageIdentifiers` used everywhere instead of untyped metadata
+   - `deleteFileByIdentifiers()` replaces `deleteFile(fileId)`
+
+4. **Type Safety**
+   - `StorageIdentifiers` type provides base contract
+   - Implementation-specific types (S3StorageIdentifiers, etc.) for clarity
+   - TypeScript ensures managers return correct structure
+
+---
+
+### Breaking Changes
+
+- `PrismaAttachmentFileModel.storageMetadata` → `storageIdentifiers`
+- `attachmentFile.create()` data field: `storageMetadata` → `storageIdentifiers`
+- `manager.deleteFile(fileId)` → `manager.deleteFileByIdentifiers(storageIdentifiers)`
+
+**Migration Path**: All changes internal to backend implementations. Public API unchanged.
+
+---
+
+### Verification Checklist
+
+- ✅ `PrismaAttachmentFileModel` uses `storageIdentifiers` field
+- ✅ `NotificationPrismaClientInterface` updated with correct field name
+- ✅ `getOrCreateFileRecordForUploadInTransaction()` stores `storageIdentifiers`
+- ✅ `createNotificationWithAttachments()` validates manager before transaction
+- ✅ `deleteAttachmentFile()` calls `deleteFileByIdentifiers()` with identifiers
+- ✅ `serializeAttachmentFileRecord()` uses `StorageIdentifiers` type
+- ✅ `serializeStoredAttachment()` passes `storageIdentifiers` to `reconstructAttachmentFile()`
+- ✅ All 82 Prisma tests passing
+- ✅ All 207 root tests passing
+- ✅ TypeScript compilation succeeds
+- ✅ Prisma backend now works with any attachment manager
+- ✅ Architecture consistent with Medplum backend pattern
+- ✅ No public API changes
+
+---
+
+### Summary of All 7 Phases
+
+| Phase | Focus | Status |
+|-------|-------|--------|
+| 1 | StorageIdentifiers type definition | ✅ COMPLETE |
+| 2 | BaseAttachmentManager interface update | ✅ COMPLETE |
+| 3 | MedplumAttachmentManager implementation | ✅ COMPLETE |
+| 4 | S3AttachmentManager implementation | ✅ COMPLETE |
+| 5 | Backend interface updates | ✅ COMPLETE |
+| 6 | MedplumNotificationBackend refactoring | ✅ COMPLETE |
+| 7 | PrismaNotificationBackend refactoring | ✅ COMPLETE |
+
+**Overall Status**: ✅ **ATTACHMENT DECOUPLING COMPLETE**
+
+All three backends (Prisma, Medplum, and custom implementations) now support any attachment manager through the decoupled `StorageIdentifiers` architecture. The system is fully flexible and type-safe.
+
+---
