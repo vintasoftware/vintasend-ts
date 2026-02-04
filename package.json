@@ -1,6 +1,6 @@
 {
   "name": "vintasend",
-  "version": "0.5.0-alpha2",
+  "version": "0.5.0",
   "main": "dist/index.js",
   "files": [
     "dist"
@@ -20,6 +20,7 @@
     "release:bump:patch": "node scripts/release-bump.js --bump=patch",
     "release:bump:minor": "node scripts/release-bump.js --bump=minor",
     "release:bump:alpha": "node scripts/release-bump.js --bump=alpha",
+    "release:bump:promote": "node scripts/release-bump.js --bump=promote",
     "release:publish": "node scripts/release-publish.js"
   },
   "devDependencies": {

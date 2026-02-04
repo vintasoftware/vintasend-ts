@@ -108,6 +108,11 @@ async function main() {
     // Check if current version is an alpha version
     const isCurrentAlpha = /^(\d+\.\d+\.\d+)-alpha(\d+)$/.test(highestVersion);
     const currentAlphaMatch = highestVersion.match(/^(\d+\.\d+\.\d+)-alpha(\d+)$/);
+
+    if (selectedBumpType === 'promote' && !isCurrentAlpha) {
+      logError('Cannot promote alpha: current version is not an alpha version');
+      process.exit(1);
+    }
     
     // If --bump=alpha was passed and current version is already alpha, ask if user wants to increment
     if (selectedBumpType === 'alpha' && isCurrentAlpha) {
@@ -131,10 +136,11 @@ async function main() {
       
       if (isCurrentAlpha) {
         console.log(`  4) increment alpha (e.g., ${highestVersion} → ${currentAlphaMatch[1]}-alpha${parseInt(currentAlphaMatch[2]) + 1})`);
+        console.log(`  5) promote alpha to stable (e.g., ${highestVersion} → ${currentAlphaMatch[1]})`);
       }
       
-      const maxChoice = isCurrentAlpha ? 4 : 3;
-      const choice = await question(`\nEnter choice (1, 2, ${isCurrentAlpha ? '3, or 4' : 'or 3'}): `);
+      const maxChoice = isCurrentAlpha ? 5 : 3;
+      const choice = await question(`\nEnter choice (1, 2, ${isCurrentAlpha ? '3, 4, or 5' : 'or 3'}): `);
       
       if (choice === '2') {
         selectedBumpType = 'minor';
@@ -143,6 +149,8 @@ async function main() {
       } else if (choice === '4' && isCurrentAlpha) {
         selectedBumpType = 'alpha-iteration';
         alphaIteration = parseInt(currentAlphaMatch[2]) + 1;
+      } else if (choice === '5' && isCurrentAlpha) {
+        selectedBumpType = 'promote';
       } else {
         selectedBumpType = 'patch';
       }

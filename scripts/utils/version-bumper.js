@@ -1,12 +1,23 @@
 /**
  * Bump a version number
  * @param {string} version - Current version (e.g., "0.4.14" or "0.4.14-alpha1")
- * @param {'patch' | 'minor' | 'major' | 'alpha' | 'alpha-iteration'} bumpType - Type of version bump
+ * @param {'patch' | 'minor' | 'major' | 'alpha' | 'alpha-iteration' | 'promote'} bumpType - Type of version bump
  * @param {number} alphaIteration - Alpha iteration number (used when bumpType is 'alpha' or 'alpha-iteration')
  * @param {'patch' | 'minor'} alphaBaseBumpType - Base bump type for alpha (patch or minor, defaults to patch)
  * @returns {string} - New version
  */
 function bumpVersion(version, bumpType, alphaIteration = 1, alphaBaseBumpType = 'patch') {
+  if (bumpType === 'promote') {
+    const alphaMatch = version.match(/^(\d+\.\d+\.\d+)(-alpha\d+)?$/);
+    if (!alphaMatch) {
+      throw new Error('Cannot promote alpha: invalid version format');
+    }
+    if (!alphaMatch[2]) {
+      throw new Error('Cannot promote alpha: current version is not an alpha version');
+    }
+    return alphaMatch[1];
+  }
+
   // Handle alpha iteration bump (just increment the alpha number without changing base version)
   if (bumpType === 'alpha-iteration') {
     const alphaMatch = version.match(/^(\d+\.\d+\.\d+)-alpha(\d+)$/);

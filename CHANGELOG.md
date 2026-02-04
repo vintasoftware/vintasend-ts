@@ -1,6 +1,6 @@
 # Changelog
 
-## Version 0.5.0-alpha1
+## Version 0.5.0
 
 * **Attachment Decoupling Architecture** (Complete refactor): Fully decoupled attachment storage from notification backends, enabling any backend to work with any attachment manager:
   * **StorageIdentifiers Type System**: Introduced `StorageIdentifiers` base interface with implementation-specific types (`MedplumStorageIdentifiers`, `S3StorageIdentifiers`, etc.) for type-safe attachment identification
