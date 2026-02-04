@@ -221,7 +221,7 @@ describe('Notification Types with Attachments', () => {
             createdAt: new Date(),
             file: mockAttachmentFile,
             description: 'Test file',
-            storageMetadata: { key: 'attachments/file-123.txt' },
+            storageMetadata: { id: 'file-123', key: 'attachments/file-123.txt' },
           },
         ],
       };
@@ -271,7 +271,7 @@ describe('Notification Types with Attachments', () => {
             checksum: 'abc123',
             createdAt: new Date(),
             file: mockAttachmentFile,
-            storageMetadata: {},
+            storageMetadata: { id: 'file-123' },
           },
           {
             id: 'att-2',
@@ -282,7 +282,7 @@ describe('Notification Types with Attachments', () => {
             checksum: 'def456',
             createdAt: new Date(),
             file: mockAttachmentFile,
-            storageMetadata: {},
+            storageMetadata: { id: 'file-456' },
           },
         ],
       };
@@ -350,7 +350,7 @@ describe('Notification Types with Attachments', () => {
             checksum: 'abc',
             createdAt: new Date(),
             file: mockFile,
-            storageMetadata: {},
+            storageMetadata: { id: 'file-123' },
           },
         ],
       };

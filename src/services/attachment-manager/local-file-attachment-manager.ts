@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Readable } from 'node:stream';
 import { promisify } from 'node:util';
-import type { AttachmentFile, AttachmentFileRecord, FileAttachment } from '../../types/attachment';
+import type { AttachmentFile, AttachmentFileRecord, FileAttachment, StorageIdentifiers } from '../../types/attachment';
 import { BaseAttachmentManager } from './base-attachment-manager';
 
 const writeFile = promisify(fs.writeFile);
@@ -120,7 +120,8 @@ export class LocalFileAttachmentManager extends BaseAttachmentManager {
       contentType: finalContentType,
       size,
       checksum,
-      storageMetadata: {
+      storageIdentifiers: {
+        id: fileId,
         path: filePath,
         backend: 'local-filesystem',
       },
@@ -153,7 +154,8 @@ export class LocalFileAttachmentManager extends BaseAttachmentManager {
         contentType: metadata.contentType,
         size: metadata.size,
         checksum: metadata.checksum,
-        storageMetadata: {
+        storageIdentifiers: {
+          id: metadata.id,
           path: filePath,
           backend: 'local-filesystem',
         },
@@ -175,7 +177,8 @@ export class LocalFileAttachmentManager extends BaseAttachmentManager {
           contentType: 'application/octet-stream', // Unknown
           size: stats.size,
           checksum,
-          storageMetadata: {
+          storageIdentifiers: {
+            id: fileId,
             path: filePath,
             backend: 'local-filesystem',
           },
@@ -217,14 +220,32 @@ export class LocalFileAttachmentManager extends BaseAttachmentManager {
   }
 
   /**
-   * Reconstruct an AttachmentFile interface from stored metadata
+   * Delete a file from the local filesystem using storage identifiers
    */
-  reconstructAttachmentFile(storageMetadata: Record<string, unknown>): AttachmentFile {
-    if (!storageMetadata.path || typeof storageMetadata.path !== 'string') {
-      throw new Error('Invalid storage metadata: missing path');
+  async deleteFileByIdentifiers(storageIdentifiers: StorageIdentifiers): Promise<void> {
+    if (storageIdentifiers.id && typeof storageIdentifiers.id === 'string') {
+      await this.deleteFile(storageIdentifiers.id);
+      return;
     }
 
-    const filePath = storageMetadata.path as string;
+    if (storageIdentifiers.path && typeof storageIdentifiers.path === 'string') {
+      const fileId = path.basename(storageIdentifiers.path);
+      await this.deleteFile(fileId);
+      return;
+    }
+
+    throw new Error('Invalid storage identifiers: missing id or path');
+  }
+
+  /**
+   * Reconstruct an AttachmentFile interface from stored identifiers
+   */
+  reconstructAttachmentFile(storageIdentifiers: StorageIdentifiers): AttachmentFile {
+    if (!storageIdentifiers.path || typeof storageIdentifiers.path !== 'string') {
+      throw new Error('Invalid storage identifiers: missing path');
+    }
+
+    const filePath = storageIdentifiers.path as string;
 
     return new LocalAttachmentFile(filePath, this);
   }

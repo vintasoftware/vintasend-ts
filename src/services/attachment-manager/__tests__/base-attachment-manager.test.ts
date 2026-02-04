@@ -4,6 +4,7 @@ import type {
   AttachmentFile,
   AttachmentFileRecord,
   FileAttachment,
+  StorageIdentifiers,
 } from '../../../types/attachment';
 import { BaseAttachmentManager } from '../base-attachment-manager';
 
@@ -11,6 +12,7 @@ import { BaseAttachmentManager } from '../base-attachment-manager';
 class TestAttachmentManager extends BaseAttachmentManager {
   private files = new Map<string, AttachmentFileRecord>();
   private fileContents = new Map<string, Buffer>();
+  private storageIndex = new Map<string, StorageIdentifiers>();
 
   async uploadFile(
     file: FileAttachment,
@@ -21,39 +23,44 @@ class TestAttachmentManager extends BaseAttachmentManager {
     const checksum = this.calculateChecksum(buffer);
     const detectedContentType = contentType || this.detectContentType(filename);
 
+    const fileId = `file-${Date.now()}-${Math.random()}`;
+    const storageIdentifiers: StorageIdentifiers = {
+      id: fileId,
+      key: `test/${filename}`,
+    };
     const fileRecord: AttachmentFileRecord = {
-      id: `file-${Date.now()}-${Math.random()}`,
+      id: fileId,
       filename,
       contentType: detectedContentType,
       size: buffer.length,
       checksum,
-      storageMetadata: { key: `test/${filename}` },
+      storageIdentifiers,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
     this.files.set(fileRecord.id, fileRecord);
     this.fileContents.set(fileRecord.id, buffer);
+    this.storageIndex.set(fileRecord.id, storageIdentifiers);
 
     return fileRecord;
   }
 
-  async getFile(fileId: string): Promise<AttachmentFileRecord | null> {
-    return this.files.get(fileId) || null;
-  }
-
-  async deleteFile(fileId: string): Promise<void> {
-    this.files.delete(fileId);
-    this.fileContents.delete(fileId);
-  }
-
-  reconstructAttachmentFile(_storageMetadata: Record<string, unknown>): AttachmentFile {
+  reconstructAttachmentFile(_storageIdentifiers: StorageIdentifiers): AttachmentFile {
     return {
       read: async () => Buffer.from('test content'),
       stream: async () => new ReadableStream(),
       url: async () => 'https://example.com/file.txt',
       delete: async () => {},
     };
+  }
+
+  async deleteFileByIdentifiers(storageIdentifiers: StorageIdentifiers): Promise<void> {
+    if (this.storageIndex.has(storageIdentifiers.id)) {
+      this.files.delete(storageIdentifiers.id);
+      this.fileContents.delete(storageIdentifiers.id);
+      this.storageIndex.delete(storageIdentifiers.id);
+    }
   }
 
   // Helper method for testing
@@ -179,7 +186,7 @@ describe('BaseAttachmentManager', () => {
       expect(record.contentType).toBe('text/plain');
       expect(record.size).toBe(content.length);
       expect(record.checksum).toBeDefined();
-      expect(record.storageMetadata).toBeDefined();
+      expect(record.storageIdentifiers).toBeDefined();
       expect(record.createdAt).toBeInstanceOf(Date);
       expect(record.updatedAt).toBeInstanceOf(Date);
     });
@@ -191,14 +198,14 @@ describe('BaseAttachmentManager', () => {
     });
   });
 
-  describe('deleteFile', () => {
-    it('should delete file', async () => {
+  describe('deleteFileByIdentifiers', () => {
+    it('should delete file by storage identifiers', async () => {
       const uploaded = await manager.uploadFile(Buffer.from('test'), 'test.txt');
 
       // Verify file exists before deletion
       expect(manager.hasFile(uploaded.id)).toBe(true);
 
-      await manager.deleteFile(uploaded.id);
+      await manager.deleteFileByIdentifiers(uploaded.storageIdentifiers);
 
       // Verify file is actually deleted from in-memory Maps
       expect(manager.hasFile(uploaded.id)).toBe(false);
@@ -206,9 +213,9 @@ describe('BaseAttachmentManager', () => {
   });
 
   describe('reconstructAttachmentFile', () => {
-    it('should reconstruct AttachmentFile from metadata', () => {
-      const metadata = { key: 'test/file.txt' };
-      const file = manager.reconstructAttachmentFile(metadata);
+    it('should reconstruct AttachmentFile from identifiers', () => {
+      const identifiers: StorageIdentifiers = { id: 'test-id', key: 'test/file.txt' };
+      const file = manager.reconstructAttachmentFile(identifiers);
 
       expect(file).toBeDefined();
       expect(file.read).toBeDefined();

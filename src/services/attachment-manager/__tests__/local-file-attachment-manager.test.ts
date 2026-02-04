@@ -91,8 +91,8 @@ describe('LocalFileAttachmentManager', () => {
       expect(record.contentType).toBe('text/plain');
       expect(record.size).toBe(buffer.length);
       expect(record.checksum).toBeDefined();
-      expect(record.storageMetadata.backend).toBe('local-filesystem');
-      expect(record.storageMetadata.path).toContain(tempDir);
+      expect(record.storageIdentifiers.backend).toBe('local-filesystem');
+      expect(record.storageIdentifiers.path).toContain(tempDir);
 
       // Verify file exists on disk
       const filePath = path.join(tempDir, record.id);
@@ -140,7 +140,7 @@ describe('LocalFileAttachmentManager', () => {
       const record = await manager.uploadFile(buffer, maliciousFilename);
 
       expect(record.filename).toBe('passwd');
-      expect(record.storageMetadata.path).not.toContain('..');
+      expect(record.storageIdentifiers.path).not.toContain('..');
     });
 
     it('should calculate checksum correctly', async () => {
@@ -179,7 +179,7 @@ describe('LocalFileAttachmentManager', () => {
       const buffer = Buffer.from('reconstruct test');
       const record = await manager.uploadFile(buffer, 'reconstruct.txt');
 
-      const attachmentFile = manager.reconstructAttachmentFile(record.storageMetadata);
+      const attachmentFile = manager.reconstructAttachmentFile(record.storageIdentifiers);
 
       expect(attachmentFile).toBeDefined();
 
@@ -189,7 +189,7 @@ describe('LocalFileAttachmentManager', () => {
     });
 
     it('should throw error if storage metadata is invalid', () => {
-      expect(() => manager.reconstructAttachmentFile({})).toThrow('Invalid storage metadata');
+      expect(() => manager.reconstructAttachmentFile({ id: 'test' })).toThrow('Invalid storage identifiers');
     });
   });
 
@@ -203,7 +203,7 @@ describe('LocalFileAttachmentManager', () => {
 
     describe('read', () => {
       it('should read file content as Buffer', async () => {
-        const attachmentFile = manager.reconstructAttachmentFile(record.storageMetadata);
+        const attachmentFile = manager.reconstructAttachmentFile(record.storageIdentifiers);
         const content = await attachmentFile.read();
 
         expect(Buffer.isBuffer(content)).toBe(true);
@@ -213,7 +213,7 @@ describe('LocalFileAttachmentManager', () => {
 
     describe('stream', () => {
       it('should return a readable stream', async () => {
-        const attachmentFile = manager.reconstructAttachmentFile(record.storageMetadata);
+        const attachmentFile = manager.reconstructAttachmentFile(record.storageIdentifiers);
         const stream = await attachmentFile.stream();
 
         expect(stream).toBeInstanceOf(ReadableStream);
@@ -238,7 +238,7 @@ describe('LocalFileAttachmentManager', () => {
 
     describe('url', () => {
       it('should return a file:// URL', async () => {
-        const attachmentFile = manager.reconstructAttachmentFile(record.storageMetadata);
+        const attachmentFile = manager.reconstructAttachmentFile(record.storageIdentifiers);
         const url = await attachmentFile.url();
 
         expect(url).toMatch(/^file:\/\//);
@@ -247,7 +247,7 @@ describe('LocalFileAttachmentManager', () => {
       });
 
       it('should ignore expiresIn parameter', async () => {
-        const attachmentFile = manager.reconstructAttachmentFile(record.storageMetadata);
+        const attachmentFile = manager.reconstructAttachmentFile(record.storageIdentifiers);
         const url1 = await attachmentFile.url();
         const url2 = await attachmentFile.url(3600);
 
@@ -257,7 +257,7 @@ describe('LocalFileAttachmentManager', () => {
 
     describe('delete', () => {
       it('should delete the file', async () => {
-        const attachmentFile = manager.reconstructAttachmentFile(record.storageMetadata);
+        const attachmentFile = manager.reconstructAttachmentFile(record.storageIdentifiers);
 
         const filePath = path.join(tempDir, record.id);
         expect(fs.existsSync(filePath)).toBe(true);
@@ -293,7 +293,7 @@ describe('LocalFileAttachmentManager', () => {
 
       expect(record.size).toBe(1024 * 1024);
 
-      const attachmentFile = manager.reconstructAttachmentFile(record.storageMetadata);
+      const attachmentFile = manager.reconstructAttachmentFile(record.storageIdentifiers);
       const content = await attachmentFile.read();
 
       expect(content.length).toBe(1024 * 1024);
@@ -303,7 +303,7 @@ describe('LocalFileAttachmentManager', () => {
       const binaryBuffer = Buffer.from([0x00, 0xff, 0x01, 0xfe, 0x02, 0xfd]);
       const record = await manager.uploadFile(binaryBuffer, 'binary.bin');
 
-      const attachmentFile = manager.reconstructAttachmentFile(record.storageMetadata);
+      const attachmentFile = manager.reconstructAttachmentFile(record.storageIdentifiers);
       const content = await attachmentFile.read();
 
       expect(content).toEqual(binaryBuffer);

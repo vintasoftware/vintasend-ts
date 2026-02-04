@@ -1,5 +1,7 @@
 import {
   type AttachmentFile,
+  type AttachmentFileRecord,
+  type StorageIdentifiers,
   isAttachmentReference,
   type NotificationAttachment,
   type NotificationAttachmentReference,
@@ -137,4 +139,127 @@ describe('Attachment Type Definitions', () => {
       }
     });
   });
+
+  describe('StorageIdentifiers', () => {
+    it('should allow id field', () => {
+      const ids: StorageIdentifiers = { id: 'test-123' };
+      expect(ids.id).toBe('test-123');
+    });
+
+    it('should allow arbitrary fields', () => {
+      const ids: StorageIdentifiers = {
+        id: 'test-123',
+        customField: 'value',
+        anotherField: 42,
+        nestedObject: { key: 'val' },
+      };
+      expect(ids.customField).toBe('value');
+      expect(ids.anotherField).toBe(42);
+      expect((ids.nestedObject as any).key).toBe('val');
+    });
+
+    it('should be extensible by implementation-specific types', () => {
+      interface CustomIdentifiers extends StorageIdentifiers {
+        id: string;
+        customManagerField: string;
+      }
+
+      const ids: CustomIdentifiers = {
+        id: 'test-123',
+        customManagerField: 'custom-value',
+      };
+
+      expect(ids.id).toBe('test-123');
+      expect(ids.customManagerField).toBe('custom-value');
+    });
+  });
+
+  describe('AttachmentFileRecord', () => {
+    it('should have all required fields', () => {
+      const now = new Date();
+      const record: AttachmentFileRecord = {
+        id: 'file-123',
+        filename: 'test.pdf',
+        contentType: 'application/pdf',
+        size: 1024,
+        checksum: 'abc123def456',
+        createdAt: now,
+        updatedAt: now,
+        storageIdentifiers: { id: 'file-123' },
+      };
+
+      expect(record.id).toBe('file-123');
+      expect(record.filename).toBe('test.pdf');
+      expect(record.contentType).toBe('application/pdf');
+      expect(record.size).toBe(1024);
+      expect(record.checksum).toBe('abc123def456');
+      expect(record.createdAt).toBe(now);
+      expect(record.updatedAt).toBe(now);
+    });
+
+    it('should have storageIdentifiers property', () => {
+      const record: AttachmentFileRecord = {
+        id: 'file-123',
+        filename: 'test.txt',
+        contentType: 'text/plain',
+        size: 100,
+        checksum: 'abc123',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        storageIdentifiers: { id: 'file-123' },
+      };
+
+      expect(record.storageIdentifiers).toHaveProperty('id');
+      expect(record.storageIdentifiers.id).toBe('file-123');
+    });
+
+    it('should accept implementation-specific storageIdentifiers', () => {
+      interface CustomIds extends StorageIdentifiers {
+        id: string;
+        bucket: string;
+        key: string;
+      }
+
+      const customIds: CustomIds = {
+        id: 'file-123',
+        bucket: 'my-bucket',
+        key: 'path/to/file.pdf',
+      };
+
+      const record: AttachmentFileRecord = {
+        id: 'file-123',
+        filename: 'file.pdf',
+        contentType: 'application/pdf',
+        size: 2048,
+        checksum: 'xyz789',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        storageIdentifiers: customIds,
+      };
+
+      expect(record.storageIdentifiers).toEqual(customIds);
+      expect((record.storageIdentifiers as CustomIds).bucket).toBe('my-bucket');
+    });
+
+    it('should accept dates as Date objects', () => {
+      const createdAt = new Date('2026-02-04T10:00:00Z');
+      const updatedAt = new Date('2026-02-04T11:00:00Z');
+
+      const record: AttachmentFileRecord = {
+        id: 'file-123',
+        filename: 'test.txt',
+        contentType: 'text/plain',
+        size: 100,
+        checksum: 'abc123',
+        createdAt,
+        updatedAt,
+        storageIdentifiers: { id: 'file-123' },
+      };
+
+      expect(record.createdAt instanceof Date).toBe(true);
+      expect(record.updatedAt instanceof Date).toBe(true);
+      expect(record.createdAt.getTime()).toBe(createdAt.getTime());
+    });
+  });
 });
+

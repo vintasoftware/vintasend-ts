@@ -3,6 +3,7 @@ import type {
   AttachmentFileRecord,
   AttachmentFile,
   FileAttachment,
+  StorageIdentifiers,
 } from 'vintasend/dist/types/attachment';
 
 /**
@@ -50,33 +51,19 @@ export class TemplateAttachmentManager extends BaseAttachmentManager {
   }
 
   /**
-   * Retrieve a file record by its ID.
-   *
-   * @param fileId - The unique identifier of the file
-   * @returns The file record or null if not found
-   */
-  async getFile(fileId: string): Promise<AttachmentFileRecord | null> {
-    // TODO: Implement file retrieval from database/storage
-    // This should fetch the file metadata from your backend's database
-
-    throw new Error('getFile not implemented');
-  }
-
-  /**
-   * Delete a file from storage.
+   * Delete a file from storage using its identifiers.
    *
    * Note: Only call this if the file is not referenced by any notifications.
    * The backend should check for orphaned files before calling this method.
    *
-   * @param fileId - The unique identifier of the file to delete
+   * @param storageIdentifiers - The storage identifiers required for deletion
    */
-  async deleteFile(fileId: string): Promise<void> {
+  async deleteFileByIdentifiers(storageIdentifiers: StorageIdentifiers): Promise<void> {
     // TODO: Implement file deletion logic
-    // 1. Get file record to access storage metadata
+    // 1. Use storageIdentifiers to locate file in storage backend
     // 2. Delete from storage backend (S3, Azure, etc.)
-    // 3. Delete file record from database
 
-    throw new Error('deleteFile not implemented');
+    throw new Error('deleteFileByIdentifiers not implemented');
   }
 
   /**
@@ -85,12 +72,12 @@ export class TemplateAttachmentManager extends BaseAttachmentManager {
    * This allows the system to recreate file access objects when loading
    * notifications from the database.
    *
-   * @param storageMetadata - Storage-specific metadata (e.g., S3 key, bucket)
+   * @param storageIdentifiers - Storage-specific identifiers (e.g., S3 key, bucket)
    * @returns An AttachmentFile instance for accessing the file
    */
-  reconstructAttachmentFile(storageMetadata: Record<string, unknown>): AttachmentFile {
+  reconstructAttachmentFile(storageIdentifiers: StorageIdentifiers): AttachmentFile {
     // TODO: Implement file reconstruction
-    // Create a TemplateAttachmentFile instance with the storage metadata
+    // Create a TemplateAttachmentFile instance with the storage identifiers
 
     throw new Error('reconstructAttachmentFile not implemented');
   }
@@ -121,7 +108,7 @@ export class TemplateAttachmentManager extends BaseAttachmentManager {
 class TemplateAttachmentFile implements AttachmentFile {
   constructor(
     private fileId: string,
-    private storageMetadata: Record<string, unknown>,
+    private storageIdentifiers: StorageIdentifiers,
   ) {
     // TODO: Store any additional context needed for file operations
     // Example: private s3Client: S3Client, private bucket: string, private key: string

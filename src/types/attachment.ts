@@ -39,16 +39,58 @@ export interface AttachmentFile {
   delete(): Promise<void>;
 }
 
-// Database record for reusable attachment files
+/**
+ * Generic storage identifiers returned by AttachmentManagers.
+ * Backends persist these as opaque data and pass them back for file reconstruction.
+ * Each AttachmentManager implementation defines its own specific structure.
+ *
+ * @example MedplumStorageIdentifiers
+ * ```typescript
+ * {
+ *   id: "media-123",
+ *   medplumBinaryId: "binary-456",
+ *   medplumMediaId: "media-123",
+ *   url: "Binary/binary-456"
+ * }
+ * ```
+ *
+ * @example S3StorageIdentifiers
+ * ```typescript
+ * {
+ *   id: "file-123",
+ *   awsS3Bucket: "my-bucket",
+ *   awsS3Key: "uploads/file-123.pdf",
+ *   awsS3Region: "us-east-1"
+ * }
+ * ```
+ */
+export interface StorageIdentifiers {
+  // Universal identifier (required) - used as primary key by backends
+  id: string;
+
+  // Allow implementation-specific fields
+  // Backends treat this as opaque data and don't inspect specific fields
+  [key: string]: unknown;
+}
+
+/**
+ * Complete file record returned after upload.
+ * Contains both file metadata and storage identifiers.
+ * Storage identifiers are opaque to backends - used only for reconstruction.
+ */
 export interface AttachmentFileRecord {
+  // File metadata (stored by backend in database)
   id: string;
   filename: string;
   contentType: string;
   size: number;
   checksum: string;
-  storageMetadata: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
+
+  // Storage identifiers (opaque to backend, only used for reconstruction)
+  // Each AttachmentManager populates these with its own specific fields
+  storageIdentifiers: StorageIdentifiers;
 }
 
 // Stored attachment with metadata (notification-specific)
@@ -62,5 +104,5 @@ export interface StoredAttachment {
   createdAt: Date;
   file: AttachmentFile;
   description?: string;
-  storageMetadata: Record<string, unknown>;
+  storageMetadata: StorageIdentifiers;
 }

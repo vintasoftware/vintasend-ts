@@ -1,7 +1,12 @@
 import * as crypto from 'node:crypto';
 import type { Readable } from 'node:stream';
 import * as mime from 'mime-types';
-import type { AttachmentFile, AttachmentFileRecord, FileAttachment } from '../../types/attachment';
+import type {
+  AttachmentFile,
+  AttachmentFileRecord,
+  FileAttachment,
+  StorageIdentifiers,
+} from '../../types/attachment';
 
 export abstract class BaseAttachmentManager {
   /**
@@ -14,19 +19,14 @@ export abstract class BaseAttachmentManager {
   ): Promise<AttachmentFileRecord>;
 
   /**
-   * Get file metadata by ID
+   * Reconstruct AttachmentFile from storage identifiers
    */
-  abstract getFile(fileId: string): Promise<AttachmentFileRecord | null>;
+  abstract reconstructAttachmentFile(storageIdentifiers: StorageIdentifiers): AttachmentFile;
 
   /**
-   * Delete a file (only if not referenced by any notifications)
+   * Delete a file from storage using its identifiers
    */
-  abstract deleteFile(fileId: string): Promise<void>;
-
-  /**
-   * Reconstruct AttachmentFile from storage metadata
-   */
-  abstract reconstructAttachmentFile(storageMetadata: Record<string, unknown>): AttachmentFile;
+  abstract deleteFileByIdentifiers(storageIdentifiers: StorageIdentifiers): Promise<void>;
 
   /**
    * Detect content type from filename

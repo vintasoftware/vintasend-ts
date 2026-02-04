@@ -609,7 +609,7 @@ describe('OneOffNotification Types', () => {
               createdAt: new Date(),
               file: mockAttachmentFile,
               description: 'Company brochure',
-              storageMetadata: { key: 'attachments/file-123.pdf' },
+              storageMetadata: { id: 'file-123', key: 'attachments/file-123.pdf' },
             },
           ],
         };
