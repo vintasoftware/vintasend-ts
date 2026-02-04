@@ -61,6 +61,8 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotifications: jest.fn().mockResolvedValue([]),
 
         // Attachment methods
+        storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
+        getAttachmentFileRecord: jest.fn().mockResolvedValue(null),
         getAttachmentFile: jest.fn().mockResolvedValue(null),
         findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
         deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
@@ -141,6 +143,8 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotifications: jest.fn(),
 
         // Attachment methods
+        storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
+        getAttachmentFileRecord: jest.fn().mockResolvedValue(null),
         getAttachmentFile: jest.fn().mockResolvedValue(null),
         findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
         deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
@@ -204,6 +208,8 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotifications: jest.fn(),
 
         // Attachment methods
+        storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
+        getAttachmentFileRecord: jest.fn().mockResolvedValue(null),
         getAttachmentFile: jest.fn().mockResolvedValue(null),
         findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
         deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
@@ -279,6 +285,8 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotifications: jest.fn(),
 
         // Attachment methods
+        storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
+        getAttachmentFileRecord: jest.fn().mockResolvedValue(null),
         getAttachmentFile: jest.fn().mockResolvedValue(null),
         findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
         deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
@@ -328,6 +336,8 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotifications: jest.fn(),
 
         // Attachment methods
+        storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
+        getAttachmentFileRecord: jest.fn().mockResolvedValue(null),
         getAttachmentFile: jest.fn().mockResolvedValue(null),
         findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
         deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
@@ -389,6 +399,8 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotifications: jest.fn(),
 
         // Attachment methods
+        storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
+        getAttachmentFileRecord: jest.fn().mockResolvedValue(null),
         getAttachmentFile: jest.fn().mockResolvedValue(null),
         findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
         deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
@@ -507,6 +519,8 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotifications: jest.fn(),
 
         // Attachment methods
+        storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
+        getAttachmentFileRecord: jest.fn().mockResolvedValue(null),
         getAttachmentFile: jest.fn().mockResolvedValue(null),
         findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
         deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),

@@ -100,7 +100,23 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
   injectLogger?(logger: BaseLogger): void;
 
   // Attachment management methods (optional - only needed if backend supports attachments)
+
   /**
+   * Store attachment file record in database.
+   * Called after AttachmentManager.uploadFile() returns storageIdentifiers.
+   * Backend persists file metadata and storage identifiers for later retrieval.
+   */
+  storeAttachmentFileRecord?(record: AttachmentFileRecord): Promise<void>;
+
+  /**
+   * Get attachment file record from database by ID.
+   * Returns the file metadata and storage identifiers needed to reconstruct file access.
+   * Used by AttachmentManager.reconstructAttachmentFile() to get file content.
+   */
+  getAttachmentFileRecord?(fileId: string): Promise<AttachmentFileRecord | null>;
+
+  /**
+   * @deprecated Use getAttachmentFileRecord instead.
    * Get an attachment file record by ID
    */
   getAttachmentFile?(fileId: string): Promise<AttachmentFileRecord | null>;
@@ -142,7 +158,8 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
 export function supportsAttachments<Config extends BaseNotificationTypeConfig>(
   backend: BaseNotificationBackend<Config>,
 ): backend is BaseNotificationBackend<Config> & {
-  getAttachmentFile(fileId: string): Promise<AttachmentFileRecord | null>;
+  storeAttachmentFileRecord(record: AttachmentFileRecord): Promise<void>;
+  getAttachmentFileRecord(fileId: string): Promise<AttachmentFileRecord | null>;
   findAttachmentFileByChecksum(checksum: string): Promise<AttachmentFileRecord | null>;
   deleteAttachmentFile(fileId: string): Promise<void>;
   getOrphanedAttachmentFiles(): Promise<AttachmentFileRecord[]>;
@@ -153,7 +170,8 @@ export function supportsAttachments<Config extends BaseNotificationTypeConfig>(
   ): Promise<void>;
 } {
   return (
-    typeof backend.getAttachmentFile === 'function' &&
+    typeof backend.storeAttachmentFileRecord === 'function' &&
+    typeof backend.getAttachmentFileRecord === 'function' &&
     typeof backend.findAttachmentFileByChecksum === 'function' &&
     typeof backend.deleteAttachmentFile === 'function' &&
     typeof backend.getOrphanedAttachmentFiles === 'function' &&

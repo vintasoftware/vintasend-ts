@@ -939,3 +939,214 @@ async uploadFile(...): Promise<AttachmentFileRecord> {
 
 ---
 
+## Phase 5 Progress Report: Backend Interface Update
+
+**Status**: ✅ COMPLETE
+**Date**: February 4, 2026
+**Phase**: 5 of 7
+
+---
+
+### Summary
+
+Phase 5 updated the `BaseNotificationBackend` interface to clarify backend responsibilities regarding attachment file storage. The interface now explicitly includes `storeAttachmentFileRecord()` and `getAttachmentFileRecord()` methods, establishing the contract for how backends persist and retrieve attachment file metadata and storage identifiers.
+
+### Files Modified
+
+#### 1. BaseNotificationBackend Interface
+
+##### [src/services/notification-backends/base-notification-backend.ts](src/services/notification-backends/base-notification-backend.ts)
+**Changes**:
+- Added `storeAttachmentFileRecord(record: AttachmentFileRecord)` method
+  - New method for backends to store file metadata and storage identifiers in their database
+  - Called after `AttachmentManager.uploadFile()` returns storage identifiers
+  - Enables separation of concerns: attachment manager returns identifiers, backend persists them
+  
+- Added `getAttachmentFileRecord(fileId: string)` method
+  - New method for backends to retrieve file metadata and storage identifiers by ID
+  - Returns the identifiers needed to reconstruct file access via attachment manager
+  - Used during attachment retrieval and deduplication checks
+
+- Marked `getAttachmentFile()` as deprecated
+  - Kept for backward compatibility during migration
+  - Implementation should migrate to `getAttachmentFileRecord()`
+  - Will be removed in a future major version
+
+- Updated `supportsAttachments()` type guard
+  - Now checks for both new methods (`storeAttachmentFileRecord`, `getAttachmentFileRecord`)
+  - Updated return type to include new method signatures
+  - Maintains narrowing for safe method calls after type guard
+
+#### 2. New Test File
+
+##### [src/services/notification-backends/__tests__/base-notification-backend.test.ts](src/services/notification-backends/__tests__/base-notification-backend.test.ts)
+**Created**: Comprehensive type tests for the new backend interface
+
+**Test Coverage**:
+- ✅ 11 tests validating the new interface
+  - Compilation test for new methods
+  - Method existence tests
+  - Type guard validation
+  - Return type verification
+  - Type narrowing after type guard check
+
+**Key Tests**:
+- `should compile with new attachment methods` - TypeScript compilation validation
+- `should have storeAttachmentFileRecord method` - Method existence check
+- `should have getAttachmentFileRecord method` - Method existence check
+- `supportsAttachments type guard`
+  - `should return true for backend with all attachment methods` - Proper type guard detection
+  - `should return false for backend with missing attachment methods` - Missing method detection
+  - `should allow calling typed methods after type guard` - Type narrowing verification
+
+#### 3. Updated Mock Implementations in Existing Tests
+
+Updated mock backend implementations across test files to include new attachment methods:
+- [src/services/notification-backends/__tests__/base-backend-interface.test.ts](src/services/notification-backends/__tests__/base-backend-interface.test.ts) - Updated 7 test mocks
+- [src/services/__tests__/notification-service.test.ts](src/services/__tests__/notification-service.test.ts) - Updated root package mock
+- [src/services/__tests__/notification-service-one-off.test.ts](src/services/__tests__/notification-service-one-off.test.ts) - Updated one-off mock
+- [src/services/notification-adapters/__tests__/base-adapter-one-off.test.ts](src/services/notification-adapters/__tests__/base-adapter-one-off.test.ts) - Updated adapter mock
+
+All mocks now include:
+```typescript
+storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
+getAttachmentFileRecord: jest.fn().mockResolvedValue(null),
+getAttachmentFile: jest.fn().mockResolvedValue(null),  // Deprecated but still present
+// ... remaining attachment methods ...
+```
+
+---
+
+### Test Results
+
+#### Root Package
+```
+Test Suites: 11 passed, 11 total
+Tests:       207 passed, 207 total
+Time:        6.242 s
+```
+
+All 207 tests passing:
+- ✅ base-notification-backend.test.ts (11 new tests)
+- ✅ base-backend-interface.test.ts (19 tests)
+- ✅ notification-service.test.ts (47 tests)
+- ✅ notification-service-one-off.test.ts (46 tests)
+- ✅ base-adapter-one-off.test.ts (21 tests)
+- ✅ base-notification-adapter.test.ts (34 tests)
+- ✅ attachment manager tests (11 tests)
+- ✅ type tests (18 tests)
+
+#### TypeScript Compilation
+```
+> tsc
+[No errors]
+```
+
+---
+
+### Architecture Changes
+
+#### Before Phase 5
+```
+BaseNotificationBackend Interface {
+  // Database operation methods
+  persistNotification()
+  markAsSent()
+  // ...
+  
+  // Attachment methods
+  getAttachmentFile()        // ❌ How does backend store metadata?
+  findAttachmentFileByChecksum()
+  deleteAttachmentFile()
+  getOrphanedAttachmentFiles()
+  getAttachments()
+  deleteNotificationAttachment()
+}
+```
+
+**Problem**: Interface didn't explicitly define how attachment metadata gets stored in the backend's database. The method names didn't make clear what happens to storage identifiers returned by attachment managers.
+
+#### After Phase 5
+```
+BaseNotificationBackend Interface {
+  // Database operation methods
+  persistNotification()
+  markAsSent()
+  // ...
+  
+  // Attachment storage (NEW: explicit data flow)
+  storeAttachmentFileRecord()   // ✅ Backend stores identifiers from manager
+  getAttachmentFileRecord()      // ✅ Backend retrieves identifiers for manager
+  getAttachmentFile()            // ⚠️  Deprecated, use getAttachmentFileRecord()
+  
+  // Attachment queries
+  findAttachmentFileByChecksum()
+  deleteAttachmentFile()
+  getOrphanedAttachmentFiles()
+  getAttachments()
+  deleteNotificationAttachment()
+}
+```
+
+**Benefit**: Clear separation of concerns - `storeAttachmentFileRecord()` and `getAttachmentFileRecord()` explicitly document the data flow between attachment managers and backends.
+
+---
+
+### Key Design Decisions
+
+1. **Explicit method names clarify responsibility**
+   - `storeAttachmentFileRecord()` - Backend's responsibility to persist
+   - `getAttachmentFileRecord()` - Backend's responsibility to retrieve
+   - Not `storeFile()` or `saveMetadata()` - names are specific about what's stored
+
+2. **New methods don't replace old ones**
+   - `getAttachmentFile()` marked as deprecated, not removed
+   - Enables gradual migration path for existing implementations
+   - Implementations can support both during transition
+   - Will be removed in future major version (clearly documented)
+
+3. **Parameter and return types are explicit**
+   - Parameter: `AttachmentFileRecord` - includes metadata and storage identifiers
+   - Return type: `Promise<AttachmentFileRecord | null>` - consistent with file metadata queries
+   - Enables type-safe integration with attachment managers
+
+4. **Type guard updated to include new methods**
+   - `supportsAttachments()` now checks for both old and new methods
+   - Allows safe narrowing after type guard check
+   - Enables calling typed methods without null checks
+
+---
+
+### Breaking Changes
+
+None - this is a fully backward-compatible addition:
+- New methods are optional (`?`)
+- Deprecated method (`getAttachmentFile`) still present
+- Existing code continues to work
+- New code can use `storeAttachmentFileRecord()` and `getAttachmentFileRecord()`
+- Type guard updated to handle both old and new methods
+
+**Migration Path**:
+1. Implementations add `storeAttachmentFileRecord()` and `getAttachmentFileRecord()` methods
+2. Update internal code to call new methods instead of `getAttachmentFile()`
+3. Keep `getAttachmentFile()` as a wrapper or remove if no longer needed
+4. In future major version (e.g., v1.0.0), remove deprecated `getAttachmentFile()`
+
+---
+
+### Verification Checklist
+
+- ✅ New `storeAttachmentFileRecord()` method added to interface
+- ✅ New `getAttachmentFileRecord()` method added to interface
+- ✅ `getAttachmentFile()` marked as deprecated with JSDoc
+- ✅ Both new methods have clear documentation
+- ✅ Type guard updated to check for new methods
+- ✅ Type guard return type includes new method signatures
+- ✅ New test file created with 11 passing tests
+- ✅ All 7 existing test mocks updated with new methods
+- ✅ All 207 tests passing (including 11 new tests)
+- ✅ TypeScript compilation succeeds with no errors
+- ✅ No breaking changes - fully backward compatible
+- ✅ Clear migration path documented for implementations
+
+---
