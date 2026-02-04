@@ -60,6 +60,24 @@ npm run release:bump
 0.4.14 → 0.5.0-alpha1 → 0.5.0-alpha2 → 0.5.0 (stable)
 ```
 
+### Incrementing Alpha Versions
+
+If your current version is already an alpha (e.g., `0.5.0-alpha1`), you'll see an additional option to just increment the alpha iteration:
+
+```bash
+npm run release:bump
+
+Select version bump type:
+  1) patch (e.g., 0.5.0-alpha1 → 0.5.1)
+  2) minor (e.g., 0.5.0-alpha1 → 0.6.0)
+  3) alpha (e.g., 0.5.0-alpha1 → 0.5.1-alpha1)
+  4) increment alpha (e.g., 0.5.0-alpha1 → 0.5.0-alpha2)
+
+# Choosing option 4 will bump: 0.5.0-alpha1 → 0.5.0-alpha2
+```
+
+This is useful when you want to release multiple alpha iterations of the same version for testing and bug fixes.
+
 ### How Alpha Versions Are Compared
 
 The version comparison correctly handles alpha versions:

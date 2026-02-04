@@ -67,10 +67,10 @@ function publishPackage(packageDir, dryRun = false) {
   const packageJsonPath = path.join(packageDir, 'package.json');
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
   const version = packageJson.version;
-  
+
   // Check if it's a pre-release version (contains a hyphen, e.g., 1.0.0-alpha1)
   const isPreRelease = version.includes('-');
-  
+
   // Add --tag flag for pre-release versions
   const command = isPreRelease ? 'npm publish --tag alpha' : 'npm publish';
 

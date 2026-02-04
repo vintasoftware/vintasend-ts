@@ -105,16 +105,44 @@ async function main() {
     let alphaIteration = 1;
     let alphaBaseBumpType = 'patch';
 
+    // Check if current version is an alpha version
+    const isCurrentAlpha = /^(\d+\.\d+\.\d+)-alpha(\d+)$/.test(highestVersion);
+    const currentAlphaMatch = highestVersion.match(/^(\d+\.\d+\.\d+)-alpha(\d+)$/);
+    
+    // If --bump=alpha was passed and current version is already alpha, ask if user wants to increment
+    if (selectedBumpType === 'alpha' && isCurrentAlpha) {
+      console.log('\nCurrent version is already an alpha. What would you like to do?');
+      console.log('  1) Increment alpha iteration only (e.g., ' + highestVersion + ' → ' + currentAlphaMatch[1] + '-alpha' + (parseInt(currentAlphaMatch[2]) + 1) + ')');
+      console.log('  2) Create new alpha version (bump base version first)');
+      const alphaChoice = await question('\nEnter choice (1 or 2): ');
+      
+      if (alphaChoice === '1') {
+        selectedBumpType = 'alpha-iteration';
+        alphaIteration = parseInt(currentAlphaMatch[2]) + 1;
+      }
+      // If choice is 2 or anything else, keep selectedBumpType as 'alpha' and continue
+    }
+    
     if (!selectedBumpType) {
       console.log('\nSelect version bump type:');
       console.log('  1) patch (e.g., 0.4.14 → 0.4.15)');
       console.log('  2) minor (e.g., 0.4.14 → 0.5.0)');
       console.log('  3) alpha (e.g., 0.4.14 → 0.4.15-alpha1)');
-      const choice = await question('\nEnter choice (1, 2, or 3): ');
+      
+      if (isCurrentAlpha) {
+        console.log(`  4) increment alpha (e.g., ${highestVersion} → ${currentAlphaMatch[1]}-alpha${parseInt(currentAlphaMatch[2]) + 1})`);
+      }
+      
+      const maxChoice = isCurrentAlpha ? 4 : 3;
+      const choice = await question(`\nEnter choice (1, 2, ${isCurrentAlpha ? '3, or 4' : 'or 3'}): `);
+      
       if (choice === '2') {
         selectedBumpType = 'minor';
       } else if (choice === '3') {
         selectedBumpType = 'alpha';
+      } else if (choice === '4' && isCurrentAlpha) {
+        selectedBumpType = 'alpha-iteration';
+        alphaIteration = parseInt(currentAlphaMatch[2]) + 1;
       } else {
         selectedBumpType = 'patch';
       }
