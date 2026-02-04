@@ -38,21 +38,42 @@ function findHighestVersion(implementationsDir) {
 }
 
 /**
- * Compare two semver versions
+ * Compare two semver versions (including alpha versions)
  * @param {string} v1 - First version
  * @param {string} v2 - Second version
  * @returns {number} - 1 if v1 > v2, -1 if v1 < v2, 0 if equal
  */
 function compareVersions(v1, v2) {
-  const parts1 = v1.split('.').map(Number);
-  const parts2 = v2.split('.').map(Number);
+  // Extract base version and alpha info from both versions
+  const parseVersion = (version) => {
+    const match = version.match(/^(\d+)\.(\d+)\.(\d+)(?:-alpha(\d+))?$/);
+    if (!match) return { major: 0, minor: 0, patch: 0, alphaNum: null };
+    return {
+      major: parseInt(match[1]),
+      minor: parseInt(match[2]),
+      patch: parseInt(match[3]),
+      alphaNum: match[4] ? parseInt(match[4]) : null
+    };
+  };
 
-  for (let i = 0; i < 3; i++) {
-    if (parts1[i] > parts2[i]) return 1;
-    if (parts1[i] < parts2[i]) return -1;
-  }
+  const p1 = parseVersion(v1);
+  const p2 = parseVersion(v2);
 
-  return 0;
+  // Compare major
+  if (p1.major !== p2.major) return p1.major > p2.major ? 1 : -1;
+  // Compare minor
+  if (p1.minor !== p2.minor) return p1.minor > p2.minor ? 1 : -1;
+  // Compare patch
+  if (p1.patch !== p2.patch) return p1.patch > p2.patch ? 1 : -1;
+
+  // Both have same base version, compare alpha versions
+  // If both have no alpha, they're equal
+  if (p1.alphaNum === null && p2.alphaNum === null) return 0;
+  // If one has alpha and one doesn't, the stable version is higher
+  if (p1.alphaNum === null) return 1; // v1 is stable, v2 is alpha
+  if (p2.alphaNum === null) return -1; // v2 is stable, v1 is alpha
+  // Both are alpha versions, compare iteration numbers
+  return p1.alphaNum > p2.alphaNum ? 1 : p1.alphaNum < p2.alphaNum ? -1 : 0;
 }
 
 /**

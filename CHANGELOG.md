@@ -1,5 +1,43 @@
 # Changelog
 
+## Version 0.5.0-alpha1
+
+* **Attachment Decoupling Architecture** (Complete refactor): Fully decoupled attachment storage from notification backends, enabling any backend to work with any attachment manager:
+  * **StorageIdentifiers Type System**: Introduced `StorageIdentifiers` base interface with implementation-specific types (`MedplumStorageIdentifiers`, `S3StorageIdentifiers`, etc.) for type-safe attachment identification
+  * **Backend-Manager Separation**: Clear separation of concerns - backends handle database operations, attachment managers handle file storage only
+  * **Flexible Manager Support**: All backends now work with any attachment manager (S3, Medplum, local filesystem, or custom implementations)
+  * **BaseAttachmentManager Redesign**:
+    * Removed `getFile()` and `deleteFile()` methods requiring database access
+    * Added `deleteFileByIdentifiers()` for clean file deletion using opaque identifiers
+    * Updated `reconstructAttachmentFile()` to accept typed `StorageIdentifiers` instead of untyped metadata
+    * Managers now focused solely on file storage operations
+  * **MedplumNotificationBackend Updates**:
+    * Refactored to store `storageIdentifiers` (opaque JSON) instead of backend-specific metadata
+    * Works seamlessly with S3, local filesystem, or any custom attachment manager
+    * Maintains Media resources for backend database records while supporting any storage backend
+    * Proper separation: manager identifiers vs backend metadata
+  * **PrismaNotificationBackend Updates**:
+    * Updated `PrismaAttachmentFileModel` to use `storageIdentifiers` field for opaque storage
+    * Refactored file deletion to use `deleteFileByIdentifiers()` with proper identifiers
+    * Works with any attachment manager without coupling to specific implementations
+    * Full type safety with `StorageIdentifiers` type
+  * **Type Safety Improvements**:
+    * All attachment operations now use properly typed `StorageIdentifiers`
+    * Implementation-specific identifier types ensure correct manager selection
+    * TypeScript compilation validates identifier structures
+  * **Comprehensive Testing**:
+    * All 207 root package tests passing
+    * All 82 Prisma package tests passing  
+    * All 140+ Medplum package tests passing
+    * Zero TypeScript compilation errors
+  * **Breaking Changes**:
+    * ⚠️ **BREAKING**: Attachment field renamed: `storageMetadata` → `storageIdentifiers` in `AttachmentFileRecord` and `StoredAttachment`
+    * ⚠️ **BREAKING**: `BaseAttachmentManager.deleteFile(fileId)` → `deleteFileByIdentifiers(storageIdentifiers)`
+    * ⚠️ **BREAKING**: `BaseAttachmentManager.getFile()` and `deleteFile()` removed from interface
+    * **Migration Path**: Internal changes to backend implementations only - public VintaSend API unchanged
+    * **Benefits**: Enables true multi-backend support and cleaner architecture going forward
+  * **Documentation**: Complete progress tracking in `ATTACHMENT_DECOUPLING_PLAN_PROGRESS.md`
+
 ## Version 0.4.17
 
 * **Release Automation**: Introduced a comprehensive two-step release automation system for managing vintasend-ts and all implementation packages:

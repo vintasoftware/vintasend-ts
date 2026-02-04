@@ -62,7 +62,17 @@ function testPackage(packageDir, dryRun = false) {
  * @param {boolean} dryRun - If true, don't actually publish
  */
 function publishPackage(packageDir, dryRun = false) {
-  const command = 'npm publish';
+  // Read package.json to check if it's a pre-release version
+  const fs = require('fs');
+  const packageJsonPath = path.join(packageDir, 'package.json');
+  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  const version = packageJson.version;
+  
+  // Check if it's a pre-release version (contains a hyphen, e.g., 1.0.0-alpha1)
+  const isPreRelease = version.includes('-');
+  
+  // Add --tag flag for pre-release versions
+  const command = isPreRelease ? 'npm publish --tag alpha' : 'npm publish';
 
   if (dryRun) {
     return { command, cwd: packageDir, dryRun: true };

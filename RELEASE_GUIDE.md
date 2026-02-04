@@ -6,12 +6,13 @@ The release process is split into two steps:
 
 **Step 1: Bump Versions**
 ```bash
-# Interactive (prompts for patch/minor)
+# Interactive (prompts for patch/minor/alpha)
 npm run release:bump
 
 # Direct bump type
 npm run release:bump:patch   # 0.4.14 → 0.4.15
 npm run release:bump:minor   # 0.4.14 → 0.5.0
+npm run release:bump:alpha   # 0.4.14 → 0.4.15-alpha1 (prompts for base bump type)
 ```
 
 **Step 2: Update CHANGELOG.md**
@@ -32,11 +33,66 @@ npm run release:publish
 
 This gives you full control over release notes and commit messages.
 
+## Alpha Versions
+
+Alpha versions allow you to release experimental or unstable versions for testing before a stable release. The system supports alpha versions with the format `X.Y.Z-alphaN` where N is the iteration number.
+
+### When to Use Alpha Versions
+
+- Testing new features before stable release
+- Getting early feedback from users
+- Fixing bugs in pre-release versions without affecting stable releases
+- Testing breaking changes
+
+### Creating Alpha Versions
+
+```bash
+# Interactive mode
+npm run release:bump
+# Then select option 3 for alpha
+# Select base bump type: patch or minor
+# Enter alpha iteration number (default: 1)
+
+# Example progression:
+0.4.14 → 0.4.15-alpha1 → 0.4.15-alpha2 → 0.4.15 (stable)
+
+# Or with minor bump:
+0.4.14 → 0.5.0-alpha1 → 0.5.0-alpha2 → 0.5.0 (stable)
+```
+
+### How Alpha Versions Are Compared
+
+The version comparison correctly handles alpha versions:
+- `0.4.15` > `0.4.15-alpha1` (stable is newer than alpha)
+- `0.4.15-alpha2` > `0.4.15-alpha1` (higher alpha iteration is newer)
+- `0.4.14` < `0.4.15-alpha1` (older stable version is less than newer alpha)
+- When bumping from `0.4.15-alpha3` with a patch bump → `0.4.16`
+- When bumping from `0.4.15-alpha3` with a minor bump → `0.5.0`
+
+### Publishing Alpha Versions
+
+Alpha versions publish normally to npm but won't be installed by default:
+
+```bash
+# Users must explicitly request alpha versions
+npm install vintasend@0.4.15-alpha1
+
+# Or use a tag
+npm install vintasend@alpha
+```
+
+To set the `@alpha` tag in npm (requires npm publish with `--tag=alpha`):
+
+```bash
+# This requires manual setup; the automated release uses default tags
+npm publish --tag alpha
+```
+
 ## What Gets Automated
 
 ### Step 1: Version Bump (`npm run release:bump`)
-✅ **Version Detection**: Finds the highest version among all implementations  
-✅ **Version Bumping**: Updates main package and all implementations to the same new version  
+✅ **Version Detection**: Finds the highest version among all implementations (supports stable and alpha versions)  
+✅ **Version Bumping**: Updates main package and all implementations to the same new version (patch, minor, or alpha)  
 ✅ **Dependency Updates**: Updates `vintasend` dependency in all implementations  
 ✅ **State Saving**: Saves release state for step 2
 
@@ -135,8 +191,9 @@ $ npm run release
 Select version bump type:
   1) patch (e.g., 0.4.14 → 0.4.15)
   2) minor (e.g., 0.4.14 → 0.5.0)
+  3) alpha (e.g., 0.4.14 → 0.4.14-alpha1)
 
-Enter choice (1 or 2): 1
+Enter choice (1, 2, or 3): 1
 
 ℹ New version will be: 0.4.15 (patch bump)
 
@@ -198,6 +255,106 @@ Press Enter after authorizing in the browser:
 ==================================================
 
 Released version: 0.4.15
+Packages published: 8
+
+Next steps:
+  1. Update CHANGELOG.md manually
+  2. Review the commits
+  3. Push to remote: git push && git push --tags
+```
+
+### Alpha Release Example
+
+```bash
+$ npm run release
+
+========================================
+  VintaSend Release Automation
+========================================
+
+[1] Checking git status...
+✓ Working directory is clean
+
+[2] Finding highest implementation version...
+ℹ Highest version: 0.4.14 (vintasend-medplum)
+
+[3] Determining version bump type...
+
+Select version bump type:
+  1) patch (e.g., 0.4.14 → 0.4.15)
+  2) minor (e.g., 0.4.14 → 0.5.0)
+  3) alpha (e.g., 0.4.14 → 0.4.15-alpha1)
+
+Enter choice (1, 2, or 3): 3
+
+Select alpha base bump type:
+  1) patch (e.g., 0.4.14 → 0.4.15-alpha1)
+  2) minor (e.g., 0.4.14 → 0.5.0-alpha1)
+
+Enter choice (1 or 2): 1
+
+Enter alpha iteration number (default 1): 1
+
+ℹ New version will be: 0.4.15-alpha1 (alpha bump)
+
+[4] Getting commit message...
+
+Commit message (press Enter for "Bump versions"): Release alpha version for testing new features
+
+ℹ Commit message: "Release alpha version for testing new features"
+
+==================================================
+RELEASE SUMMARY
+==================================================
+New version:      0.4.15-alpha1
+Bump type:        alpha
+Commit message:   "Release alpha version for testing new features"
+==================================================
+
+Proceed with release? (yes/no): yes
+
+[6] Updating main package version...
+✓ Updated vintasend package.json to 0.4.15-alpha1
+
+[7] Testing main package...
+✓ Tests passed
+
+[8] Building main package...
+✓ Build completed
+
+[9] Publishing main package...
+⚠ Publishing main package - this will open a browser for 2FA authorization
+ℹ After authorizing in the browser, you have 5 minutes to publish all packages
+[npm publish output - browser opens]
+✓ Published vintasend@0.4.15-alpha1 to npm
+⚠ Please confirm you have authorized npm publish in your browser
+Press Enter after authorizing in the browser: 
+✓ Authorization confirmed - proceeding with implementation publishing
+
+[10] Updating implementation packages...
+ℹ Processing vintasend-nodemailer...
+✓   Updated vintasend dependency to ^0.4.15-alpha1
+✓   Updated package version to 0.4.15-alpha1
+...
+
+[11] Building and publishing implementation packages...
+ℹ Building vintasend-nodemailer...
+✓   Tests passed
+✓   Build completed
+✓   Published vintasend-nodemailer@0.4.15-alpha1
+...
+
+[12] Committing changes...
+ℹ Committing implementation changes...
+✓ Committed implementation changes
+ℹ Committing main package changes...
+✓ Committed main package changes
+
+==================================================
+✓ RELEASE COMPLETED SUCCESSFULLY!
+==================================================
+
+Released version: 0.4.15-alpha1
 Packages published: 8
 
 Next steps:

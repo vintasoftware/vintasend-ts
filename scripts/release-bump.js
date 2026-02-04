@@ -102,16 +102,42 @@ async function main() {
     // Step 2: Determine bump type
     logStep('2', 'Determining version bump type...');
     let selectedBumpType = bumpType;
+    let alphaIteration = 1;
+    let alphaBaseBumpType = 'patch';
 
     if (!selectedBumpType) {
       console.log('\nSelect version bump type:');
       console.log('  1) patch (e.g., 0.4.14 → 0.4.15)');
       console.log('  2) minor (e.g., 0.4.14 → 0.5.0)');
-      const choice = await question('\nEnter choice (1 or 2): ');
-      selectedBumpType = choice === '2' ? 'minor' : 'patch';
+      console.log('  3) alpha (e.g., 0.4.14 → 0.4.15-alpha1)');
+      const choice = await question('\nEnter choice (1, 2, or 3): ');
+      if (choice === '2') {
+        selectedBumpType = 'minor';
+      } else if (choice === '3') {
+        selectedBumpType = 'alpha';
+      } else {
+        selectedBumpType = 'patch';
+      }
     }
 
-    const newVersion = bumpVersion(highestVersion, selectedBumpType);
+    // If alpha was selected, ask for base bump type and iteration
+    if (selectedBumpType === 'alpha') {
+      console.log('\nSelect alpha base bump type:');
+      console.log('  1) patch (e.g., 0.4.14 → 0.4.15-alpha1)');
+      console.log('  2) minor (e.g., 0.4.14 → 0.5.0-alpha1)');
+      const baseBumpChoice = await question('\nEnter choice (1 or 2): ');
+      alphaBaseBumpType = baseBumpChoice === '2' ? 'minor' : 'patch';
+      logInfo(`Alpha base bump type: ${alphaBaseBumpType}`);
+
+      const iterInput = await question('\nEnter alpha iteration number (default 1): ');
+      alphaIteration = iterInput.trim() ? parseInt(iterInput, 10) : 1;
+      if (isNaN(alphaIteration) || alphaIteration < 1) {
+        alphaIteration = 1;
+      }
+      logInfo(`Alpha iteration: ${alphaIteration}`);
+    }
+
+    const newVersion = bumpVersion(highestVersion, selectedBumpType, alphaIteration, alphaBaseBumpType);
     logInfo(`New version will be: ${newVersion} (${selectedBumpType} bump)`);
 
     // Step 3: Confirm before proceeding
