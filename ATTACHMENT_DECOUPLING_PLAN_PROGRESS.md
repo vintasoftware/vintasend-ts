@@ -500,3 +500,247 @@ All backends must:
 - ✅ Root package tests passing (196 tests)
 - ✅ TypeScript compilation succeeds with no errors
 - ✅ Mock implementations updated to new interface
+
+---
+
+## Phase 3 Progress Report: MedplumAttachmentManager Implementation
+
+**Status**: ✅ COMPLETE
+**Date**: February 4, 2026
+**Phase**: 3 of 7
+
+---
+
+### Summary
+
+Phase 3 fully implemented the `MedplumAttachmentManager` to use the new `MedplumStorageIdentifiers` type with proper field names. The manager now returns storage identifiers with `medplumBinaryId` and `medplumMediaId` fields instead of the generic `binaryId`, providing clear type safety and making the attachment manager's contract explicit.
+
+---
+
+### Files Modified
+
+#### 1. MedplumAttachmentManager Implementation
+
+##### [src/implementations/vintasend-medplum/src/medplum-attachment-manager.ts](src/implementations/vintasend-medplum/src/medplum-attachment-manager.ts)
+**Changes**:
+- Added `MedplumStorageIdentifiers` import from `./types`
+- Updated `uploadFile()` to return `MedplumStorageIdentifiers` with proper field names:
+  - `id`: Media resource ID (universal identifier)
+  - `medplumBinaryId`: Binary resource ID (file storage)
+  - `medplumMediaId`: Media resource ID (metadata)
+  - `url`: Binary reference URL
+- Updated `getFile()` to return `MedplumStorageIdentifiers` with proper field names
+- Updated `reconstructAttachmentFile()` to use `medplumBinaryId` instead of generic `binaryId`
+- Updated error message to reference `medplumBinaryId` for clarity
+
+**Before**:
+```typescript
+storageIdentifiers: {
+  id: createdMedia.id as string,
+  url: binaryUrl,
+  binaryId: createdBinary.id as string,  // ❌ Generic field name
+  creation: createdMedia.content.creation,
+}
+```
+
+**After**:
+```typescript
+const storageIdentifiers: MedplumStorageIdentifiers = {
+  id: createdMedia.id as string,
+  medplumBinaryId: createdBinary.id as string,  // ✅ Medplum-specific field
+  medplumMediaId: createdMedia.id as string,    // ✅ Explicit Media ID
+  url: binaryUrl,
+};
+```
+
+#### 2. MedplumAttachmentManager Tests
+
+##### [src/implementations/vintasend-medplum/src/__tests__/medplum-attachment-manager.test.ts](src/implementations/vintasend-medplum/src/__tests__/medplum-attachment-manager.test.ts)
+**Changes**:
+- Updated `uploadFile` test expectations to verify `MedplumStorageIdentifiers` structure (5 locations):
+  - Added `medplumBinaryId` expectation
+  - Added `medplumMediaId` expectation
+  - Removed `creation` field (not part of `MedplumStorageIdentifiers`)
+- Updated `getFile` test expectations to use new field names (1 location)
+- Updated `reconstructAttachmentFile` test fixtures to use `MedplumStorageIdentifiers` (3 locations):
+  - Changed `binaryId` → `medplumBinaryId`
+  - Added `medplumMediaId` field
+  - Added `url` field for completeness
+- Updated error message expectations to reference `medplumBinaryId` (2 locations)
+- Updated test description from "when binaryId is missing" → "when medplumBinaryId is missing"
+
+**Test Coverage**:
+```
+✅ 22 tests passing
+  - uploadFile: 4 tests
+  - getFile: 3 tests
+  - deleteFile: 3 tests
+  - reconstructAttachmentFile: 4 tests
+  - MedplumAttachmentFile: 8 tests
+```
+
+---
+
+### Test Results
+
+#### Root Package
+```
+Test Suites: 10 passed, 10 total
+Tests:       196 passed, 196 total
+Time:        2.203 s
+```
+
+#### Medplum Package
+```
+Test Suites: 10 passed, 10 total
+Tests:       141 passed, 141 total
+Time:        14.297 s
+```
+
+All Medplum-specific test suites passing:
+- ✅ types.test.ts (5 tests)
+- ✅ medplum-attachment-manager.test.ts (22 tests)
+- ✅ medplum-adapter-attachments.test.ts
+- ✅ medplum-backend-attachments.test.ts
+- ✅ medplum-adapter.test.ts
+- ✅ medplum-adapter-one-off.test.ts
+- ✅ medplum-backend.test.ts
+- ✅ medplum-logger.test.ts
+- ✅ pug-inline-email-template-renderer.test.ts
+- ✅ compile-pug-templates.test.ts
+
+#### Build Output
+```
+> tsc
+[No errors]
+```
+
+---
+
+### Architecture Changes
+
+#### Before Phase 3
+```typescript
+// MedplumAttachmentManager returned generic field names
+uploadFile(): Promise<AttachmentFileRecord> {
+  return {
+    storageIdentifiers: {
+      id: mediaId,
+      binaryId: binaryId,      // ❌ Generic - could be any storage system
+      url: binaryUrl,
+      creation: timestamp,     // ❌ Not in MedplumStorageIdentifiers
+    }
+  };
+}
+
+reconstructAttachmentFile(identifiers: StorageIdentifiers) {
+  const binaryId = identifiers.binaryId;  // ❌ Type-unsafe access
+}
+```
+
+**Problem**: Generic field names don't communicate the Medplum-specific nature. Type safety is lost when accessing fields.
+
+#### After Phase 3
+```typescript
+// MedplumAttachmentManager returns typed, Medplum-specific identifiers
+uploadFile(): Promise<AttachmentFileRecord> {
+  const storageIdentifiers: MedplumStorageIdentifiers = {
+    id: mediaId,
+    medplumBinaryId: binaryId,    // ✅ Clearly Medplum-specific
+    medplumMediaId: mediaId,       // ✅ Explicit Media resource ID
+    url: binaryUrl,
+  };
+  
+  return { storageIdentifiers, /* ... */ };
+}
+
+reconstructAttachmentFile(identifiers: StorageIdentifiers) {
+  const medplumIds = identifiers as MedplumStorageIdentifiers;
+  const binaryId = medplumIds.medplumBinaryId;  // ✅ Type-safe access
+}
+```
+
+**Benefit**: 
+- Clear contract: Anyone using `MedplumAttachmentManager` knows exactly what fields are available
+- Type safety: TypeScript can validate field access
+- Self-documenting: Field names communicate the storage implementation
+- Prevents confusion: Can't accidentally mix up with other attachment managers' identifiers
+
+---
+
+### Key Design Decisions
+
+1. **Explicit Medplum-specific field names**
+   - `medplumBinaryId` instead of generic `binaryId`
+   - `medplumMediaId` instead of just relying on `id`
+   - Makes it clear these are FHIR resource IDs
+
+2. **Type-safe storage identifier access**
+   - Cast to `MedplumStorageIdentifiers` when accessing Medplum-specific fields
+   - Maintains compatibility with generic `StorageIdentifiers` base type
+   - Allows backends to store identifiers without knowing implementation details
+
+3. **Consistent field naming convention**
+   - All Medplum-specific fields prefixed with `medplum`
+   - Follows pattern established in `MedplumStorageIdentifiers` type
+   - Differentiates from S3-specific fields (`awsS3Bucket`, `awsS3Key`, etc.)
+
+4. **Removed non-essential fields**
+   - Removed `creation` timestamp from storage identifiers
+   - Storage identifiers should only contain what's needed to access files
+   - Metadata like creation time belongs in `AttachmentFileRecord`, not identifiers
+
+---
+
+### Breaking Changes
+
+#### For MedplumAttachmentManager consumers
+- **Changed**: `storageIdentifiers.binaryId` → `storageIdentifiers.medplumBinaryId`
+- **Added**: `storageIdentifiers.medplumMediaId` field
+- **Removed**: `storageIdentifiers.creation` field (was Medplum-specific metadata)
+
+#### Migration Path
+Any code that directly accesses `MedplumAttachmentManager` storage identifiers must:
+1. Cast to `MedplumStorageIdentifiers` for type-safe access
+2. Use `medplumBinaryId` instead of `binaryId`
+3. Use `medplumMediaId` for Media resource references
+4. Don't rely on `creation` field (use `AttachmentFileRecord.createdAt` instead)
+
+**Example Migration**:
+```typescript
+// Before
+const file = await manager.getFile(fileId);
+const binaryId = file.storageIdentifiers.binaryId;
+
+// After
+const file = await manager.getFile(fileId);
+const identifiers = file.storageIdentifiers as MedplumStorageIdentifiers;
+const binaryId = identifiers.medplumBinaryId;
+```
+
+---
+
+### Verification Checklist
+
+- ✅ `MedplumStorageIdentifiers` type imported and used
+- ✅ `uploadFile()` returns proper `MedplumStorageIdentifiers` structure
+- ✅ `getFile()` returns proper `MedplumStorageIdentifiers` structure
+- ✅ `reconstructAttachmentFile()` uses `medplumBinaryId` field
+- ✅ Error messages reference correct field names
+- ✅ All 22 MedplumAttachmentManager tests passing
+- ✅ All 141 Medplum package tests passing
+- ✅ All 196 root package tests passing
+- ✅ TypeScript compilation succeeds with no errors
+- ✅ Field names follow Medplum-specific naming convention
+- ✅ Type safety maintained with explicit type casting
+- ✅ Test expectations updated to match new field structure
+- ✅ No remaining references to old generic `binaryId` field
+
+---
+
+### Notes
+
+- The `getFile()` and `deleteFile()` methods remain in `MedplumAttachmentManager` for backward compatibility and testing purposes, but are not part of the `BaseAttachmentManager` abstract contract (removed in Phase 2)
+- Backends should not call these methods directly - they should use `reconstructAttachmentFile()` and `deleteFileByIdentifiers()` instead
+- The dual resource model (Binary + Media) is maintained: Binary stores file data, Media stores metadata and links to Binary
+
