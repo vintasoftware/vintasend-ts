@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.5.1
+
+* Fix pending/future message logic on all officially supported backends (Prisma and Medplum)
+
+
 ## Version 0.5.0
 
 * **Attachment Decoupling Architecture** (Complete refactor): Fully decoupled attachment storage from notification backends, enabling any backend to work with any attachment manager:
