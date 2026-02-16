@@ -23,3 +23,6 @@
 [submodule "src/implementations/vintasend-ts-sendgrid"]
 	path = src/implementations/vintasend-ts-sendgrid
 	url = git@github.com:vintasoftware/vintasend-ts-sendgrid.git
+[submodule "src/tools/vintasend-dashboard"]
+	path = src/tools/vintasend-dashboard
+	url = git@github.com:vintasoftware/vintasend-ts-dashboard.git

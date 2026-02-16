@@ -390,6 +390,14 @@ export class VintaSend<
     return this.backend.getPendingNotifications(page, pageSize);
   }
 
+  async getNotifications(page: number, pageSize: number) {
+    return this.backend.getNotifications(page, pageSize);
+  }
+
+  async getOneOffNotifications(page: number, pageSize: number) {
+    return this.backend.getOneOffNotifications(page, pageSize);
+  }
+
   async getNotification(notificationId: Config['NotificationIdType'], forUpdate = false) {
     return this.backend.getNotification(notificationId, forUpdate);
   }

@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.5.2
+
+* Add missing methods on the service that were already available on the backends.
+
+
 ## Version 0.5.1
 
 * Fix pending/future message logic on all officially supported backends (Prisma and Medplum)
