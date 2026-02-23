@@ -38,9 +38,16 @@ class TestAdapter<
   }
 }
 
+type Config = {
+  // biome-ignore lint/suspicious/noExplicitAny: Testing with generic config
+  ContextMap: any;
+  NotificationIdType: string;
+  UserIdType: string;
+};
+
 // Mock implementations
 // biome-ignore lint/suspicious/noExplicitAny: any config for testing
-const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
+const mockBackend = {
   persistNotification: jest.fn(),
   persistNotificationUpdate: jest.fn(),
   getAllFutureNotifications: jest.fn(),
@@ -55,7 +62,7 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   cancelNotification: jest.fn(),
   markAsSent: jest.fn(),
   markAsFailed: jest.fn(),
-  storeContextUsed: jest.fn(),
+  storeAdapterAndContextUsed: jest.fn(),
   getUserEmailFromNotification: jest.fn(),
   filterInAppUnreadNotifications: jest.fn(),
   bulkPersistNotifications: jest.fn(),
@@ -66,6 +73,7 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   getOneOffNotification: jest.fn(),
   getAllOneOffNotifications: jest.fn(),
   getOneOffNotifications: jest.fn(),
+  filterNotifications: jest.fn(),
 
   // Attachment methods
   storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
@@ -76,19 +84,13 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   getOrphanedAttachmentFiles: jest.fn().mockResolvedValue([]),
   getAttachments: jest.fn().mockResolvedValue([]),
   deleteNotificationAttachment: jest.fn().mockResolvedValue(undefined),
-};
+} as jest.Mocked<BaseNotificationBackend<Config>>;
 
-// biome-ignore lint/suspicious/noExplicitAny: any config for testing
-const mockTemplateRenderer: jest.Mocked<BaseNotificationTemplateRenderer<any>> = {
+const mockTemplateRenderer: jest.Mocked<BaseNotificationTemplateRenderer<Config>> = {
   render: jest.fn(),
 };
 
-type Config = {
-  // biome-ignore lint/suspicious/noExplicitAny: Testing with generic config
-  ContextMap: any;
-  NotificationIdType: string;
-  UserIdType: string;
-};
+
 
 describe('BaseNotificationAdapter - One-Off Notifications', () => {
   let adapter: TestAdapter<typeof mockTemplateRenderer, Config>;

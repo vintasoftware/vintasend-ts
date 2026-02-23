@@ -227,10 +227,10 @@ export class VintaSend<
       }
 
       try {
-        await this.backend.storeContextUsed(notification.id, context ?? {});
+        await this.backend.storeAdapterAndContextUsed(notification.id, adapter.key ?? 'unknown', context ?? {});
       } catch (storeContextError) {
         this.logger.error(
-          `Error storing context for notification ${notification.id}: ${storeContextError}`,
+          `Error storing adapter and context for notification ${notification.id}: ${storeContextError}`,
         );
       }
     }
@@ -542,7 +542,9 @@ export class VintaSend<
       notification.contextParameters,
     );
 
+    let lastAdapterKey = 'unknown';
     for (const adapter of enqueueNotificationsAdapters) {
+      lastAdapterKey = adapter.key ?? 'unknown';
       try {
         await adapter.send(notification, context);
       } catch (sendError) {
@@ -568,10 +570,10 @@ export class VintaSend<
     }
 
     try {
-      await this.backend.storeContextUsed(notification.id, context);
+      await this.backend.storeAdapterAndContextUsed(notification.id, lastAdapterKey, context);
     } catch (storeContextError) {
       this.logger.error(
-        `Error storing context for notification ${notification.id}: ${storeContextError}`,
+        `Error storing adapter and context for notification ${notification.id}: ${storeContextError}`,
       );
     }
   }

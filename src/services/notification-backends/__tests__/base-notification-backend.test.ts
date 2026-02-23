@@ -1,5 +1,6 @@
 import type { BaseNotificationBackend } from '../base-notification-backend';
-import { supportsAttachments } from '../base-notification-backend';
+import { supportsAttachments, isFieldFilter } from '../base-notification-backend';
+import type { NotificationFilter, NotificationFilterFields, DateRange } from '../base-notification-backend';
 import type { AttachmentFileRecord, StoredAttachment } from '../../../types/attachment';
 import type { AnyDatabaseNotification, DatabaseNotification } from '../../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../../types/notification-type-config';
@@ -89,7 +90,7 @@ class TestBackendWithAttachments implements BaseNotificationBackend<TestConfig> 
     return undefined;
   }
 
-  async storeContextUsed(): Promise<void> {
+  async storeAdapterAndContextUsed(): Promise<void> {
     // Implementation
   }
 
@@ -110,6 +111,15 @@ class TestBackendWithAttachments implements BaseNotificationBackend<TestConfig> 
   }
 
   async getOneOffNotifications(): Promise<any[]> {
+    return [];
+  }
+
+  // filterNotifications method
+  async filterNotifications(
+    filter: NotificationFilter<TestConfig>,
+    page: number,
+    pageSize: number,
+  ): Promise<AnyDatabaseNotification<TestConfig>[]> {
     return [];
   }
 
@@ -226,7 +236,7 @@ describe('BaseNotificationBackend Interface', () => {
         filterAllInAppUnreadNotifications: async () => [],
         filterInAppUnreadNotifications: async () => [],
         getUserEmailFromNotification: async () => undefined,
-        storeContextUsed: async () => {
+        storeAdapterAndContextUsed: async () => {
           // Implementation
         },
         persistOneOffNotification: async () => {
@@ -238,6 +248,7 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotification: async () => null,
         getAllOneOffNotifications: async () => [],
         getOneOffNotifications: async () => [],
+        filterNotifications: async () => [],
         // Missing attachment methods
       };
 
@@ -276,6 +287,337 @@ describe('BaseNotificationBackend Interface', () => {
         expect(result6).toBeInstanceOf(Promise);
         expect(result7).toBeInstanceOf(Promise);
       }
+    });
+  });
+
+  describe('filterNotifications', () => {
+    it('should have filterNotifications method', () => {
+      const backend = new TestBackendWithAttachments();
+      expect(typeof backend.filterNotifications).toBe('function');
+    });
+
+    it('should accept a simple status filter', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        status: 'PENDING_SEND',
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept multiple statuses as array', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        status: ['PENDING_SEND', 'SENT'],
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept a notification type filter', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        notificationType: 'EMAIL',
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept multiple notification types as array', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        notificationType: ['EMAIL', 'PUSH'],
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept an adapter filter', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        adapterUsed: 'sendgrid',
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept multiple adapters as array', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        adapterUsed: ['sendgrid', 'nodemailer'],
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept a userId (recipient) filter', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        userId: 'user-123',
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept a bodyTemplate filter', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        bodyTemplate: 'welcome-email',
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept a subjectTemplate filter', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        subjectTemplate: 'welcome-subject',
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept a contextName filter', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        contextName: 'user-context',
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept a createdAtRange filter', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        createdAtRange: {
+          from: new Date('2025-01-01'),
+          to: new Date('2025-12-31'),
+        },
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept a sentAtRange filter', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        sentAtRange: {
+          from: new Date('2025-06-01'),
+        },
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept a sendAfterRange filter', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        sendAfterRange: {
+          to: new Date('2025-07-01'),
+        },
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept combined field filters (implicit AND)', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        status: 'SENT',
+        notificationType: 'EMAIL',
+        userId: 'user-456',
+        adapterUsed: 'sendgrid',
+        createdAtRange: { from: new Date('2025-01-01') },
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept an explicit AND filter', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        and: [
+          { status: 'SENT' },
+          { notificationType: 'EMAIL' },
+          { userId: 'user-789' },
+        ],
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept an OR filter', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        or: [
+          { status: 'SENT' },
+          { status: 'FAILED' },
+        ],
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept a NOT filter', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        not: { status: 'CANCELLED' },
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept deeply nested logical filters', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        and: [
+          { notificationType: 'EMAIL' },
+          {
+            or: [
+              { status: 'SENT', sentAtRange: { from: new Date('2025-01-01') } },
+              {
+                and: [
+                  { status: 'PENDING_SEND' },
+                  { not: { adapterUsed: 'deprecated-adapter' } },
+                ],
+              },
+            ],
+          },
+          { not: { userId: 'blocked-user' } },
+        ],
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept NOT wrapping an OR filter', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        not: {
+          or: [
+            { status: 'CANCELLED' },
+            { status: 'FAILED' },
+          ],
+        },
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept date range with only from bound', async () => {
+      const backend = new TestBackendWithAttachments();
+      const range: DateRange = { from: new Date('2025-01-01') };
+      const filter: NotificationFilter<TestConfig> = { createdAtRange: range };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept date range with only to bound', async () => {
+      const backend = new TestBackendWithAttachments();
+      const range: DateRange = { to: new Date('2025-12-31') };
+      const filter: NotificationFilter<TestConfig> = { sentAtRange: range };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept empty field filter (match all)', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {};
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe('isFieldFilter type guard', () => {
+    it('should return true for a plain field filter', () => {
+      const filter: NotificationFilter<TestConfig> = { status: 'SENT' };
+      expect(isFieldFilter(filter)).toBe(true);
+    });
+
+    it('should return true for an empty field filter', () => {
+      const filter: NotificationFilter<TestConfig> = {};
+      expect(isFieldFilter(filter)).toBe(true);
+    });
+
+    it('should return false for an AND filter', () => {
+      const filter: NotificationFilter<TestConfig> = {
+        and: [{ status: 'SENT' }],
+      };
+      expect(isFieldFilter(filter)).toBe(false);
+    });
+
+    it('should return false for an OR filter', () => {
+      const filter: NotificationFilter<TestConfig> = {
+        or: [{ status: 'SENT' }],
+      };
+      expect(isFieldFilter(filter)).toBe(false);
+    });
+
+    it('should return false for a NOT filter', () => {
+      const filter: NotificationFilter<TestConfig> = {
+        not: { status: 'CANCELLED' },
+      };
+      expect(isFieldFilter(filter)).toBe(false);
+    });
+
+    it('should narrow type to NotificationFilterFields after guard', () => {
+      const filter: NotificationFilter<TestConfig> = {
+        status: 'SENT',
+        userId: 'user-1',
+        createdAtRange: { from: new Date('2025-01-01') },
+      };
+
+      if (isFieldFilter(filter)) {
+        // These should compile without errors after narrowing
+        expect(filter.status).toBe('SENT');
+        expect(filter.userId).toBe('user-1');
+        expect(filter.createdAtRange?.from).toEqual(new Date('2025-01-01'));
+      }
+    });
+  });
+
+  describe('getFilterCapabilities', () => {
+    it('should return default capabilities when method exists', async () => {
+      const backend = new (class extends TestBackendWithAttachments {
+        getFilterCapabilities() {
+          return {
+            'logical.and': true,
+            'fields.status': true,
+          };
+        }
+      })();
+      const capabilities = backend.getFilterCapabilities();
+      expect(capabilities).toBeDefined();
+      expect(capabilities['logical.and']).toBe(true);
+      expect(capabilities['fields.status']).toBe(true);
+    });
+
+    it('should support flat dotted keys for capability names', () => {
+      const backend = new (class extends TestBackendWithAttachments {
+        getFilterCapabilities() {
+          return {
+            'logical.and': true,
+            'logical.or': false,
+            'fields.status': true,
+            'negation.createdAtRange': false,
+          };
+        }
+      })();
+      const capabilities = backend.getFilterCapabilities();
+      expect(capabilities['logical.and']).toBe(true);
+      expect(capabilities['logical.or']).toBe(false);
+      expect(capabilities['fields.status']).toBe(true);
+      expect(capabilities['negation.createdAtRange']).toBe(false);
+    });
+
+    it('should allow backends that do not implement getFilterCapabilities', () => {
+      const backend = new TestBackendWithAttachments();
+      // Backend should be usable - getFilterCapabilities is optional
+      expect(backend).toBeDefined();
+      // TypeScript should allow optional chaining on the optional method
+      const capabilities = (backend as any).getFilterCapabilities?.();
+      // Method may not exist, so capabilities may be undefined
+      expect(capabilities === undefined || typeof capabilities === 'object').toBe(true);
     });
   });
 });

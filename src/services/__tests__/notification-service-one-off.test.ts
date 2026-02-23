@@ -25,9 +25,10 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   cancelNotification: jest.fn(),
   markAsSent: jest.fn(),
   markAsFailed: jest.fn(),
-  storeContextUsed: jest.fn(),
+  storeAdapterAndContextUsed: jest.fn(),
   getUserEmailFromNotification: jest.fn(),
   filterInAppUnreadNotifications: jest.fn(),
+  filterNotifications: jest.fn(),
   bulkPersistNotifications: jest.fn(),
   getAllNotifications: jest.fn(),
   getNotifications: jest.fn(),
@@ -456,7 +457,11 @@ describe('NotificationService - One-Off Notifications', () => {
 
       await service.createOneOffNotification(mockOneOffNotificationInput);
 
-      expect(mockBackend.storeContextUsed).toHaveBeenCalledWith('123', { test: 'context' });
+      expect(mockBackend.storeAdapterAndContextUsed).toHaveBeenCalledWith(
+        '123',
+        'test-adapter',
+        { test: 'context' },
+      );
     });
 
     it('should mark as failed if send fails', async () => {

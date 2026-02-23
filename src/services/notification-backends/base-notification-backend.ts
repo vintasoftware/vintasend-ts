@@ -1,5 +1,7 @@
 import type { AttachmentFileRecord, StoredAttachment } from '../../types/attachment';
 import type { InputJsonValue } from '../../types/json-values';
+import type { NotificationStatus } from '../../types/notification-status';
+import type { NotificationType } from '../../types/notification-type';
 import type {
   AnyDatabaseNotification,
   AnyNotification,
@@ -10,6 +12,60 @@ import type {
 } from '../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
 import type { BaseLogger } from '../loggers/base-logger';
+
+/**
+ * Date range filter with optional lower and upper bounds.
+ */
+export type DateRange = {
+  from?: Date;
+  to?: Date;
+};
+
+/**
+ * Flat dotted key capability map describing which filter features a backend supports.
+ * Use flat dotted keys for logical operators, fields, and negations:
+ * - `logical.*`: Operator support (and, or, not, notNested)
+ * - `fields.*`: Field filtering support
+ * - `negation.*`: Negation support for specific fields
+ *
+ * When a backend implements getFilterCapabilities(), missing keys default to true (supported),
+ * ensuring forward compatibility when new capabilities are added.
+ * Backends that don't implement getFilterCapabilities() are treated as supporting all features.
+ */
+export type NotificationFilterCapabilities = {
+  [key: string]: boolean;
+};
+
+/**
+ * Leaf-level filter conditions for notification fields.
+ * All specified fields are combined with implicit AND.
+ */
+export type NotificationFilterFields<Config extends BaseNotificationTypeConfig> = {
+  status?: NotificationStatus | NotificationStatus[];
+  notificationType?: NotificationType | NotificationType[];
+  adapterUsed?: string | string[];
+  userId?: Config['UserIdType'];
+  bodyTemplate?: string;
+  subjectTemplate?: string;
+  contextName?: string;
+  sendAfterRange?: DateRange;
+  createdAtRange?: DateRange;
+  sentAtRange?: DateRange;
+};
+
+/**
+ * Composable notification filter supporting logical operators.
+ *
+ * - A plain field filter applies all conditions with implicit AND.
+ * - `{ and: [...] }` requires all sub-filters to match.
+ * - `{ or: [...] }` requires at least one sub-filter to match.
+ * - `{ not: filter }` inverts the sub-filter.
+ */
+export type NotificationFilter<Config extends BaseNotificationTypeConfig> =
+  | NotificationFilterFields<Config>
+  | { and: NotificationFilter<Config>[] }
+  | { or: NotificationFilter<Config>[] }
+  | { not: NotificationFilter<Config> };
 
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
   getAllPendingNotifications(): Promise<AnyDatabaseNotification<Config>[]>;
@@ -70,8 +126,9 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
   getUserEmailFromNotification(
     notificationId: Config['NotificationIdType'],
   ): Promise<string | undefined>;
-  storeContextUsed(
+  storeAdapterAndContextUsed(
     notificationId: Config['NotificationIdType'],
+    adapterKey: string,
     context: InputJsonValue,
   ): Promise<void>;
 
@@ -92,6 +149,40 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     page: number,
     pageSize: number,
   ): Promise<DatabaseOneOffNotification<Config>[]>;
+
+  /**
+   * Filter notifications using composable query filters.
+   * Supports filtering by status, notification type, adapter, recipient,
+    * body/subject templates, context, and date ranges (sendAfter, created, sent).
+   * Filters can be combined with logical operators (and, or, not).
+   *
+   * @param filter - Composable filter expression
+   * @param page - Page number (1-indexed) for pagination
+   * @param pageSize - Number of results per page
+   * @returns Matching notifications
+   */
+  filterNotifications(
+    filter: NotificationFilter<Config>,
+    page: number,
+    pageSize: number,
+  ): Promise<AnyDatabaseNotification<Config>[]>;
+
+  /**
+   * Get the filter capabilities supported by this backend.
+   * Returns an object with flat dotted keys indicating which filtering features are supported.
+   *
+   * Example capability names:
+   * - `logical.and`, `logical.or`, `logical.not`, `logical.notNested`
+   * - `fields.status`, `fields.notificationType`, `fields.adapterUsed`, `fields.userId`,
+   *   `fields.bodyTemplate`, `fields.subjectTemplate`, `fields.contextName`,
+  *   `fields.sendAfterRange`, `fields.createdAtRange`, `fields.sentAtRange`
+  * - `negation.sendAfterRange`, `negation.createdAtRange`, `negation.sentAtRange`
+   *
+   * If this method is not implemented, all features are assumed to be supported.
+   * If this method is implemented, missing keys default to true (supported) for forward compatibility.
+   * Only explicitly set keys to false to indicate unsupported features.
+   */
+  getFilterCapabilities?(): NotificationFilterCapabilities;
 
   // Optional logger injection for debugging and monitoring
   /**
@@ -150,6 +241,15 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     notificationId: Config['NotificationIdType'],
     attachmentId: string,
   ): Promise<void>;
+}
+
+/**
+ * Type guard to check if a filter is a field filter (leaf node).
+ */
+export function isFieldFilter<Config extends BaseNotificationTypeConfig>(
+  filter: NotificationFilter<Config>,
+): filter is NotificationFilterFields<Config> {
+  return !('and' in filter) && !('or' in filter) && !('not' in filter);
 }
 
 /**

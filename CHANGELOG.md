@@ -1,5 +1,184 @@
 # Changelog
 
+## Version 0.6.0
+
+* **Composable notification filtering added to root package**:
+  * Added `filterNotifications(filter, page, pageSize)` to `BaseNotificationBackend`
+  * Added and exported `NotificationFilter`, `NotificationFilterFields`, `DateRange`, `NotificationFilterCapabilities`, and `isFieldFilter`
+  * Added comprehensive backend-interface tests for field filters, logical composition (`AND`/`OR`/`NOT`), nested filters, and date ranges
+* **Prisma implementation (`vintasend-prisma`) updates**:
+  * Implemented full server-side `filterNotifications` using Prisma `where` conversion
+  * Added recursive filter conversion for `AND` / `OR` / `NOT`
+  * Added range filtering support for `sendAfter`, `createdAt`, and `sentAt`
+  * Expanded internal Prisma where typings to support the new filter model
+  * Added focused Prisma tests for pagination, nested logical filters, and date-range behavior
+* **Medplum implementation (`vintasend-medplum`) updates**:
+  * Implemented server-side `filterNotifications` by translating VintaSend filters to FHIR search parameters
+  * Added Medplum filter capability reporting (`getFilterCapabilities`) so clients can detect unsupported operators
+  * Persisted searchable fields in `Communication.identifier`:
+    * `http://vintasend.com/fhir/body-template`
+    * `http://vintasend.com/fhir/subject-template`
+    * `http://vintasend.com/fhir/adapter-used`
+  * Updated read/write paths to use identifier-based fields with backward-compatible read fallback for body/subject from payload
+  * Added identifier upsert behavior in update paths for regular and one-off notifications
+* **Bug fixes**:
+  * Fixed `adapterUsed` not being persisted in Medplum (`storeAdapterAndContextUsed` now upserts the adapter identifier)
+  * Fixed `contextUsed` persistence/read path in Medplum (stored as extension and mapped back on reads)
+  * Fixed Medplum filterability gaps for `bodyTemplate`, `subjectTemplate`, and `adapterUsed` by storing them in searchable FHIR identifiers
+* **Breaking changes (Medplum data format)**:
+  * ⚠️ Existing `Communication` resources created before this version may not contain the new identifier systems.
+  * ⚠️ Filtering by `bodyTemplate`, `subjectTemplate`, and `adapterUsed` only works for records that have been backfilled or newly written in the new format.
+  * ⚠️ Medplum backend does not support `OR` across arbitrary fields in a single FHIR query; `OR` filters now throw explicitly.
+* **Migration plan for existing Medplum data**:
+  1. Query all `Communication` resources tagged with `notification`.
+  2. For each resource, upsert missing identifiers:
+     * `body-template`: from `payload[0].contentString` when available
+     * `subject-template`: from payload extension (`email-notification-subject`) when available
+     * `adapter-used`: from historical execution metadata if available; otherwise leave unset (do not guess)
+  3. Preserve all existing identifiers and only add/replace the three VintaSend systems above.
+  4. Update resources in batches and log failures for retry.
+  5. Validate by sampling migrated records and running `filterNotifications` queries for `bodyTemplate`, `subjectTemplate`, and `adapterUsed`.
+  6. Keep fallback reads enabled during rollout; after migration completion, treat identifier-based fields as the canonical source.
+  7. Example bulk migration bot (Medplum Bot + TypeScript, inspiration-only):
+
+```typescript
+import { BotEvent, MedplumClient } from '@medplum/core';
+import type { Communication, Identifier } from '@medplum/fhirtypes';
+
+/**
+ * Medplum Bot: Backfill Notification Identifiers
+ *
+ * This is an inspiration template for teams to adapt to their own projects.
+ * It migrates old Communication resources tagged as "notification" so they
+ * contain searchable identifiers used by vintasend-medplum filterNotifications.
+ *
+ * Suggested schedule: run once manually, then re-run as needed while monitoring logs.
+ */
+
+const IDENTIFIER_SYSTEMS = {
+  bodyTemplate: 'http://vintasend.com/fhir/body-template',
+  subjectTemplate: 'http://vintasend.com/fhir/subject-template',
+  adapterUsed: 'http://vintasend.com/fhir/adapter-used',
+} as const;
+
+const SUBJECT_EXTENSION_URL =
+  'http://vintasend.com/fhir/StructureDefinition/email-notification-subject';
+
+function upsertIdentifier(
+  identifiers: Identifier[] = [],
+  system: string,
+  value: string | undefined,
+): Identifier[] {
+  if (!value) return identifiers;
+
+  const next = [...identifiers];
+  const idx = next.findIndex((id) => id.system === system);
+
+  if (idx >= 0) {
+    next[idx] = { ...next[idx], system, value };
+  } else {
+    next.push({ system, value });
+  }
+
+  return next;
+}
+
+function extractSubjectTemplate(comm: Communication): string | undefined {
+  return comm.payload?.[0]?.extension?.find((ext) => ext.url === SUBJECT_EXTENSION_URL)?.valueString;
+}
+
+function getAdapterUsedFromHistoricalSource(
+  _comm: Communication,
+  _event: BotEvent,
+): string | undefined {
+  // IMPORTANT:
+  // Fill this using your authoritative historical source (audit logs, prior execution records, etc).
+  // Do not infer or guess adapter values.
+  return undefined;
+}
+
+export async function handler(medplum: MedplumClient, event: BotEvent): Promise<any> {
+  console.log('[BackfillNotificationIdentifiersBot] Starting migration');
+
+  const dryRun =
+    event.input?.dryRun === true ||
+    event.input?.dryRun === 'true' ||
+    process.env.DRY_RUN === 'true';
+
+  const pageSize = Number(event.input?.pageSize ?? process.env.PAGE_SIZE ?? 200);
+  const maxPages = Number(event.input?.maxPages ?? process.env.MAX_PAGES ?? 0); // 0 = no cap
+
+  let page = 0;
+  let totalScanned = 0;
+  let totalUpdated = 0;
+  let totalFailed = 0;
+
+  while (true) {
+    if (maxPages > 0 && page >= maxPages) {
+      console.log(`[BackfillNotificationIdentifiersBot] maxPages=${maxPages} reached, stopping`);
+      break;
+    }
+
+    const communications = await medplum.searchResources('Communication', {
+      _tag: 'notification',
+      _count: pageSize.toString(),
+      _offset: (page * pageSize).toString(),
+    });
+
+    if (communications.length === 0) break;
+
+    for (const comm of communications) {
+      totalScanned += 1;
+
+      try {
+        const bodyTemplate = comm.payload?.[0]?.contentString;
+        const subjectTemplate = extractSubjectTemplate(comm);
+        const adapterUsed = getAdapterUsedFromHistoricalSource(comm, event);
+
+        let nextIdentifiers = comm.identifier ?? [];
+        nextIdentifiers = upsertIdentifier(nextIdentifiers, IDENTIFIER_SYSTEMS.bodyTemplate, bodyTemplate);
+        nextIdentifiers = upsertIdentifier(nextIdentifiers, IDENTIFIER_SYSTEMS.subjectTemplate, subjectTemplate);
+        nextIdentifiers = upsertIdentifier(nextIdentifiers, IDENTIFIER_SYSTEMS.adapterUsed, adapterUsed);
+
+        const changed = JSON.stringify(nextIdentifiers) !== JSON.stringify(comm.identifier ?? []);
+        if (!changed) continue;
+
+        totalUpdated += 1;
+
+        if (!dryRun) {
+          await medplum.updateResource<Communication>({
+            ...comm,
+            identifier: nextIdentifiers,
+          });
+        }
+      } catch (error) {
+        totalFailed += 1;
+        console.error(`Failed migrating Communication/${comm.id}:`, error);
+      }
+    }
+
+    page += 1;
+  }
+
+  const result = {
+    dryRun,
+    pageSize,
+    pagesProcessed: page,
+    totalScanned,
+    totalUpdated,
+    totalFailed,
+  };
+
+  console.log('[BackfillNotificationIdentifiersBot] Completed migration');
+  console.log('[BackfillNotificationIdentifiersBot] Result:', JSON.stringify(result, null, 2));
+
+  return {
+    message: 'Communication identifier backfill completed',
+    result,
+  };
+}
+```
+
 ## Version 0.5.2
 
 * Add missing methods on the service that were already available on the backends.

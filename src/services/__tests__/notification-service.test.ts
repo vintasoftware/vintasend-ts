@@ -23,9 +23,10 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
   cancelNotification: jest.fn(),
   markAsSent: jest.fn(),
   markAsFailed: jest.fn(),
-  storeContextUsed: jest.fn(),
+  storeAdapterAndContextUsed: jest.fn(),
   getUserEmailFromNotification: jest.fn(),
   filterInAppUnreadNotifications: jest.fn(),
+  filterNotifications: jest.fn(),
   bulkPersistNotifications: jest.fn(),
   getAllNotifications: jest.fn(),
   getNotifications: jest.fn(),
@@ -243,25 +244,31 @@ describe('NotificationService', () => {
 
     it('should handle error storing context', async () => {
       notificationContextgenerators.testContext.generate.mockResolvedValue({});
-      mockBackend.storeContextUsed.mockRejectedValue(new Error('Storage error'));
+      mockBackend.storeAdapterAndContextUsed.mockRejectedValue(new Error('Storage error'));
 
       await service.send(mockNotification);
 
       expect(mockAdapter.send).toHaveBeenCalled();
-      expect(mockBackend.storeContextUsed).toHaveBeenCalledWith(mockNotification.id, {});
+      expect(mockBackend.storeAdapterAndContextUsed).toHaveBeenCalledWith(
+        mockNotification.id,
+        'test-adapter',
+        {},
+      );
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error storing context for notification'),
+        expect.stringContaining('Error storing adapter and context for notification'),
       );
     });
 
     it('should handle failed storage of context and continue execution', async () => {
       notificationContextgenerators.testContext.generate.mockResolvedValue({});
-      mockBackend.storeContextUsed.mockRejectedValue(new Error('Failed to store context'));
+      mockBackend.storeAdapterAndContextUsed.mockRejectedValue(
+        new Error('Failed to store context'),
+      );
 
       await service.send(mockNotification);
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error storing context for notification'),
+        expect.stringContaining('Error storing adapter and context for notification'),
       );
       // Should still complete the send operation
       expect(mockAdapter.send).toHaveBeenCalled();
@@ -273,7 +280,11 @@ describe('NotificationService', () => {
 
       await service.send(mockNotification);
 
-      expect(mockBackend.storeContextUsed).toHaveBeenCalledWith(mockNotification.id, {});
+      expect(mockBackend.storeAdapterAndContextUsed).toHaveBeenCalledWith(
+        mockNotification.id,
+        'test-adapter',
+        {},
+      );
     });
   });
 

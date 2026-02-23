@@ -1,6 +1,6 @@
 {
   "name": "vintasend",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "main": "dist/index.js",
   "files": [
     "dist"
@@ -16,6 +16,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:implementations:local": "node scripts/test-implementations-local.js",
     "release:bump": "node scripts/release-bump.js",
     "release:bump:patch": "node scripts/release-bump.js --bump=patch",
     "release:bump:minor": "node scripts/release-bump.js --bump=minor",

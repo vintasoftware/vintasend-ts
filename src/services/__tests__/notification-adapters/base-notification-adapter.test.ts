@@ -44,7 +44,7 @@ describe('BaseNotificationAdapter', () => {
       cancelNotification: jest.fn(),
       markPendingAsSent: jest.fn(),
       markPendingAsFailed: jest.fn(),
-      storeContextUsed: jest.fn(),
+      storeAdapterAndContextUsed: jest.fn(),
       getUserEmailFromNotification: jest.fn(),
       filterInAppUnreadNotifications: jest.fn(),
     };

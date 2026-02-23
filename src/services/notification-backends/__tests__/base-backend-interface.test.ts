@@ -47,7 +47,8 @@ describe('BaseNotificationBackend Interface', () => {
         filterAllInAppUnreadNotifications: jest.fn().mockResolvedValue([]),
         filterInAppUnreadNotifications: jest.fn().mockResolvedValue([]),
         getUserEmailFromNotification: jest.fn().mockResolvedValue(undefined),
-        storeContextUsed: jest.fn().mockResolvedValue(undefined),
+        storeAdapterAndContextUsed: jest.fn().mockResolvedValue(undefined),
+        filterNotifications: jest.fn().mockResolvedValue([]),
 
         // One-off notification methods
         persistOneOffNotification: jest
@@ -135,12 +136,13 @@ describe('BaseNotificationBackend Interface', () => {
         filterAllInAppUnreadNotifications: jest.fn(),
         filterInAppUnreadNotifications: jest.fn(),
         getUserEmailFromNotification: jest.fn(),
-        storeContextUsed: jest.fn(),
+        storeAdapterAndContextUsed: jest.fn(),
         persistOneOffNotification: jest.fn(),
         persistOneOffNotificationUpdate: jest.fn(),
         getOneOffNotification: jest.fn(),
         getAllOneOffNotifications: jest.fn(),
         getOneOffNotifications: jest.fn(),
+        filterNotifications: jest.fn(),
 
         // Attachment methods
         storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
@@ -200,13 +202,13 @@ describe('BaseNotificationBackend Interface', () => {
         filterAllInAppUnreadNotifications: jest.fn(),
         filterInAppUnreadNotifications: jest.fn(),
         getUserEmailFromNotification: jest.fn(),
-        storeContextUsed: jest.fn(),
+        storeAdapterAndContextUsed: jest.fn(),
         persistOneOffNotification: jest.fn(),
         persistOneOffNotificationUpdate: jest.fn(),
         getOneOffNotification: jest.fn(),
         getAllOneOffNotifications: jest.fn(),
         getOneOffNotifications: jest.fn(),
-
+        filterNotifications: jest.fn(),
         // Attachment methods
         storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
         getAttachmentFileRecord: jest.fn().mockResolvedValue(null),
@@ -277,12 +279,13 @@ describe('BaseNotificationBackend Interface', () => {
         filterAllInAppUnreadNotifications: jest.fn(),
         filterInAppUnreadNotifications: jest.fn(),
         getUserEmailFromNotification: jest.fn(),
-        storeContextUsed: jest.fn(),
+        storeAdapterAndContextUsed: jest.fn(),
         persistOneOffNotification: jest.fn().mockResolvedValue(expectedResult),
         persistOneOffNotificationUpdate: jest.fn(),
         getOneOffNotification: jest.fn(),
         getAllOneOffNotifications: jest.fn(),
         getOneOffNotifications: jest.fn(),
+        filterNotifications: jest.fn(),
 
         // Attachment methods
         storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
@@ -326,7 +329,7 @@ describe('BaseNotificationBackend Interface', () => {
         filterAllInAppUnreadNotifications: jest.fn(),
         filterInAppUnreadNotifications: jest.fn(),
         getUserEmailFromNotification: jest.fn(),
-        storeContextUsed: jest.fn(),
+        storeAdapterAndContextUsed: jest.fn(),
         persistOneOffNotification: jest.fn(),
         persistOneOffNotificationUpdate: jest
           .fn()
@@ -334,7 +337,7 @@ describe('BaseNotificationBackend Interface', () => {
         getOneOffNotification: jest.fn(),
         getAllOneOffNotifications: jest.fn(),
         getOneOffNotifications: jest.fn(),
-
+        filterNotifications: jest.fn(),
         // Attachment methods
         storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
         getAttachmentFileRecord: jest.fn().mockResolvedValue(null),
@@ -391,12 +394,13 @@ describe('BaseNotificationBackend Interface', () => {
         filterAllInAppUnreadNotifications: jest.fn(),
         filterInAppUnreadNotifications: jest.fn(),
         getUserEmailFromNotification: jest.fn(),
-        storeContextUsed: jest.fn(),
+        storeAdapterAndContextUsed: jest.fn(),
         persistOneOffNotification: jest.fn(),
         persistOneOffNotificationUpdate: jest.fn(),
         getOneOffNotification: jest.fn(),
         getAllOneOffNotifications: jest.fn(),
         getOneOffNotifications: jest.fn(),
+        filterNotifications: jest.fn(),
 
         // Attachment methods
         storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
@@ -511,12 +515,13 @@ describe('BaseNotificationBackend Interface', () => {
         filterAllInAppUnreadNotifications: jest.fn(),
         filterInAppUnreadNotifications: jest.fn(),
         getUserEmailFromNotification: jest.fn(),
-        storeContextUsed: jest.fn(),
+        storeAdapterAndContextUsed: jest.fn(),
         persistOneOffNotification: jest.fn(),
         persistOneOffNotificationUpdate: jest.fn(),
         getOneOffNotification: jest.fn(),
         getAllOneOffNotifications: jest.fn(),
         getOneOffNotifications: jest.fn(),
+        filterNotifications: jest.fn(),
 
         // Attachment methods
         storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
