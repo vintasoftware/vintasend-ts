@@ -347,6 +347,8 @@ VintaSend has many backend, adapter, and template renderer implementations. If y
 * **[vintasend-nodemailer](https://github.com/vintasoftware/vintasend-nodemailer/)**: Uses nodemailer to send transactional emails to users.
 * **[vintasend-sendgrid](https://github.com/vintasoftware/vintasend-ts-sendgrid/)**: Uses SendGrid's API to send transactional emails with attachment support.
 * **[vintasend-medplum](https://github.com/vintasoftware/vintasend-medplum/)**: Uses Medplum's email API to send notifications in healthcare applications.
+* **[vintasend-mailgun](https://github.com/vintasoftware/vintasend-ts-mailgun/)**: Uses Mailgun's API to send transactional emails with attachment support.
+* **[vintasend-twilio](https://github.com/vintasoftware/vintasend-ts-twilio/)**: Uses Twilio's API to send transactional SMS.
 
 ##### Attachment Managers
 

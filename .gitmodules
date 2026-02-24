@@ -26,3 +26,9 @@
 [submodule "src/tools/vintasend-dashboard"]
 	path = src/tools/vintasend-dashboard
 	url = git@github.com:vintasoftware/vintasend-ts-dashboard.git
+[submodule "src/implementations/vintasend-ts-mailgun"]
+	path = src/implementations/vintasend-ts-mailgun
+	url = https://github.com/vintasoftware/vintasend-ts-mailgun
+[submodule "src/implementations/vintasend-ts-twilio"]
+	path = src/implementations/vintasend-ts-twilio
+	url = https://github.com/vintasoftware/vintasend-ts-twilio
