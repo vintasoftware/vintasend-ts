@@ -67,6 +67,26 @@ export type NotificationFilter<Config extends BaseNotificationTypeConfig> =
   | { or: NotificationFilter<Config>[] }
   | { not: NotificationFilter<Config> };
 
+export const DEFAULT_BACKEND_FILTER_CAPABILITIES = {
+  'logical.and': true,
+  'logical.or': true,
+  'logical.not': true,
+  'logical.notNested': true,
+  'fields.status': true,
+  'fields.notificationType': true,
+  'fields.adapterUsed': true,
+  'fields.userId': true,
+  'fields.bodyTemplate': true,
+  'fields.subjectTemplate': true,
+  'fields.contextName': true,
+  'fields.sendAfterRange': true,
+  'fields.createdAtRange': true,
+  'fields.sentAtRange': true,
+  'negation.sendAfterRange': true,
+  'negation.createdAtRange': true,
+  'negation.sentAtRange': true,
+};
+
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
   getAllPendingNotifications(): Promise<AnyDatabaseNotification<Config>[]>;
   getPendingNotifications(
@@ -175,8 +195,8 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
    * - `logical.and`, `logical.or`, `logical.not`, `logical.notNested`
    * - `fields.status`, `fields.notificationType`, `fields.adapterUsed`, `fields.userId`,
    *   `fields.bodyTemplate`, `fields.subjectTemplate`, `fields.contextName`,
-  *   `fields.sendAfterRange`, `fields.createdAtRange`, `fields.sentAtRange`
-  * - `negation.sendAfterRange`, `negation.createdAtRange`, `negation.sentAtRange`
+   *   `fields.sendAfterRange`, `fields.createdAtRange`, `fields.sentAtRange`
+   * - `negation.sendAfterRange`, `negation.createdAtRange`, `negation.sentAtRange`
    *
    * If this method is not implemented, all features are assumed to be supported.
    * If this method is implemented, missing keys default to true (supported) for forward compatibility.

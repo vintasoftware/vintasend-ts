@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 0.6.1
+
+* **Filter capability defaults exposed at core level**:
+  * Added and exported `DEFAULT_BACKEND_FILTER_CAPABILITIES` in `BaseNotificationBackend` module.
+  * Centralized default support map for logical operators, filterable fields, and range-negation capabilities.
+* **Notification service API additions**:
+  * Added `filterNotifications(filter, page, pageSize)` to `VintaSend` service to expose backend filtering through the root service.
+  * Added `getBackendSupportedFilterCapabilities()` to `VintaSend`, merging backend-reported capabilities with defaults for forward-compatible capability checks.
+
 ## Version 0.6.0
 
 * **Composable notification filtering added to root package**:

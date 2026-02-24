@@ -14,7 +14,7 @@ import {
   type BaseNotificationAdapter,
   isOneOffNotification,
 } from './notification-adapters/base-notification-adapter';
-import type { BaseNotificationBackend } from './notification-backends/base-notification-backend';
+import { DEFAULT_BACKEND_FILTER_CAPABILITIES, type BaseNotificationBackend, type NotificationFilterFields } from './notification-backends/base-notification-backend';
 import { NotificationContextGeneratorsMap } from './notification-context-generators-map';
 import type { BaseNotificationQueueService } from './notification-queue-service/base-notification-queue-service';
 import type { BaseNotificationTemplateRenderer } from './notification-template-renderers/base-notification-template-renderer';
@@ -400,6 +400,14 @@ export class VintaSend<
 
   async getNotification(notificationId: Config['NotificationIdType'], forUpdate = false) {
     return this.backend.getNotification(notificationId, forUpdate);
+  }
+
+  async filterNotifications(filter: NotificationFilterFields<Config>, page: number, pageSize: number) {
+    return this.backend.filterNotifications(filter, page, pageSize);
+  }
+
+  async getBackendSupportedFilterCapabilities() {
+    return { ...DEFAULT_BACKEND_FILTER_CAPABILITIES, ...(this.backend.getFilterCapabilities?.() ?? {}) };
   }
 
   /**
