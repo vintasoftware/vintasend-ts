@@ -8,7 +8,14 @@ export {
 } from './services/notification-adapters/base-notification-adapter';
 export type { BaseNotificationBackend } from './services/notification-backends/base-notification-backend';
 export { supportsAttachments, isFieldFilter } from './services/notification-backends/base-notification-backend';
-export type { NotificationFilter, NotificationFilterFields, DateRange, NotificationFilterCapabilities } from './services/notification-backends/base-notification-backend';
+export type {
+  NotificationFilter,
+  NotificationFilterFields,
+  DateRange,
+  NotificationFilterCapabilities,
+  StringFilterLookup,
+  StringFieldFilter,
+} from './services/notification-backends/base-notification-backend';
 export type { BaseNotificationQueueService } from './services/notification-queue-service/base-notification-queue-service';
 export type { VintaSend } from './services/notification-service';
 export { VintaSendFactory } from './services/notification-service';

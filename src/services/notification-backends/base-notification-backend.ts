@@ -21,6 +21,14 @@ export type DateRange = {
   to?: Date;
 };
 
+export type StringFilterLookup = {
+  lookup: 'exact' | 'startsWith' | 'endsWith' | 'includes';
+  value: string;
+  caseSensitive?: boolean;
+};
+
+export type StringFieldFilter = string | StringFilterLookup;
+
 /**
  * Flat dotted key capability map describing which filter features a backend supports.
  * Use flat dotted keys for logical operators, fields, and negations:
@@ -45,9 +53,9 @@ export type NotificationFilterFields<Config extends BaseNotificationTypeConfig> 
   notificationType?: NotificationType | NotificationType[];
   adapterUsed?: string | string[];
   userId?: Config['UserIdType'];
-  bodyTemplate?: string;
-  subjectTemplate?: string;
-  contextName?: string;
+  bodyTemplate?: StringFieldFilter;
+  subjectTemplate?: StringFieldFilter;
+  contextName?: StringFieldFilter;
   sendAfterRange?: DateRange;
   createdAtRange?: DateRange;
   sentAtRange?: DateRange;
@@ -85,6 +93,10 @@ export const DEFAULT_BACKEND_FILTER_CAPABILITIES = {
   'negation.sendAfterRange': true,
   'negation.createdAtRange': true,
   'negation.sentAtRange': true,
+  'stringLookups.startsWith': true,
+  'stringLookups.endsWith': true,
+  'stringLookups.includes': true,
+  'stringLookups.caseInsensitive': true,
 };
 
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
@@ -270,6 +282,12 @@ export function isFieldFilter<Config extends BaseNotificationTypeConfig>(
   filter: NotificationFilter<Config>,
 ): filter is NotificationFilterFields<Config> {
   return !('and' in filter) && !('or' in filter) && !('not' in filter);
+}
+
+export function isStringFilterLookup(
+  value: StringFieldFilter,
+): value is StringFilterLookup {
+  return typeof value === 'object' && value !== null && 'lookup' in value && 'value' in value;
 }
 
 /**

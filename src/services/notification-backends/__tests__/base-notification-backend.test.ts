@@ -1,6 +1,11 @@
 import type { BaseNotificationBackend } from '../base-notification-backend';
-import { supportsAttachments, isFieldFilter } from '../base-notification-backend';
-import type { NotificationFilter, NotificationFilterFields, DateRange } from '../base-notification-backend';
+import { supportsAttachments, isFieldFilter, isStringFilterLookup } from '../base-notification-backend';
+import type {
+  NotificationFilter,
+  NotificationFilterFields,
+  DateRange,
+  StringFieldFilter,
+} from '../base-notification-backend';
 import type { AttachmentFileRecord, StoredAttachment } from '../../../types/attachment';
 import type { AnyDatabaseNotification, DatabaseNotification } from '../../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../../types/notification-type-config';
@@ -386,6 +391,17 @@ describe('BaseNotificationBackend Interface', () => {
       expect(result).toEqual([]);
     });
 
+    it('should accept string lookup objects for string fields', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        bodyTemplate: { lookup: 'startsWith', value: 'welcome-', caseSensitive: false },
+        subjectTemplate: { lookup: 'includes', value: 'alert' },
+        contextName: { lookup: 'exact', value: 'critical-context' },
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
     it('should accept a createdAtRange filter', async () => {
       const backend = new TestBackendWithAttachments();
       const filter: NotificationFilter<TestConfig> = {
@@ -573,6 +589,23 @@ describe('BaseNotificationBackend Interface', () => {
         expect(filter.userId).toBe('user-1');
         expect(filter.createdAtRange?.from).toEqual(new Date('2025-01-01'));
       }
+    });
+  });
+
+  describe('isStringFilterLookup type guard', () => {
+    it('should return true for lookup object values', () => {
+      const value: StringFieldFilter = {
+        lookup: 'startsWith',
+        value: 'prefix',
+        caseSensitive: false,
+      };
+
+      expect(isStringFilterLookup(value)).toBe(true);
+    });
+
+    it('should return false for plain string values', () => {
+      const value: StringFieldFilter = 'plain-value';
+      expect(isStringFilterLookup(value)).toBe(false);
     });
   });
 

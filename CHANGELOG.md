@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 0.6.3
+
+* **String lookup filters added for advanced filtering**:
+  * Implemented string lookup filters on `bodyTemplate`, `subjectTemplate`, and `contextName` fields
+  * Supports lookup types: `exact`, `startsWith`, `endsWith`, `includes` with optional case-insensitive matching
+  * Added `StringFilterLookup` type with structure: `{ lookup: 'exact' | 'startsWith' | 'endsWith' | 'includes', value: string, caseSensitive?: boolean }`
+  * Added `StringFieldFilter` union type for filter field values: plain string (treated as case-sensitive exact match) or lookup object
+  * Added `isStringFilterLookup()` type guard to distinguish lookup objects from plain strings
+  * **Prisma implementation**: Full support for all lookup types with case-insensitive mode via Prisma's `StringFilter` mechanism
+  * **Medplum implementation**: Exact-only support (FHIR token search limitation); `startsWith`, `endsWith`, `includes` throw with informative error; capability flags (`stringLookups.startsWith|endsWith|includes`) report false
+  * **Backward compatibility**: Plain string filters continue to work without breaking changes, treated as case-sensitive exact matches
+  * **Type exports**: Added `StringFilterLookup`, `StringFieldFilter` to public API exports
+
 ## Version 0.6.2
 
 * **Fix tag filters on medplum-backend**:
