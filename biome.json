@@ -12,7 +12,8 @@
       "!dist",
       "!node_modules",
       "!src/implementations",
-      "!src/examples"
+      "!src/examples",
+      "!src/tools"
     ]
   },
   "formatter": {

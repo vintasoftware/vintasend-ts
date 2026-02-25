@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.6.2
+
+* **Fix tag filters on medplum-backend**:
+  * Some filters for fields stored as tags like `notificationType` and `context` wasn't filtering because we always include the filter by the `notification` tag, the way it was working the filter was including records with ANY of tags, not with ALL the tags. If we filtered by a specific `notificationType`, we'd still return all other notificationTypes, making the filter pointless.
+
 ## Version 0.6.1
 
 * **Filter capability defaults exposed at core level**:
