@@ -6,6 +6,86 @@
 - Current phase: Phase 4 (Implement multi-backend write operations)
 - Overall status: In progress
 
+## Phase 4 — Implement Multi-Backend Write Operations
+
+### Status
+
+- ✅ Phase 4 implementation started
+- ✅ Primary-first + best-effort replication helper added
+- ✅ Core write paths migrated to replication flow
+- ✅ Initial Phase 4 test suites added and passing
+- ⏳ Remaining: attachment replication paths and deeper parity checks
+
+### Completed Items (Current Slice)
+
+1. **Added shared primary-first replication helper**
+    - Added internal `executeMultiBackendWrite<T>()` helper in `VintaSend`.
+    - Behavior:
+       - runs write on primary backend first
+       - replicates to additional backends on best-effort basis
+       - logs replication success/failure with backend identifier
+       - does not throw on additional backend failures
+    - File: `src/services/notification-service.ts`
+
+2. **Migrated core write operations to multi-backend flow**
+    - Updated methods:
+       - `createNotification`
+       - `updateNotification`
+       - `createOneOffNotification`
+       - `updateOneOffNotification`
+       - `markRead`
+       - `cancelNotification`
+       - `bulkPersistNotifications` (replicates using IDs returned by primary)
+    - File: `src/services/notification-service.ts`
+
+3. **Replicated send-path write side effects**
+    - Updated send-related backend writes to replicate across additional backends:
+       - `markAsSent`
+       - `markAsFailed`
+       - `storeAdapterAndContextUsed`
+       - git commit SHA persistence updates (`persistNotificationUpdate` / `persistOneOffNotificationUpdate` in execution path)
+    - Applied in both `send` and `delayedSend` flows.
+    - File: `src/services/notification-service.ts`
+
+4. **Added Phase 4 test coverage (initial)**
+    - New test suite: `src/services/__tests__/multi-backend-writes.test.ts`
+       - create/update replication for regular and one-off notifications
+       - mark/cancel replication
+       - bulk replication with primary-generated IDs
+       - primary failure blocks replication
+       - single-backend backward compatibility
+    - New test suite: `src/services/__tests__/multi-backend-error-handling.test.ts`
+       - additional backend failure does not fail operation
+       - failure logs include backend identifier
+       - operation continues through other backends and send-path writes
+
+### Test Results (Executed)
+
+- Targeted run executed and passing.
+- Result: **112 passed, 0 failed**
+- Executed files:
+   - `src/services/__tests__/multi-backend-initialization.test.ts`
+   - `src/services/__tests__/multi-backend-writes.test.ts`
+   - `src/services/__tests__/multi-backend-error-handling.test.ts`
+   - `src/services/__tests__/notification-service.test.ts`
+   - `src/services/__tests__/notification-service-one-off.test.ts`
+
+### Phase 4 Acceptance Criteria Check (Current)
+
+- [x] All write operations replicate to additional backends *(implemented for current core write paths and send-path status/context writes)*
+- [x] Primary backend writes complete before replication
+- [x] Failures in additional backends are logged but don't fail operations
+- [x] Notification IDs are consistent across backends *(covered for create + bulk in this slice)*
+- [x] Queue operations only happen for primary backend *(unchanged behavior)*
+- [x] All existing tests pass *(targeted service suites)*
+- [x] New multi-backend write tests pass
+- [x] Error handling tests pass
+
+### Notes
+
+- Attachment-specific replication operations (`storeAttachmentFileRecord`, `deleteAttachmentFile`, `deleteNotificationAttachment`) are still pending and will be handled in the next Phase 4 increment.
+- This change set focuses on core notification write replication with backward-compatible behavior in single-backend mode.
+
 ## Phase 3 — Update VintaSend to Support Multiple Backends
 
 ### Status

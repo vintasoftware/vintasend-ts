@@ -303,6 +303,33 @@ export class VintaSend<
       .map(([, backend]) => backend);
   }
 
+  private async executeMultiBackendWrite<T>(
+    operation: string,
+    primaryWrite: (backend: Backend) => Promise<T>,
+    additionalWrite?: (backend: Backend, primaryResult: T) => Promise<void>,
+  ): Promise<T> {
+    const primaryResult = await primaryWrite(this.backend);
+
+    if (!additionalWrite) {
+      return primaryResult;
+    }
+
+    for (const additionalBackend of this.getAdditionalBackends()) {
+      const backendIdentifier = this.getBackendIdentifier(additionalBackend);
+
+      try {
+        await additionalWrite(additionalBackend, primaryResult);
+        this.logger.info(`${operation} replicated to backend ${backendIdentifier}`);
+      } catch (replicationError) {
+        this.logger.error(
+          `Failed to replicate ${operation} to backend ${backendIdentifier}: ${replicationError}`,
+        );
+      }
+    }
+
+    return primaryResult;
+  }
+
   registerQueueService(queueService: QueueService): void {
     this.queueService = queueService;
   }
@@ -344,14 +371,30 @@ export class VintaSend<
         gitCommitSha,
       } as unknown as Partial<Omit<OneOffNotificationInput<Config>, 'id'>>;
 
-      return this.backend.persistOneOffNotificationUpdate(notification.id, oneOffNotificationUpdate);
+      return this.executeMultiBackendWrite(
+        'persistOneOffNotificationGitCommitSha',
+        async (backend) => {
+          return backend.persistOneOffNotificationUpdate(notification.id, oneOffNotificationUpdate);
+        },
+        async (backend) => {
+          await backend.persistOneOffNotificationUpdate(notification.id, oneOffNotificationUpdate);
+        },
+      );
     }
 
     const notificationUpdate = {
       gitCommitSha,
     } as unknown as Partial<Omit<Notification<Config>, 'id'>>;
 
-    return this.backend.persistNotificationUpdate(notification.id, notificationUpdate);
+    return this.executeMultiBackendWrite(
+      'persistNotificationGitCommitSha',
+      async (backend) => {
+        return backend.persistNotificationUpdate(notification.id, notificationUpdate);
+      },
+      async (backend) => {
+        await backend.persistNotificationUpdate(notification.id, notificationUpdate);
+      },
+    );
   }
 
   private async resolveAndPersistGitCommitShaForExecution(
@@ -444,7 +487,15 @@ export class VintaSend<
           `Error sending notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key}: ${sendError}`,
         );
         try {
-          await this.backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
+          await this.executeMultiBackendWrite(
+            'markAsFailed',
+            async (backend) => {
+              return backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
+            },
+            async (backend) => {
+              await backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
+            },
+          );
         } catch (markFailedError) {
           this.logger.error(
             `Error marking notification ${notificationWithExecutionGitCommitSha.id} as failed: ${markFailedError}`,
@@ -454,7 +505,15 @@ export class VintaSend<
       }
 
       try {
-        await this.backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
+        await this.executeMultiBackendWrite(
+          'markAsSent',
+          async (backend) => {
+            return backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
+          },
+          async (backend) => {
+            await backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
+          },
+        );
       } catch (markSentError) {
         this.logger.error(
           `Error marking notification ${notificationWithExecutionGitCommitSha.id} as sent: ${markSentError}`,
@@ -462,10 +521,22 @@ export class VintaSend<
       }
 
       try {
-        await this.backend.storeAdapterAndContextUsed(
-          notificationWithExecutionGitCommitSha.id,
-          adapter.key ?? 'unknown',
-          context ?? {},
+        await this.executeMultiBackendWrite(
+          'storeAdapterAndContextUsed',
+          async (backend) => {
+            await backend.storeAdapterAndContextUsed(
+              notificationWithExecutionGitCommitSha.id,
+              adapter.key ?? 'unknown',
+              context ?? {},
+            );
+          },
+          async (backend) => {
+            await backend.storeAdapterAndContextUsed(
+              notificationWithExecutionGitCommitSha.id,
+              adapter.key ?? 'unknown',
+              context ?? {},
+            );
+          },
         );
       } catch (storeContextError) {
         this.logger.error(
@@ -478,7 +549,18 @@ export class VintaSend<
   async createNotification(
     notification: Omit<Notification<Config>, 'id'>,
   ): Promise<DatabaseNotification<Config>> {
-    const createdNotification = await this.backend.persistNotification(notification);
+    const createdNotification = await this.executeMultiBackendWrite(
+      'createNotification',
+      async (backend) => {
+        return backend.persistNotification(notification);
+      },
+      async (backend, primaryResult) => {
+        await backend.persistNotification({
+          ...notification,
+          id: primaryResult.id,
+        });
+      },
+    );
     this.logger.info(`Notification ${createdNotification.id} created`);
 
     if (!notification.sendAfter || notification.sendAfter <= new Date()) {
@@ -499,9 +581,14 @@ export class VintaSend<
     notificationId: Config['NotificationIdType'],
     notification: Partial<Omit<Notification<Config>, 'id'>>,
   ) {
-    const updatedNotification = this.backend.persistNotificationUpdate(
-      notificationId,
-      notification,
+    const updatedNotification = this.executeMultiBackendWrite(
+      'updateNotification',
+      async (backend) => {
+        return backend.persistNotificationUpdate(notificationId, notification);
+      },
+      async (backend) => {
+        await backend.persistNotificationUpdate(notificationId, notification);
+      },
     );
     this.logger.info(`Notification ${notificationId} updated`);
     return updatedNotification;
@@ -520,7 +607,18 @@ export class VintaSend<
     // Validate email or phone format
     this.validateEmailOrPhone(notification.emailOrPhone);
 
-    const createdNotification = await this.backend.persistOneOffNotification(notification);
+    const createdNotification = await this.executeMultiBackendWrite(
+      'createOneOffNotification',
+      async (backend) => {
+        return backend.persistOneOffNotification(notification);
+      },
+      async (backend, primaryResult) => {
+        await backend.persistOneOffNotification({
+          ...notification,
+          id: primaryResult.id,
+        });
+      },
+    );
     this.logger.info(`One-off notification ${createdNotification.id} created`);
 
     if (!notification.sendAfter || notification.sendAfter <= new Date()) {
@@ -551,9 +649,14 @@ export class VintaSend<
       this.validateEmailOrPhone(notification.emailOrPhone);
     }
 
-    const updatedNotification = await this.backend.persistOneOffNotificationUpdate(
-      notificationId,
-      notification,
+    const updatedNotification = await this.executeMultiBackendWrite(
+      'updateOneOffNotification',
+      async (backend) => {
+        return backend.persistOneOffNotificationUpdate(notificationId, notification);
+      },
+      async (backend) => {
+        await backend.persistOneOffNotificationUpdate(notificationId, notification);
+      },
     );
     this.logger.info(`One-off notification ${notificationId} updated`);
 
@@ -696,7 +799,15 @@ export class VintaSend<
     notificationId: Config['NotificationIdType'],
     checkIsSent = true,
   ): Promise<DatabaseNotification<Config>> {
-    const notification = await this.backend.markAsRead(notificationId, checkIsSent);
+    const notification = await this.executeMultiBackendWrite(
+      'markRead',
+      async (backend) => {
+        return backend.markAsRead(notificationId, checkIsSent);
+      },
+      async (backend) => {
+        await backend.markAsRead(notificationId, checkIsSent);
+      },
+    );
     this.logger.info(`Notification ${notificationId} marked as read`);
     return notification;
   }
@@ -706,7 +817,15 @@ export class VintaSend<
   }
 
   async cancelNotification(notificationId: Config['NotificationIdType']): Promise<void> {
-    await this.backend.cancelNotification(notificationId);
+    await this.executeMultiBackendWrite(
+      'cancelNotification',
+      async (backend) => {
+        await backend.cancelNotification(notificationId);
+      },
+      async (backend) => {
+        await backend.cancelNotification(notificationId);
+      },
+    );
     this.logger.info(`Notification ${notificationId} cancelled`);
   }
 
@@ -832,7 +951,15 @@ export class VintaSend<
           `Error sending notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key}: ${sendError}`,
         );
         try {
-          await this.backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
+            await this.executeMultiBackendWrite(
+              'markAsFailed',
+              async (backend) => {
+                return backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
+              },
+              async (backend) => {
+                await backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
+              },
+            );
         } catch (markFailedError) {
           this.logger.error(
             `Error marking notification ${notificationWithExecutionGitCommitSha.id} as failed: ${markFailedError}`,
@@ -841,7 +968,15 @@ export class VintaSend<
       }
 
       try {
-        await this.backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
+        await this.executeMultiBackendWrite(
+          'markAsSent',
+          async (backend) => {
+            return backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
+          },
+          async (backend) => {
+            await backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
+          },
+        );
       } catch (markSentError) {
         this.logger.error(
           `Error marking notification ${notificationWithExecutionGitCommitSha.id} as sent: ${markSentError}`,
@@ -850,10 +985,22 @@ export class VintaSend<
     }
 
     try {
-      await this.backend.storeAdapterAndContextUsed(
-        notificationWithExecutionGitCommitSha.id,
-        lastAdapterKey,
-        context,
+      await this.executeMultiBackendWrite(
+        'storeAdapterAndContextUsed',
+        async (backend) => {
+          await backend.storeAdapterAndContextUsed(
+            notificationWithExecutionGitCommitSha.id,
+            lastAdapterKey,
+            context,
+          );
+        },
+        async (backend) => {
+          await backend.storeAdapterAndContextUsed(
+            notificationWithExecutionGitCommitSha.id,
+            lastAdapterKey,
+            context,
+          );
+        },
       );
     } catch (storeContextError) {
       this.logger.error(
@@ -865,7 +1012,24 @@ export class VintaSend<
   async bulkPersistNotifications(
     notifications: Omit<AnyNotification<Config>, 'id'>[],
   ): Promise<Config['NotificationIdType'][]> {
-    return this.getBackend().bulkPersistNotifications(notifications);
+    return this.executeMultiBackendWrite(
+      'bulkPersistNotifications',
+      async (backend) => {
+        return backend.bulkPersistNotifications(notifications);
+      },
+      async (backend, createdIds) => {
+        const notificationsWithIds = notifications.map((notification, index) => {
+          return {
+            ...notification,
+            id: createdIds[index],
+          };
+        });
+
+        await backend.bulkPersistNotifications(
+          notificationsWithIds as unknown as Omit<AnyNotification<Config>, 'id'>[],
+        );
+      },
+    );
   }
 
   async migrateToBackend<DestinationBackend extends BaseNotificationBackend<Config>>(
