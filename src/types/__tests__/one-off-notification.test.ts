@@ -208,6 +208,7 @@ describe('OneOffNotification Types', () => {
         readAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+        gitCommitSha: null,
       };
 
       expect(dbNotification.id).toBe('notif-123');
@@ -242,6 +243,7 @@ describe('OneOffNotification Types', () => {
           adapterUsed: null,
           sentAt: status === 'SENT' ? new Date() : null,
           readAt: status === 'READ' ? new Date() : null,
+          gitCommitSha: null,
         };
 
         expect(notification.status).toBe(status);
@@ -268,6 +270,7 @@ describe('OneOffNotification Types', () => {
         adapterUsed: 'nodemailer-adapter',
         sentAt: new Date(),
         readAt: null,
+        gitCommitSha: null,
       };
 
       expect(notification.contextUsed).toEqual({ greeting: 'Hello from Processed Inc!' });
@@ -354,6 +357,7 @@ describe('OneOffNotification Types', () => {
         adapterUsed: null,
         sentAt: null,
         readAt: null,
+        gitCommitSha: null,
       };
 
       const regularDb: AnyDatabaseNotification<TestConfig> = {
@@ -372,6 +376,7 @@ describe('OneOffNotification Types', () => {
         adapterUsed: null,
         sentAt: null,
         readAt: null,
+        gitCommitSha: null,
       };
 
       expect(oneOffDb.id).toBe('one-off-123');
@@ -403,6 +408,7 @@ describe('OneOffNotification Types', () => {
         adapterUsed: null,
         sentAt: null,
         readAt: null,
+        gitCommitSha: null,
       };
 
       const regularDb: AnyDatabaseNotification<TestConfig> = {
@@ -421,6 +427,7 @@ describe('OneOffNotification Types', () => {
         adapterUsed: null,
         sentAt: null,
         readAt: null,
+        gitCommitSha: null,
       };
 
       expect(isOneOffNotification(oneOffDb)).toBe(true);
@@ -555,7 +562,7 @@ describe('OneOffNotification Types', () => {
           contextParameters: { companyName: 'Acme Corp' },
           sendAfter: null,
           subjectTemplate: 'Welcome',
-          status: 'PENDING' as NotificationStatus,
+          status: 'PENDING_SEND' as NotificationStatus,
           // @ts-expect-error - contextUsed should match welcomeContext return type
           contextUsed: { greeting: 'Hello' },
           extraParams: {},
@@ -564,6 +571,7 @@ describe('OneOffNotification Types', () => {
           readAt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
+          gitCommitSha: null,
         };
 
         expect(notification.attachments).toBeUndefined();
@@ -589,7 +597,7 @@ describe('OneOffNotification Types', () => {
           contextParameters: { companyName: 'Acme Corp' },
           sendAfter: null,
           subjectTemplate: 'Welcome',
-          status: 'PENDING' as NotificationStatus,
+          status: 'PENDING_SEND' as NotificationStatus,
           // @ts-expect-error - contextUsed should match welcomeContext return type
           contextUsed: { greeting: 'Hello' },
           extraParams: {},
@@ -598,6 +606,7 @@ describe('OneOffNotification Types', () => {
           readAt: null,
           createdAt: new Date(),
           updatedAt: new Date(),
+          gitCommitSha: null,
           attachments: [
             {
               id: 'att-1',
@@ -619,6 +628,110 @@ describe('OneOffNotification Types', () => {
         expect(notification.attachments?.[0]).toHaveProperty('id', 'att-1');
         expect(notification.attachments?.[0]).toHaveProperty('fileId', 'file-123');
         expect(notification.attachments?.[0].file).toHaveProperty('read');
+      });
+    });
+
+    describe('Git Commit SHA field', () => {
+      it('should not allow gitCommitSha in one-off notification input (system-managed field)', () => {
+        // @ts-expect-error - gitCommitSha field type is never (optional only to keep structural compatibility)
+        const invalidGitCommitShaValue: OneOffNotificationInput<TestConfig>['gitCommitSha'] =
+          'abc123def456789012345678901234567890abcd';
+
+        const inputWithGitCommitSha: OneOffNotificationInput<TestConfig> = {
+          emailOrPhone: 'test@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          notificationType: 'EMAIL' as NotificationType,
+          title: 'Test',
+          bodyTemplate: '/templates/test.pug',
+          contextName: 'welcomeContext',
+          contextParameters: { companyName: 'Test Corp' },
+          sendAfter: null,
+          subjectTemplate: null,
+          extraParams: null,
+          // @ts-expect-error - gitCommitSha is system-managed and must not be accepted in input
+          gitCommitSha: 'abc123def456789012345678901234567890abcd',
+        };
+
+        expect(invalidGitCommitShaValue).toBeDefined();
+        expect(inputWithGitCommitSha).toBeDefined();
+      });
+
+      it('should not allow gitCommitSha in one-off resend input (system-managed field)', () => {
+        // @ts-expect-error - gitCommitSha field type is never (optional only to keep structural compatibility)
+        const invalidGitCommitShaValue: OneOffNotificationResendWithContextInput<TestConfig>['gitCommitSha'] =
+          'abc123def456789012345678901234567890abcd';
+
+        const inputWithGitCommitSha: OneOffNotificationResendWithContextInput<TestConfig> = {
+          emailOrPhone: 'test@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          notificationType: 'EMAIL' as NotificationType,
+          title: 'Test',
+          bodyTemplate: '/templates/test.pug',
+          contextName: 'welcomeContext',
+          contextParameters: { companyName: 'Test Corp' },
+          contextUsed: { task: 'Hello', due: '2024-01-01' },
+          sendAfter: null,
+          subjectTemplate: null,
+          extraParams: null,
+          // @ts-expect-error - gitCommitSha is system-managed and must not be accepted in resend input
+          gitCommitSha: 'abc123def456789012345678901234567890abcd',
+        };
+
+        expect(invalidGitCommitShaValue).toBeDefined();
+        expect(inputWithGitCommitSha).toBeDefined();
+      });
+
+
+      it('should require gitCommitSha field (nullable) in database one-off notification', () => {
+        const notification: DatabaseOneOffNotification<TestConfig> = {
+          id: 'notif-123',
+          emailOrPhone: 'test@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          notificationType: 'EMAIL' as NotificationType,
+          title: 'Test',
+          bodyTemplate: '/templates/test.pug',
+          contextName: 'welcomeContext',
+          contextParameters: { companyName: 'Test Corp' },
+          sendAfter: null,
+          subjectTemplate: null,
+          status: 'PENDING_SEND' as NotificationStatus,
+          contextUsed: { task: 'Hello', due: '2024-01-01' },
+          extraParams: null,
+          adapterUsed: null,
+          sentAt: null,
+          readAt: null,
+          gitCommitSha: 'abc123def456789012345678901234567890abcd',
+        };
+
+        expect(notification.gitCommitSha).toBe('abc123def456789012345678901234567890abcd');
+      });
+
+      it('should allow null gitCommitSha in database one-off notification', () => {
+        const notification: DatabaseOneOffNotification<TestConfig> = {
+          id: 'notif-123',
+          emailOrPhone: 'test@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          notificationType: 'EMAIL' as NotificationType,
+          title: 'Test',
+          bodyTemplate: '/templates/test.pug',
+          contextName: 'welcomeContext',
+          contextParameters: { companyName: 'Test Corp' },
+          sendAfter: null,
+          subjectTemplate: null,
+          status: 'PENDING_SEND' as NotificationStatus,
+          contextUsed: { task: 'Hello', due: '2024-01-01' },
+          extraParams: null,
+          adapterUsed: null,
+          sentAt: null,
+          readAt: null,
+          gitCommitSha: null,
+        };
+
+        expect(notification.gitCommitSha).toBeNull();
       });
     });
   });

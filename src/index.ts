@@ -2,6 +2,9 @@
 export { BaseAttachmentManager } from './services/attachment-manager/base-attachment-manager';
 export type { LocalFileAttachmentManagerConfig } from './services/attachment-manager/local-file-attachment-manager';
 export { LocalFileAttachmentManager } from './services/attachment-manager/local-file-attachment-manager';
+// Git Commit SHA Provider
+export type { BaseGitCommitShaProvider } from './services/git-commit-sha/base-git-commit-sha-provider';
+// Notification Adapters and Backends
 export {
   BaseNotificationAdapter,
   isOneOffNotification,

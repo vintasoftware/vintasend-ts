@@ -1,5 +1,6 @@
 import { VintaSendFactory } from '../../index';
 import type { DatabaseNotification } from '../../types/notification';
+import type { BaseGitCommitShaProvider } from '../git-commit-sha/base-git-commit-sha-provider';
 import type { BaseLogger } from '../loggers/base-logger';
 import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
@@ -78,6 +79,10 @@ const mockQueueService: jest.Mocked<BaseNotificationQueueService<any>> = {
   enqueueNotification: jest.fn(),
 };
 
+const mockGitCommitShaProvider: jest.Mocked<BaseGitCommitShaProvider> = {
+  getCurrentGitCommitSha: jest.fn(),
+};
+
 const notificationContextgenerators = {
   testContext: {
     generate: jest.fn(),
@@ -109,10 +114,12 @@ describe('NotificationService', () => {
     sentAt: null,
     readAt: null,
     sendAfter: new Date(),
+    gitCommitSha: null,
   };
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGitCommitShaProvider.getCurrentGitCommitSha.mockReset();
     service = new VintaSendFactory<Config>().create(
       [mockAdapter],
       mockBackend,
@@ -135,6 +142,7 @@ describe('NotificationService', () => {
       sentAt: null,
       readAt: null,
       sendAfter: new Date(),
+      gitCommitSha: null,
     };
   });
 
@@ -286,6 +294,93 @@ describe('NotificationService', () => {
         {},
       );
     });
+
+    it('should resolve and persist normalized gitCommitSha at execution time from object factory params', async () => {
+      const normalizedGitCommitSha = 'a'.repeat(40);
+      const serviceWithGitCommitShaProvider = new VintaSendFactory<Config>().create({
+        adapters: [mockAdapter],
+        backend: mockBackend,
+        logger: mockLogger,
+        contextGeneratorsMap: notificationContextgenerators,
+        gitCommitShaProvider: mockGitCommitShaProvider,
+      });
+
+      mockGitCommitShaProvider.getCurrentGitCommitSha.mockReturnValue(normalizedGitCommitSha.toUpperCase());
+      notificationContextgenerators.testContext.generate.mockResolvedValue({});
+      mockBackend.persistNotificationUpdate.mockResolvedValue({
+        ...mockNotification,
+        gitCommitSha: normalizedGitCommitSha,
+      });
+
+      await serviceWithGitCommitShaProvider.send(mockNotification);
+
+      expect(mockGitCommitShaProvider.getCurrentGitCommitSha).toHaveBeenCalledTimes(1);
+      expect(mockBackend.persistNotificationUpdate).toHaveBeenCalledWith(
+        mockNotification.id,
+        expect.objectContaining({
+          gitCommitSha: normalizedGitCommitSha,
+        }),
+      );
+      expect(mockAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          gitCommitSha: normalizedGitCommitSha,
+        }),
+        {},
+      );
+    });
+
+    it('should persist null gitCommitSha when provider resolves null', async () => {
+      const serviceWithGitCommitShaProvider = new VintaSendFactory<Config>().create(
+        [mockAdapter],
+        mockBackend,
+        mockLogger,
+        notificationContextgenerators,
+        undefined,
+        undefined,
+        { raiseErrorOnFailedSend: false },
+        mockGitCommitShaProvider,
+      );
+
+      mockGitCommitShaProvider.getCurrentGitCommitSha.mockReturnValue(null);
+      mockBackend.persistNotificationUpdate.mockResolvedValue({
+        ...mockNotification,
+        gitCommitSha: null,
+      });
+      const notificationWithPreviousSha = {
+        ...mockNotification,
+        gitCommitSha: 'b'.repeat(40),
+        // biome-ignore lint/suspicious/noExplicitAny: any just for testing
+      } as unknown as DatabaseNotification<any>;
+
+      await serviceWithGitCommitShaProvider.send(notificationWithPreviousSha);
+
+      expect(mockBackend.persistNotificationUpdate).toHaveBeenCalledWith(
+        mockNotification.id,
+        expect.objectContaining({
+          gitCommitSha: null,
+        }),
+      );
+    });
+
+    it('should throw deterministic error when provider resolves invalid gitCommitSha', async () => {
+      const serviceWithGitCommitShaProvider = new VintaSendFactory<Config>().create(
+        [mockAdapter],
+        mockBackend,
+        mockLogger,
+        notificationContextgenerators,
+        undefined,
+        undefined,
+        { raiseErrorOnFailedSend: false },
+        mockGitCommitShaProvider,
+      );
+
+      mockGitCommitShaProvider.getCurrentGitCommitSha.mockReturnValue('invalid-sha');
+
+      await expect(serviceWithGitCommitShaProvider.send(mockNotification)).rejects.toThrow(
+        'Invalid gitCommitSha resolved by provider. Expected a 40-character hexadecimal SHA.',
+      );
+      expect(mockAdapter.send).not.toHaveBeenCalled();
+    });
   });
 
   describe('createNotification', () => {
@@ -304,6 +399,7 @@ describe('NotificationService', () => {
       sentAt: null,
       readAt: null,
       sendAfter: new Date(),
+      gitCommitSha: null,
     };
 
     it('should create a notification', async () => {
@@ -399,8 +495,8 @@ describe('NotificationService', () => {
       sentAt: null,
       readAt: null,
       sendAfter: new Date(),
+      gitCommitSha: null,
     };
-
     it('should handle delayed send with distributed adapter', async () => {
       // biome-ignore lint/suspicious/noExplicitAny: any just for testing
       const distributedAdapter = { ...mockAdapter, enqueueNotifications: true } as any;
@@ -513,6 +609,43 @@ describe('NotificationService', () => {
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.stringContaining('Error marking notification 123 as failed'),
+      );
+    });
+
+    it('should resolve and persist gitCommitSha in delayedSend execution path', async () => {
+      // biome-ignore lint/suspicious/noExplicitAny: any just for testing
+      const distributedAdapter = { ...mockAdapter, enqueueNotifications: true } as any;
+      const serviceWithQueueAndGitCommitShaProvider = new VintaSendFactory<Config>().create(
+        [distributedAdapter],
+        mockBackend,
+        mockLogger,
+        notificationContextgenerators,
+        mockQueueService,
+        undefined,
+        { raiseErrorOnFailedSend: false },
+        mockGitCommitShaProvider,
+      );
+
+      const normalizedGitCommitSha = 'c'.repeat(40);
+      mockGitCommitShaProvider.getCurrentGitCommitSha.mockResolvedValue(normalizedGitCommitSha);
+      mockBackend.getNotification.mockResolvedValue(mockNotification);
+      mockBackend.persistNotificationUpdate.mockResolvedValue({
+        ...mockNotification,
+        gitCommitSha: normalizedGitCommitSha,
+      });
+      notificationContextgenerators.testContext.generate.mockResolvedValue({});
+
+      await serviceWithQueueAndGitCommitShaProvider.delayedSend('123');
+
+      expect(mockBackend.persistNotificationUpdate).toHaveBeenCalledWith(
+        '123',
+        expect.objectContaining({
+          gitCommitSha: normalizedGitCommitSha,
+        }),
+      );
+      expect(distributedAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({ gitCommitSha: normalizedGitCommitSha }),
+        {},
       );
     });
   });
@@ -932,6 +1065,26 @@ describe('NotificationService', () => {
       expect(service.send).toHaveBeenCalledWith(newNotification);
     });
 
+    it('should not include gitCommitSha in resend payload (system-managed field)', async () => {
+      const notificationWithSha = {
+        ...mockNotification,
+        gitCommitSha: 'a'.repeat(40),
+      };
+      mockBackend.getNotification.mockResolvedValue(notificationWithSha);
+      const newContext = { test: 'new context' };
+      notificationContextgenerators.testContext.generate.mockResolvedValue(newContext);
+      mockBackend.persistNotification.mockResolvedValue({ ...notificationWithSha, id: '456' });
+
+      await service.resendNotification('123');
+
+      expect(mockBackend.persistNotification).toHaveBeenCalledTimes(1);
+      expect(mockBackend.persistNotification).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          gitCommitSha: expect.anything(),
+        }),
+      );
+    });
+
     it('should throw error when notification is scheduled for the future with raiseErrorOnFailedSend enabled', async () => {
       const serviceWithError = new VintaSendFactory<Config>().create(
         [mockAdapter],
@@ -1090,5 +1243,37 @@ describe('NotificationService', () => {
       // Should not be called when no attachment manager is provided
       expect(backendWithAttachmentInjection.injectAttachmentManager).not.toHaveBeenCalled();
     });
+
+    it('supports object parameter create overload with gitCommitShaProvider', async () => {
+      const normalizedGitCommitSha = 'e'.repeat(40);
+      mockGitCommitShaProvider.getCurrentGitCommitSha.mockReturnValue(normalizedGitCommitSha);
+      mockBackend.persistNotificationUpdate.mockResolvedValue({
+        ...mockNotification,
+        gitCommitSha: normalizedGitCommitSha,
+      });
+      notificationContextgenerators.testContext.generate.mockResolvedValue({});
+
+      const serviceWithObjectParams = new VintaSendFactory<Config>().create({
+        adapters: [mockAdapter],
+        backend: mockBackend,
+        logger: mockLogger,
+        contextGeneratorsMap: notificationContextgenerators,
+        options: { raiseErrorOnFailedSend: true },
+        gitCommitShaProvider: mockGitCommitShaProvider,
+      });
+
+      await serviceWithObjectParams.send(mockNotification);
+
+      expect(mockGitCommitShaProvider.getCurrentGitCommitSha).toHaveBeenCalledTimes(1);
+      expect(mockBackend.persistNotificationUpdate).toHaveBeenCalledWith(
+        mockNotification.id,
+        expect.objectContaining({ gitCommitSha: normalizedGitCommitSha }),
+      );
+      expect(mockAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({ gitCommitSha: normalizedGitCommitSha }),
+        expect.anything(),
+      );
+    });
+
   });
 });

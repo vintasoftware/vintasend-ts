@@ -9,6 +9,7 @@ import type {
 import type { BaseNotificationTypeConfig } from '../types/notification-type-config';
 import type { OneOffNotificationInput } from '../types/one-off-notification';
 import type { BaseAttachmentManager } from './attachment-manager/base-attachment-manager';
+import type { BaseGitCommitShaProvider } from './git-commit-sha/base-git-commit-sha-provider';
 import type { BaseLogger } from './loggers/base-logger';
 import {
   type BaseNotificationAdapter,
@@ -21,6 +22,27 @@ import type { BaseNotificationTemplateRenderer } from './notification-template-r
 
 type VintaSendOptions = {
   raiseErrorOnFailedSend: boolean;
+};
+
+type VintaSendFactoryCreateParams<
+  Config extends BaseNotificationTypeConfig,
+  AdaptersList extends BaseNotificationAdapter<
+    BaseNotificationTemplateRenderer<Config>,
+    Config
+  >[],
+  Backend extends BaseNotificationBackend<Config>,
+  Logger extends BaseLogger,
+  QueueService extends BaseNotificationQueueService<Config>,
+  AttachmentMgr extends BaseAttachmentManager,
+> = {
+  adapters: AdaptersList;
+  backend: Backend;
+  logger: Logger;
+  contextGeneratorsMap: BaseNotificationTypeConfig['ContextMap'];
+  queueService?: QueueService;
+  attachmentManager?: AttachmentMgr;
+  options?: VintaSendOptions;
+  gitCommitShaProvider?: BaseGitCommitShaProvider;
 };
 
 export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
@@ -60,24 +82,93 @@ export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
     QueueService extends BaseNotificationQueueService<Config>,
     AttachmentMgr extends BaseAttachmentManager,
   >(
+    params: VintaSendFactoryCreateParams<
+      Config,
+      AdaptersList,
+      Backend,
+      Logger,
+      QueueService,
+      AttachmentMgr
+    >,
+  ): VintaSend<Config, AdaptersList, Backend, Logger, QueueService, AttachmentMgr>;
+
+  /**
+   * @deprecated Use the object parameter overload instead.
+   */
+  create<
+    AdaptersList extends BaseNotificationAdapter<
+      BaseNotificationTemplateRenderer<Config>,
+      Config
+    >[],
+    Backend extends BaseNotificationBackend<Config>,
+    Logger extends BaseLogger,
+    QueueService extends BaseNotificationQueueService<Config>,
+    AttachmentMgr extends BaseAttachmentManager,
+  >(
     adapters: AdaptersList,
     backend: Backend,
     logger: Logger,
     contextGeneratorsMap: BaseNotificationTypeConfig['ContextMap'],
     queueService?: QueueService,
     attachmentManager?: AttachmentMgr,
+    options?: VintaSendOptions,
+    gitCommitShaProvider?: BaseGitCommitShaProvider,
+  ): VintaSend<Config, AdaptersList, Backend, Logger, QueueService, AttachmentMgr>;
+
+  create<
+    AdaptersList extends BaseNotificationAdapter<
+      BaseNotificationTemplateRenderer<Config>,
+      Config
+    >[],
+    Backend extends BaseNotificationBackend<Config>,
+    Logger extends BaseLogger,
+    QueueService extends BaseNotificationQueueService<Config>,
+    AttachmentMgr extends BaseAttachmentManager,
+  >(
+    adaptersOrParams:
+      | AdaptersList
+      | VintaSendFactoryCreateParams<
+          Config,
+          AdaptersList,
+          Backend,
+          Logger,
+          QueueService,
+          AttachmentMgr
+        >,
+    backend?: Backend,
+    logger?: Logger,
+    contextGeneratorsMap?: BaseNotificationTypeConfig['ContextMap'],
+    queueService?: QueueService,
+    attachmentManager?: AttachmentMgr,
     options: VintaSendOptions = {
       raiseErrorOnFailedSend: false,
     },
-  ) {
+    gitCommitShaProvider?: BaseGitCommitShaProvider,
+  ): VintaSend<Config, AdaptersList, Backend, Logger, QueueService, AttachmentMgr> {
+    if (!Array.isArray(adaptersOrParams)) {
+      return new VintaSend<Config, AdaptersList, Backend, Logger, QueueService, AttachmentMgr>(
+        adaptersOrParams.adapters,
+        adaptersOrParams.backend,
+        adaptersOrParams.logger,
+        adaptersOrParams.contextGeneratorsMap,
+        adaptersOrParams.queueService,
+        adaptersOrParams.attachmentManager,
+        adaptersOrParams.options ?? {
+          raiseErrorOnFailedSend: false,
+        },
+        adaptersOrParams.gitCommitShaProvider,
+      );
+    }
+
     return new VintaSend<Config, AdaptersList, Backend, Logger, QueueService, AttachmentMgr>(
-      adapters,
-      backend,
-      logger,
-      contextGeneratorsMap,
+      adaptersOrParams,
+      backend as Backend,
+      logger as Logger,
+      contextGeneratorsMap as BaseNotificationTypeConfig['ContextMap'],
       queueService,
       attachmentManager,
       options,
+      gitCommitShaProvider,
     );
   }
 }
@@ -114,6 +205,7 @@ export class VintaSend<
     private options: VintaSendOptions = {
       raiseErrorOnFailedSend: false,
     },
+    private gitCommitShaProvider?: BaseGitCommitShaProvider,
   ) {
     this.contextGeneratorsMap = new NotificationContextGeneratorsMap(contextGeneratorsMap);
     for (const adapter of adapters) {
@@ -140,19 +232,81 @@ export class VintaSend<
     this.queueService = queueService;
   }
 
+  private normalizeGitCommitSha(gitCommitSha: string): string {
+    const normalizedSha = gitCommitSha.trim().toLowerCase();
+    if (!/^[a-f0-9]{40}$/.test(normalizedSha)) {
+      throw new Error(
+        'Invalid gitCommitSha resolved by provider. Expected a 40-character hexadecimal SHA.',
+      );
+    }
+    return normalizedSha;
+  }
+
+  private async resolveGitCommitShaForExecution(): Promise<string | null> {
+    if (!this.gitCommitShaProvider) {
+      return null;
+    }
+
+    const resolvedGitCommitSha = await this.gitCommitShaProvider.getCurrentGitCommitSha();
+    if (resolvedGitCommitSha === null) {
+      return null;
+    }
+
+    return this.normalizeGitCommitSha(resolvedGitCommitSha);
+  }
+
+  private async persistGitCommitShaForExecution(
+    notification: AnyDatabaseNotification<Config>,
+    gitCommitSha: string | null,
+  ): Promise<AnyDatabaseNotification<Config>> {
+    const currentGitCommitSha = notification.gitCommitSha ?? null;
+    if (currentGitCommitSha === gitCommitSha) {
+      return notification;
+    }
+
+    if (isOneOffNotification(notification)) {
+      const oneOffNotificationUpdate = {
+        gitCommitSha,
+      } as unknown as Partial<Omit<OneOffNotificationInput<Config>, 'id'>>;
+
+      return this.backend.persistOneOffNotificationUpdate(notification.id, oneOffNotificationUpdate);
+    }
+
+    const notificationUpdate = {
+      gitCommitSha,
+    } as unknown as Partial<Omit<Notification<Config>, 'id'>>;
+
+    return this.backend.persistNotificationUpdate(notification.id, notificationUpdate);
+  }
+
+  private async resolveAndPersistGitCommitShaForExecution(
+    notification: AnyDatabaseNotification<Config>,
+  ): Promise<AnyDatabaseNotification<Config>> {
+    const gitCommitSha = await this.resolveGitCommitShaForExecution();
+    return this.persistGitCommitShaForExecution(notification, gitCommitSha);
+  }
+
   async send(notification: AnyDatabaseNotification<Config>): Promise<void> {
+    const notificationWithExecutionGitCommitSha = await this.resolveAndPersistGitCommitShaForExecution(
+      notification,
+    );
+
     const adaptersOfType = this.adapters.filter(
-      (adapter) => adapter.notificationType === notification.notificationType,
+      (adapter) => adapter.notificationType === notificationWithExecutionGitCommitSha.notificationType,
     );
     if (adaptersOfType.length === 0) {
-      this.logger.error(`No adapter found for notification type ${notification.notificationType}`);
+      this.logger.error(
+        `No adapter found for notification type ${notificationWithExecutionGitCommitSha.notificationType}`,
+      );
       if (this.options.raiseErrorOnFailedSend) {
-        throw new Error(`No adapter found for notification type ${notification.notificationType}`);
+        throw new Error(
+          `No adapter found for notification type ${notificationWithExecutionGitCommitSha.notificationType}`,
+        );
       }
       return;
     }
 
-    if (!notification.id) {
+    if (!notificationWithExecutionGitCommitSha.id) {
       throw new Error("Notification wasn't created in the database. Please create it first");
     }
 
@@ -163,33 +317,37 @@ export class VintaSend<
           continue;
         }
         try {
-          this.logger.info(`Enqueuing notification ${notification.id} with adapter ${adapter.key}`);
-          await this.queueService.enqueueNotification(notification.id);
           this.logger.info(
-            `Enqueued notification ${notification.id} with adapter ${adapter.key} successfully`,
+            `Enqueuing notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key}`,
+          );
+          await this.queueService.enqueueNotification(notificationWithExecutionGitCommitSha.id);
+          this.logger.info(
+            `Enqueued notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key} successfully`,
           );
           continue;
         } catch (enqueueError) {
           this.logger.error(
-            `Error enqueuing notification ${notification.id}: ${enqueueError} with adapter ${adapter.key}`,
+            `Error enqueuing notification ${notificationWithExecutionGitCommitSha.id}: ${enqueueError} with adapter ${adapter.key}`,
           );
           continue;
         }
       }
 
       let context: JsonObject | null = null;
-      if (notification.contextUsed) {
-        context = notification.contextUsed;
+      if (notificationWithExecutionGitCommitSha.contextUsed) {
+        context = notificationWithExecutionGitCommitSha.contextUsed;
       } else {
         try {
           context = await this.getNotificationContext(
-            notification.contextName,
-            notification.contextParameters,
+            notificationWithExecutionGitCommitSha.contextName,
+            notificationWithExecutionGitCommitSha.contextParameters,
           );
-          this.logger.info(`Generated context for notification ${notification.id}`);
+          this.logger.info(
+            `Generated context for notification ${notificationWithExecutionGitCommitSha.id}`,
+          );
         } catch (contextError) {
           this.logger.error(
-            `Error getting context for notification ${notification.id}: ${contextError}`,
+            `Error getting context for notification ${notificationWithExecutionGitCommitSha.id}: ${contextError}`,
           );
           if (this.options.raiseErrorOnFailedSend) {
             throw contextError;
@@ -199,38 +357,44 @@ export class VintaSend<
       }
 
       try {
-        this.logger.info(`Sending notification ${notification.id} with adapter ${adapter.key}`);
-        await adapter.send(notification, context);
         this.logger.info(
-          `Sent notification ${notification.id} with adapter ${adapter.key} successfully`,
+          `Sending notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key}`,
+        );
+        await adapter.send(notificationWithExecutionGitCommitSha, context);
+        this.logger.info(
+          `Sent notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key} successfully`,
         );
       } catch (sendError) {
         this.logger.error(
-          `Error sending notification ${notification.id} with adapter ${adapter.key}: ${sendError}`,
+          `Error sending notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key}: ${sendError}`,
         );
         try {
-          await this.backend.markAsFailed(notification.id, true);
+          await this.backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
         } catch (markFailedError) {
           this.logger.error(
-            `Error marking notification ${notification.id} as failed: ${markFailedError}`,
+            `Error marking notification ${notificationWithExecutionGitCommitSha.id} as failed: ${markFailedError}`,
           );
         }
         continue;
       }
 
       try {
-        await this.backend.markAsSent(notification.id, true);
+        await this.backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
       } catch (markSentError) {
         this.logger.error(
-          `Error marking notification ${notification.id} as sent: ${markSentError}`,
+          `Error marking notification ${notificationWithExecutionGitCommitSha.id} as sent: ${markSentError}`,
         );
       }
 
       try {
-        await this.backend.storeAdapterAndContextUsed(notification.id, adapter.key ?? 'unknown', context ?? {});
+        await this.backend.storeAdapterAndContextUsed(
+          notificationWithExecutionGitCommitSha.id,
+          adapter.key ?? 'unknown',
+          context ?? {},
+        );
       } catch (storeContextError) {
         this.logger.error(
-          `Error storing adapter and context for notification ${notification.id}: ${storeContextError}`,
+          `Error storing adapter and context for notification ${notificationWithExecutionGitCommitSha.id}: ${storeContextError}`,
         );
       }
     }
@@ -545,43 +709,51 @@ export class VintaSend<
       return;
     }
 
+    const notificationWithExecutionGitCommitSha = await this.resolveAndPersistGitCommitShaForExecution(
+      notification,
+    );
+
     const context = await this.getNotificationContext(
-      notification.contextName,
-      notification.contextParameters,
+      notificationWithExecutionGitCommitSha.contextName,
+      notificationWithExecutionGitCommitSha.contextParameters,
     );
 
     let lastAdapterKey = 'unknown';
     for (const adapter of enqueueNotificationsAdapters) {
       lastAdapterKey = adapter.key ?? 'unknown';
       try {
-        await adapter.send(notification, context);
+        await adapter.send(notificationWithExecutionGitCommitSha, context);
       } catch (sendError) {
         this.logger.error(
-          `Error sending notification ${notification.id} with adapter ${adapter.key}: ${sendError}`,
+          `Error sending notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key}: ${sendError}`,
         );
         try {
-          await this.backend.markAsFailed(notification.id, true);
+          await this.backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
         } catch (markFailedError) {
           this.logger.error(
-            `Error marking notification ${notification.id} as failed: ${markFailedError}`,
+            `Error marking notification ${notificationWithExecutionGitCommitSha.id} as failed: ${markFailedError}`,
           );
         }
       }
 
       try {
-        await this.backend.markAsSent(notification.id, true);
+        await this.backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
       } catch (markSentError) {
         this.logger.error(
-          `Error marking notification ${notification.id} as sent: ${markSentError}`,
+          `Error marking notification ${notificationWithExecutionGitCommitSha.id} as sent: ${markSentError}`,
         );
       }
     }
 
     try {
-      await this.backend.storeAdapterAndContextUsed(notification.id, lastAdapterKey, context);
+      await this.backend.storeAdapterAndContextUsed(
+        notificationWithExecutionGitCommitSha.id,
+        lastAdapterKey,
+        context,
+      );
     } catch (storeContextError) {
       this.logger.error(
-        `Error storing adapter and context for notification ${notification.id}: ${storeContextError}`,
+        `Error storing adapter and context for notification ${notificationWithExecutionGitCommitSha.id}: ${storeContextError}`,
       );
     }
   }

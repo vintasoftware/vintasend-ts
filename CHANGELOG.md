@@ -1,6 +1,6 @@
 # Changelog
 
-## Version 0.6.3
+## Version 0.7.0
 
 * **String lookup filters added for advanced filtering**:
   * Implemented string lookup filters on `bodyTemplate`, `subjectTemplate`, and `contextName` fields

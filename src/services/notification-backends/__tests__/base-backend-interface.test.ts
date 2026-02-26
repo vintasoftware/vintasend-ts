@@ -92,6 +92,7 @@ describe('BaseNotificationBackend Interface', () => {
         adapterUsed: null,
         sentAt: null,
         readAt: null,
+        gitCommitSha: null,
       };
 
       const oneOffNotification: DatabaseOneOffNotification<TestConfig> = {
@@ -112,6 +113,7 @@ describe('BaseNotificationBackend Interface', () => {
         adapterUsed: null,
         sentAt: null,
         readAt: null,
+        gitCommitSha: null,
       };
 
       const mockBackend: BaseNotificationBackend<TestConfig> = {
@@ -180,6 +182,7 @@ describe('BaseNotificationBackend Interface', () => {
         adapterUsed: null,
         sentAt: null,
         readAt: null,
+        gitCommitSha: null,
       };
 
       const mockBackend: BaseNotificationBackend<TestConfig> = {
@@ -257,6 +260,7 @@ describe('BaseNotificationBackend Interface', () => {
         adapterUsed: null,
         sentAt: null,
         readAt: null,
+        gitCommitSha: null,
       };
 
       const mockBackend: BaseNotificationBackend<TestConfig> = {
@@ -372,6 +376,7 @@ describe('BaseNotificationBackend Interface', () => {
         adapterUsed: null,
         sentAt: new Date(),
         readAt: null,
+        gitCommitSha: null,
       };
 
       const mockBackend: BaseNotificationBackend<TestConfig> = {
@@ -493,6 +498,7 @@ describe('BaseNotificationBackend Interface', () => {
         adapterUsed: null,
         sentAt: null,
         readAt: null,
+        gitCommitSha: null,
       };
 
       const mockBackend: BaseNotificationBackend<TestConfig> = {

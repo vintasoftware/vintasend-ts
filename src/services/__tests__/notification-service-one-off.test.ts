@@ -4,6 +4,7 @@ import type {
   OneOffNotificationInput,
 } from '../../types/one-off-notification';
 import type { BaseLogger } from '../loggers/base-logger';
+import type { BaseGitCommitShaProvider } from '../git-commit-sha/base-git-commit-sha-provider';
 import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
@@ -81,6 +82,10 @@ const notificationContextgenerators = {
   },
 };
 
+const mockGitCommitShaProvider: jest.Mocked<BaseGitCommitShaProvider> = {
+  getCurrentGitCommitSha: jest.fn(),
+};
+
 type Config = {
   ContextMap: typeof notificationContextgenerators;
   NotificationIdType: string;
@@ -96,6 +101,7 @@ describe('NotificationService - One-Off Notifications', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGitCommitShaProvider.getCurrentGitCommitSha.mockReset();
 
     const factory = new VintaSendFactory<Config>();
     service = factory.create([mockAdapter], mockBackend, mockLogger, notificationContextgenerators);
@@ -126,6 +132,7 @@ describe('NotificationService - One-Off Notifications', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       attachments: undefined, // Override to match DatabaseOneOffNotification type
+      gitCommitSha: null,
     };
 
     notificationContextgenerators.testContext.generate.mockReturnValue({ test: 'context' });
@@ -233,6 +240,40 @@ describe('NotificationService - One-Off Notifications', () => {
 
       await expect(service.createOneOffNotification(mockOneOffNotificationInput)).rejects.toThrow(
         'Backend error',
+      );
+    });
+
+    it('should resolve and persist gitCommitSha at one-off execution time', async () => {
+      const serviceWithGitCommitShaProvider = new VintaSendFactory<Config>().create(
+        [mockAdapter],
+        mockBackend,
+        mockLogger,
+        notificationContextgenerators,
+        undefined,
+        undefined,
+        { raiseErrorOnFailedSend: false },
+        mockGitCommitShaProvider,
+      );
+
+      const normalizedGitCommitSha = 'd'.repeat(40);
+      mockGitCommitShaProvider.getCurrentGitCommitSha.mockReturnValue(normalizedGitCommitSha);
+      mockBackend.persistOneOffNotification.mockResolvedValue(mockOneOffNotification);
+      mockBackend.persistOneOffNotificationUpdate.mockResolvedValue({
+        ...mockOneOffNotification,
+        gitCommitSha: normalizedGitCommitSha,
+      });
+
+      await serviceWithGitCommitShaProvider.createOneOffNotification(mockOneOffNotificationInput);
+
+      expect(mockBackend.persistOneOffNotificationUpdate).toHaveBeenCalledWith(
+        mockOneOffNotification.id,
+        expect.objectContaining({
+          gitCommitSha: normalizedGitCommitSha,
+        }),
+      );
+      expect(mockAdapter.send).toHaveBeenCalledWith(
+        expect.objectContaining({ gitCommitSha: normalizedGitCommitSha }),
+        expect.anything(),
       );
     });
   });

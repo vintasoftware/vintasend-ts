@@ -120,7 +120,8 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         status: 'PENDING_SEND',
         sentAt: null,
         readAt: null,
-        sendAfter: null,
+          sendAfter: null,
+          gitCommitSha: null,
       };
 
       expect(isOneOffNotification(oneOffNotification)).toBe(true);
@@ -142,7 +143,8 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         status: 'PENDING_SEND',
         sentAt: null,
         readAt: null,
-        sendAfter: null,
+          sendAfter: null,
+          gitCommitSha: null,
       };
 
       expect(isOneOffNotification(regularNotification)).toBe(false);
@@ -169,6 +171,7 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         sentAt: null,
         readAt: null,
         sendAfter: null,
+        gitCommitSha: null,
       };
 
       const email = await adapter.testGetRecipientEmail(oneOffNotification);
@@ -192,7 +195,8 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         status: 'PENDING_SEND',
         sentAt: null,
         readAt: null,
-        sendAfter: null,
+          sendAfter: null,
+          gitCommitSha: null,
       };
 
       mockBackend.getUserEmailFromNotification.mockResolvedValue('user@example.com');
@@ -218,7 +222,8 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         status: 'PENDING_SEND',
         sentAt: null,
         readAt: null,
-        sendAfter: null,
+          sendAfter: null,
+          gitCommitSha: null,
       };
 
       mockBackend.getUserEmailFromNotification.mockResolvedValue(undefined);
@@ -247,6 +252,7 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         sentAt: null,
         readAt: null,
         sendAfter: null,
+        gitCommitSha: null,
       };
 
       await expect(
@@ -275,6 +281,7 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         sentAt: null,
         readAt: null,
         sendAfter: null,
+        gitCommitSha: null,
       };
 
       const name = adapter.testGetRecipientName(oneOffNotification, {});
@@ -298,6 +305,7 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         sentAt: null,
         readAt: null,
         sendAfter: null,
+        gitCommitSha: null,
       };
 
       const context: JsonObject = {
@@ -326,6 +334,7 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         sentAt: null,
         readAt: null,
         sendAfter: null,
+        gitCommitSha: null,
       };
 
       const name = adapter.testGetRecipientName(regularNotification, {});
@@ -349,6 +358,7 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         sentAt: null,
         readAt: null,
         sendAfter: null,
+        gitCommitSha: null,
       };
 
       const name = adapter.testGetRecipientName(regularNotification, null);
@@ -372,6 +382,7 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         sentAt: null,
         readAt: null,
         sendAfter: null,
+        gitCommitSha: null,
       };
 
       const context: JsonObject = {
@@ -404,6 +415,7 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         sentAt: null,
         readAt: null,
         sendAfter: null,
+        gitCommitSha: null,
       };
 
       await expect(adapter.send(oneOffNotification, {})).resolves.not.toThrow();
@@ -426,6 +438,7 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         sentAt: null,
         readAt: null,
         sendAfter: null,
+        gitCommitSha: null,
       };
 
       mockBackend.getUserEmailFromNotification.mockResolvedValue('user@example.com');

@@ -22,6 +22,7 @@ export type OneOffNotificationInput<Config extends BaseNotificationTypeConfig> =
   sendAfter: Date | null;
   subjectTemplate: string | null;
   extraParams: InputJsonValue | null;
+  gitCommitSha?: never;
   attachments?: NotificationAttachment[];
 };
 
@@ -50,6 +51,7 @@ export type OneOffNotificationResendWithContextInput<Config extends BaseNotifica
   sendAfter: Date | null;
   subjectTemplate: string | null;
   extraParams: InputJsonValue | null;
+  gitCommitSha?: never;
   attachments?: NotificationAttachment[];
 };
 
@@ -87,6 +89,7 @@ export type DatabaseOneOffNotification<Config extends BaseNotificationTypeConfig
   readAt: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
+  gitCommitSha: string | null;
   attachments?: StoredAttachment[];
 };
 

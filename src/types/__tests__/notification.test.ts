@@ -178,6 +178,7 @@ describe('Notification Types with Attachments', () => {
         readAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+        gitCommitSha: null,
       };
 
       expect(notification).toBeDefined();
@@ -210,6 +211,7 @@ describe('Notification Types with Attachments', () => {
         readAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+        gitCommitSha: null,
         attachments: [
           {
             id: 'att-1',
@@ -261,6 +263,7 @@ describe('Notification Types with Attachments', () => {
         readAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
+        gitCommitSha: null,
         attachments: [
           {
             id: 'att-1',
@@ -340,6 +343,7 @@ describe('Notification Types with Attachments', () => {
         adapterUsed: null,
         sentAt: null,
         readAt: null,
+        gitCommitSha: null,
         attachments: [
           {
             id: 'att-1',
@@ -393,4 +397,102 @@ describe('Notification Types with Attachments', () => {
       expect(withoutAttachments).toBeDefined();
     });
   });
-});
+
+  describe('Git Commit SHA field', () => {
+    describe('NotificationInput and NotificationResendWithContextInput', () => {
+      it('should not allow gitCommitSha in notification input (system-managed field)', () => {
+        // @ts-expect-error - gitCommitSha field type is never (optional only to keep structural compatibility)
+        const invalidGitCommitShaValue: NotificationInput<MockConfig>['gitCommitSha'] =
+          'abc123def456789012345678901234567890abcd';
+
+        const notificationWithGitCommitSha: NotificationInput<MockConfig> = {
+          userId: 1,
+          notificationType: 'EMAIL',
+          title: 'Test Notification',
+          bodyTemplate: 'Hello {{name}}',
+          contextName: 'testContext',
+          contextParameters: { userId: 1, message: 'test' },
+          sendAfter: null,
+          subjectTemplate: 'Test Subject',
+          extraParams: null,
+          // @ts-expect-error - gitCommitSha is system-managed and must not be accepted in input
+          gitCommitSha: 'abc123def456789012345678901234567890abcd',
+        };
+
+        expect(invalidGitCommitShaValue).toBeDefined();
+        expect(notificationWithGitCommitSha).toBeDefined();
+      });
+
+      it('should not allow gitCommitSha in resend input (system-managed field)', () => {
+        // @ts-expect-error - gitCommitSha field type is never (optional only to keep structural compatibility)
+        const invalidGitCommitShaValue: NotificationResendWithContextInput<MockConfig>['gitCommitSha'] =
+          'abc123def456789012345678901234567890abcd';
+
+        const notificationWithGitCommitSha: NotificationResendWithContextInput<MockConfig> = {
+          userId: 1,
+          notificationType: 'EMAIL',
+          title: 'Test Notification',
+          bodyTemplate: 'Hello {{name}}',
+          contextName: 'testContext',
+          contextParameters: { userId: 1, message: 'test' },
+          contextUsed: { result: 'processed' },
+          sendAfter: null,
+          subjectTemplate: 'Test Subject',
+          extraParams: null,
+          // @ts-expect-error - gitCommitSha is system-managed and must not be accepted in resend input
+          gitCommitSha: 'abc123def456789012345678901234567890abcd',
+        };
+
+        expect(invalidGitCommitShaValue).toBeDefined();
+        expect(notificationWithGitCommitSha).toBeDefined();
+      });
+    });
+
+    describe('DatabaseNotification', () => {
+      it('should require gitCommitSha field (nullable)', () => {
+        const notification: DatabaseNotification<MockConfig> = {
+          id: 123,
+          userId: 1,
+          notificationType: 'EMAIL',
+          title: 'Test Notification',
+          bodyTemplate: 'Hello {{name}}',
+          contextName: 'testContext',
+          contextParameters: { userId: 1, message: 'test' },
+          sendAfter: null,
+          subjectTemplate: 'Test Subject',
+          status: 'PENDING_SEND',
+          contextUsed: { result: 'processed' },
+          extraParams: null,
+          adapterUsed: null,
+          sentAt: null,
+          readAt: null,
+          gitCommitSha: 'abc123def456789012345678901234567890abcd',
+        };
+
+        expect(notification.gitCommitSha).toBe('abc123def456789012345678901234567890abcd');
+      });
+
+      it('should allow null gitCommitSha in database notification', () => {
+        const notification: DatabaseNotification<MockConfig> = {
+          id: 123,
+          userId: 1,
+          notificationType: 'EMAIL',
+          title: 'Test Notification',
+          bodyTemplate: 'Hello {{name}}',
+          contextName: 'testContext',
+          contextParameters: { userId: 1, message: 'test' },
+          sendAfter: null,
+          subjectTemplate: 'Test Subject',
+          status: 'PENDING_SEND',
+          contextUsed: { result: 'processed' },
+          extraParams: null,
+          adapterUsed: null,
+          sentAt: null,
+          readAt: null,
+          gitCommitSha: null,
+        };
+
+        expect(notification.gitCommitSha).toBeNull();
+      });
+    });
+  });});
