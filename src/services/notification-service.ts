@@ -50,6 +50,7 @@ type VintaSendFactoryCreateParams<
 > = {
   adapters: AdaptersList;
   backend: Backend;
+  additionalBackends?: Backend[];
   logger: Logger;
   contextGeneratorsMap: BaseNotificationTypeConfig['ContextMap'];
   queueService?: QueueService;
@@ -126,6 +127,7 @@ export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
     attachmentManager?: AttachmentMgr,
     options?: VintaSendOptions,
     gitCommitShaProvider?: BaseGitCommitShaProvider,
+    additionalBackends?: Backend[],
   ): VintaSend<Config, AdaptersList, Backend, Logger, QueueService, AttachmentMgr>;
 
   create<
@@ -157,6 +159,7 @@ export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
       raiseErrorOnFailedSend: false,
     },
     gitCommitShaProvider?: BaseGitCommitShaProvider,
+    additionalBackends?: Backend[],
   ): VintaSend<Config, AdaptersList, Backend, Logger, QueueService, AttachmentMgr> {
     if (!Array.isArray(adaptersOrParams)) {
       return new VintaSend<Config, AdaptersList, Backend, Logger, QueueService, AttachmentMgr>(
@@ -170,6 +173,7 @@ export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
           raiseErrorOnFailedSend: false,
         },
         adaptersOrParams.gitCommitShaProvider,
+        adaptersOrParams.additionalBackends,
       );
     }
 
@@ -182,6 +186,7 @@ export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
       attachmentManager,
       options,
       gitCommitShaProvider,
+      additionalBackends,
     );
   }
 }
@@ -208,6 +213,8 @@ export class VintaSend<
   AttachmentMgr extends BaseAttachmentManager,
 > {
   private contextGeneratorsMap: NotificationContextGeneratorsMap<Config['ContextMap']>;
+  private backends: Map<string, Backend>;
+  private primaryBackendIdentifier: string;
   constructor(
     private adapters: AdaptersList,
     private backend: Backend,
@@ -219,8 +226,36 @@ export class VintaSend<
       raiseErrorOnFailedSend: false,
     },
     private gitCommitShaProvider?: BaseGitCommitShaProvider,
+    additionalBackends: Backend[] = [],
   ) {
     this.contextGeneratorsMap = new NotificationContextGeneratorsMap(contextGeneratorsMap);
+    this.backends = new Map();
+
+    this.primaryBackendIdentifier = this.getBackendIdentifier(backend);
+    this.backends.set(this.primaryBackendIdentifier, backend);
+
+    for (const additionalBackend of additionalBackends) {
+      const additionalBackendIdentifier = this.getBackendIdentifier(additionalBackend);
+
+      if (this.backends.has(additionalBackendIdentifier)) {
+        throw new Error(`Duplicate backend identifier: ${additionalBackendIdentifier}`);
+      }
+
+      this.backends.set(additionalBackendIdentifier, additionalBackend);
+
+      if (typeof additionalBackend.injectLogger === 'function') {
+        additionalBackend.injectLogger(logger);
+      }
+
+      if (this.attachmentManager && hasAttachmentManagerInjection(additionalBackend)) {
+        additionalBackend.injectAttachmentManager(this.attachmentManager);
+      }
+    }
+
+    if (this.getAdditionalBackends().length !== additionalBackends.length) {
+      throw new Error('Invalid additional backends configuration');
+    }
+
     for (const adapter of adapters) {
       adapter.injectBackend(backend);
       adapter.injectLogger(logger);
@@ -239,6 +274,33 @@ export class VintaSend<
     if (this.attachmentManager && hasAttachmentManagerInjection(backend)) {
       backend.injectAttachmentManager(this.attachmentManager);
     }
+  }
+
+  private getBackendIdentifier(backend: Backend): string {
+    if (typeof backend.getBackendIdentifier === 'function') {
+      return backend.getBackendIdentifier();
+    }
+
+    return `backend-${this.backends.size}`;
+  }
+
+  private getBackend(identifier?: string): Backend {
+    if (!identifier) {
+      return this.backend;
+    }
+
+    const backend = this.backends.get(identifier);
+    if (!backend) {
+      throw new Error(`Backend not found: ${identifier}`);
+    }
+
+    return backend;
+  }
+
+  private getAdditionalBackends(): Backend[] {
+    return Array.from(this.backends.entries())
+      .filter(([identifier]) => identifier !== this.primaryBackendIdentifier)
+      .map(([, backend]) => backend);
   }
 
   registerQueueService(queueService: QueueService): void {
@@ -525,11 +587,11 @@ export class VintaSend<
   }
 
   async getAllFutureNotifications() {
-    return this.backend.getAllFutureNotifications();
+    return this.getBackend().getAllFutureNotifications();
   }
 
   async getAllFutureNotificationsFromUser(userId: Config['NotificationIdType']) {
-    return this.backend.getAllFutureNotificationsFromUser(userId);
+    return this.getBackend().getAllFutureNotificationsFromUser(userId);
   }
 
   async getFutureNotificationsFromUser(
@@ -537,11 +599,11 @@ export class VintaSend<
     page: number,
     pageSize: number,
   ) {
-    return this.backend.getFutureNotificationsFromUser(userId, page, pageSize);
+    return this.getBackend().getFutureNotificationsFromUser(userId, page, pageSize);
   }
 
   async getFutureNotifications(page: number, pageSize: number) {
-    return this.backend.getFutureNotifications(page, pageSize);
+    return this.getBackend().getFutureNotifications(page, pageSize);
   }
 
   async getNotificationContext<ContextName extends string & keyof Config['ContextMap']>(
@@ -585,32 +647,35 @@ export class VintaSend<
   }
 
   async sendPendingNotifications(): Promise<void> {
-    const pendingNotifications = await this.backend.getAllPendingNotifications();
+    const pendingNotifications = await this.getBackend().getAllPendingNotifications();
     await Promise.all(pendingNotifications.map((notification) => this.send(notification)));
   }
 
   async getPendingNotifications(page: number, pageSize: number) {
-    return this.backend.getPendingNotifications(page, pageSize);
+    return this.getBackend().getPendingNotifications(page, pageSize);
   }
 
   async getNotifications(page: number, pageSize: number) {
-    return this.backend.getNotifications(page, pageSize);
+    return this.getBackend().getNotifications(page, pageSize);
   }
 
   async getOneOffNotifications(page: number, pageSize: number) {
-    return this.backend.getOneOffNotifications(page, pageSize);
+    return this.getBackend().getOneOffNotifications(page, pageSize);
   }
 
   async getNotification(notificationId: Config['NotificationIdType'], forUpdate = false) {
-    return this.backend.getNotification(notificationId, forUpdate);
+    return this.getBackend().getNotification(notificationId, forUpdate);
   }
 
   async filterNotifications(filter: NotificationFilterFields<Config>, page: number, pageSize: number) {
-    return this.backend.filterNotifications(filter, page, pageSize);
+    return this.getBackend().filterNotifications(filter, page, pageSize);
   }
 
   async getBackendSupportedFilterCapabilities() {
-    return { ...DEFAULT_BACKEND_FILTER_CAPABILITIES, ...(this.backend.getFilterCapabilities?.() ?? {}) };
+    return {
+      ...DEFAULT_BACKEND_FILTER_CAPABILITIES,
+      ...(this.getBackend().getFilterCapabilities?.() ?? {}),
+    };
   }
 
   /**
@@ -624,7 +689,7 @@ export class VintaSend<
     notificationId: Config['NotificationIdType'],
     forUpdate = false,
   ): Promise<DatabaseOneOffNotification<Config> | null> {
-    return this.backend.getOneOffNotification(notificationId, forUpdate);
+    return this.getBackend().getOneOffNotification(notificationId, forUpdate);
   }
 
   async markRead(
@@ -637,7 +702,7 @@ export class VintaSend<
   }
 
   async getInAppUnread(userId: Config['NotificationIdType']) {
-    return this.backend.filterAllInAppUnreadNotifications(userId);
+    return this.getBackend().filterAllInAppUnreadNotifications(userId);
   }
 
   async cancelNotification(notificationId: Config['NotificationIdType']): Promise<void> {
@@ -800,7 +865,7 @@ export class VintaSend<
   async bulkPersistNotifications(
     notifications: Omit<AnyNotification<Config>, 'id'>[],
   ): Promise<Config['NotificationIdType'][]> {
-    return this.backend.bulkPersistNotifications(notifications);
+    return this.getBackend().bulkPersistNotifications(notifications);
   }
 
   async migrateToBackend<DestinationBackend extends BaseNotificationBackend<Config>>(
