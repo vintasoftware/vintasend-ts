@@ -61,13 +61,37 @@ function ensureLocalVintaSend(pkgJson, localSpec) {
 const repoRoot = process.cwd();
 const implementationsRoot = path.join(repoRoot, "src", "implementations");
 const originalContents = new Map();
+const requestedImplementations = process.argv.slice(2);
 
-const implementationDirs = fs
+const allImplementationDirs = fs
   .readdirSync(implementationsRoot, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
   .filter((entry) => entry.name !== "vintasend-implementation-template")
   .map((entry) => path.join(implementationsRoot, entry.name))
   .filter((dirPath) => fs.existsSync(path.join(dirPath, "package.json")));
+
+const implementationDirs =
+  requestedImplementations.length > 0
+    ? allImplementationDirs.filter((dirPath) =>
+        requestedImplementations.includes(path.basename(dirPath)),
+      )
+    : allImplementationDirs;
+
+if (requestedImplementations.length > 0) {
+  const foundImplementations = new Set(
+    implementationDirs.map((dirPath) => path.basename(dirPath)),
+  );
+  const missingImplementations = requestedImplementations.filter(
+    (name) => !foundImplementations.has(name),
+  );
+
+  if (missingImplementations.length > 0) {
+    console.error(
+      `Unknown implementation(s): ${missingImplementations.join(", ")}`,
+    );
+    process.exit(1);
+  }
+}
 
 if (implementationDirs.length === 0) {
   console.log("No implementation packages found.");

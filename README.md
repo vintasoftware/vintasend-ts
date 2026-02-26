@@ -244,7 +244,91 @@ One-off notifications are stored in the same table as regular notifications usin
 - **Regular notifications**: Have `userId` set, `emailOrPhone` is null
 - **One-off notifications**: Have `emailOrPhone` set, `userId` is null
 
+## Git Commit SHA Tracking
+
+VintaSend can persist which source-code version executed each notification send/render flow.
+
+### Field behavior
+
+- Persisted notifications include `gitCommitSha: string | null`
+- Notification input/resend payloads do not accept this field (`gitCommitSha` is system-managed)
+- The SHA is resolved at execution time (send/render), not creation time
+
+### Configuring a provider
+
+Use `BaseGitCommitShaProvider` with `VintaSendFactory.create(...)`.
+
+Preferred factory style (object parameter):
+
+```typescript
+import { VintaSendFactory, type BaseGitCommitShaProvider } from 'vintasend';
+
+const gitCommitShaProvider: BaseGitCommitShaProvider = {
+  getCurrentGitCommitSha: () => process.env.GIT_COMMIT_SHA ?? null,
+};
+
+const vintaSend = new VintaSendFactory<NotificationTypeConfig>().create({
+  adapters: [adapter],
+  backend,
+  logger,
+  contextGeneratorsMap,
+  gitCommitShaProvider,
+});
+```
+
+> Positional `create(...)` parameters are still supported for backward compatibility, but object-style configuration is recommended.
+
+### Provider examples
+
+Environment variable (CI/CD injected):
+
+```typescript
+const envProvider: BaseGitCommitShaProvider = {
+  getCurrentGitCommitSha: () => process.env.GIT_COMMIT_SHA ?? null,
+};
+```
+
+Shell command (async):
+
+```typescript
+import { execSync } from 'node:child_process';
+
+const shellProvider: BaseGitCommitShaProvider = {
+  getCurrentGitCommitSha: async () => {
+    try {
+      return execSync('git rev-parse HEAD', { encoding: 'utf-8' }).trim() || null;
+    } catch {
+      return null;
+    }
+  },
+};
+```
+
+Static provider (for deterministic environments):
+
+```typescript
+const staticProvider: BaseGitCommitShaProvider = {
+  getCurrentGitCommitSha: () => '0123456789abcdef0123456789abcdef01234567',
+};
+```
+
 ### Migration Guides
+
+#### Migrating to v0.7.0 (Git Commit SHA Tracking)
+
+This migration is only needed if you're using the Prisma backend.
+
+`gitCommitSha` is now persisted on notifications (regular and one-off) as a nullable, system-managed field.
+
+1. Update your Prisma schema (`Notification` model):
+  - Add `gitCommitSha String?`
+  - Add `@@index([gitCommitSha])`
+2. Run a migration in your app:
+  ```bash
+  prisma migrate dev --name add-notification-git-commit-sha
+  ```
+3. Optionally configure a `BaseGitCommitShaProvider` in `VintaSendFactory`.
+4. Do not add `gitCommitSha` to notification create/resend input payloads (it is provider-managed).
 
 #### Migrating to v0.4.0 (Attachment Support)
 

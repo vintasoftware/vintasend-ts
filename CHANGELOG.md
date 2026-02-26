@@ -2,6 +2,17 @@
 
 ## Version 0.7.0
 
+* **Git Commit SHA tracking added across core + official backends**:
+  * Added persisted notification field `gitCommitSha: string | null` for regular and one-off notifications.
+  * `gitCommitSha` is system-managed and not accepted in notification create/resend input payloads.
+  * Added `BaseGitCommitShaProvider` integration in `VintaSendFactory` / `VintaSend` execution paths.
+  * Added object-parameter factory create overload with optional `gitCommitShaProvider` (positional create remains supported, but is deprecated).
+  * SHA is resolved at send/render execution time, normalized to lowercase, validated as full 40-char hex, and persisted.
+  * Provider returning `null` persists `null`; invalid SHA values throw deterministic errors.
+  * Prisma backend now persists, updates, and serializes `gitCommitSha`.
+  * Medplum backend now persists and reads `gitCommitSha` using `Communication.identifier` (`http://vintasend.com/fhir/git-commit-sha`) with upsert/removal on updates.
+  * Added Prisma schema updates (`gitCommitSha String?` + index) to schema example and official Next.js Prisma example.
+  * Added migration guidance for Prisma consumers in README.
 * **String lookup filters added for advanced filtering**:
   * Implemented string lookup filters on `bodyTemplate`, `subjectTemplate`, and `contextName` fields
   * Supports lookup types: `exact`, `startsWith`, `endsWith`, `includes` with optional case-insensitive matching
