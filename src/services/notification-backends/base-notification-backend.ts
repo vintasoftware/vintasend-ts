@@ -100,6 +100,14 @@ export const DEFAULT_BACKEND_FILTER_CAPABILITIES = {
 };
 
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
+  /**
+   * Get a unique identifier for this backend instance.
+   *
+   * Used to distinguish between multiple backend instances in a multi-backend setup.
+   * When not implemented, callers should use a fallback identifier strategy.
+   */
+  getBackendIdentifier?(): string;
+
   getAllPendingNotifications(): Promise<AnyDatabaseNotification<Config>[]>;
   getPendingNotifications(
     page: number,
