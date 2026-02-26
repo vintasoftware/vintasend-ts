@@ -51,6 +51,7 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
 // biome-ignore lint/suspicious/noExplicitAny: any just for testing
 const mockTemplateRenderer: jest.Mocked<BaseEmailTemplateRenderer<any>> = {
   render: jest.fn(),
+  renderFromTemplateContent: jest.fn(),
 };
 
 const mockLogger: jest.Mocked<BaseLogger> = {
@@ -1273,6 +1274,87 @@ describe('NotificationService', () => {
         expect.objectContaining({ gitCommitSha: normalizedGitCommitSha }),
         expect.anything(),
       );
+    });
+
+    it('renders email template from content using explicit context dictionary', async () => {
+      const expectedRendered = {
+        subject: '<strong>Rendered Subject</strong>',
+        body: '<p>Rendered Body</p>',
+      };
+
+      mockAdapter.renderFromTemplateContent = jest.fn().mockResolvedValue(expectedRendered);
+
+      const result = await service.renderEmailTemplateFromContent(
+        mockNotification,
+        {
+          subject: 'p #{name}',
+          body: 'p Hello #{name}',
+        },
+        {
+          context: { name: 'Hugo' },
+        },
+      );
+
+      expect(result).toEqual(expectedRendered);
+      expect(mockAdapter.renderFromTemplateContent).toHaveBeenCalledWith(
+        mockNotification,
+        {
+          subject: 'p #{name}',
+          body: 'p Hello #{name}',
+        },
+        { name: 'Hugo' },
+      );
+    });
+
+    it('renders email template from content using context generator input', async () => {
+      notificationContextgenerators.testContext.generate.mockResolvedValue({ patientName: 'Ana' });
+      mockAdapter.renderFromTemplateContent = jest.fn().mockResolvedValue({
+        subject: 'Rendered Subject',
+        body: '<p>Rendered Body</p>',
+      });
+
+      await service.renderEmailTemplateFromContent(
+        mockNotification,
+        {
+          subject: 'p #{patientName}',
+          body: 'p Hello #{patientName}',
+        },
+        {
+          contextName: 'testContext',
+          contextParameters: {},
+        },
+      );
+
+      expect(notificationContextgenerators.testContext.generate).toHaveBeenCalledWith({});
+      expect(mockAdapter.renderFromTemplateContent).toHaveBeenCalledWith(
+        mockNotification,
+        {
+          subject: 'p #{patientName}',
+          body: 'p Hello #{patientName}',
+        },
+        { patientName: 'Ana' },
+      );
+    });
+
+    it('throws when there is no adapter for notification type while rendering from content', async () => {
+      const invalidNotification = {
+        ...mockNotification,
+        notificationType: 'SMS' as const,
+        contextName: 'testContext' as const,
+      } as DatabaseNotification<Config>;
+
+      await expect(
+        service.renderEmailTemplateFromContent(
+          invalidNotification,
+          {
+            subject: 's',
+            body: 'b',
+          },
+          {
+            context: {},
+          },
+        ),
+      ).rejects.toThrow('No adapter found for notification type SMS');
     });
 
   });

@@ -7,4 +7,10 @@ export interface BaseNotificationTemplateRenderer<
   T = unknown,
 > {
   render(notification: AnyNotification<Config>, context: JsonObject): Promise<T>;
+
+  renderFromTemplateContent(
+    notification: AnyNotification<Config>,
+    templateContent: unknown,
+    context: JsonObject,
+  ): Promise<T>;
 }

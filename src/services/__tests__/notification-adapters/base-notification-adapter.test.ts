@@ -17,6 +17,10 @@ class MockTemplateRenderer implements BaseNotificationTemplateRenderer<MockConfi
   render() {
     return Promise.resolve({ subject: 'Test', body: 'Test body' });
   }
+
+  renderFromTemplateContent() {
+    return Promise.resolve({ subject: 'Test', body: 'Test body' });
+  }
 }
 
 class TestNotificationAdapter extends BaseNotificationAdapter<MockTemplateRenderer, MockConfig> {}

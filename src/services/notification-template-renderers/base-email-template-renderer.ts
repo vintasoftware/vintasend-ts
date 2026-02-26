@@ -12,9 +12,20 @@ export type EmailTemplate = {
   body: string;
 };
 
+export type EmailTemplateContent = {
+  subject: string | null;
+  body: string;
+};
+
 export interface BaseEmailTemplateRenderer<Config extends BaseNotificationTypeConfig>
   extends BaseNotificationTemplateRenderer<Config, EmailTemplate> {
   render(notification: AnyNotification<Config>, context: JsonObject): Promise<EmailTemplate>;
+
+  renderFromTemplateContent(
+    notification: AnyNotification<Config>,
+    templateContent: EmailTemplateContent,
+    context: JsonObject,
+  ): Promise<EmailTemplate>;
 
   /**
    * Inject logger into the template renderer (optional - called by VintaSend when logger exists)

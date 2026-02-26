@@ -18,11 +18,24 @@ import {
 import { DEFAULT_BACKEND_FILTER_CAPABILITIES, type BaseNotificationBackend, type NotificationFilterFields } from './notification-backends/base-notification-backend';
 import { NotificationContextGeneratorsMap } from './notification-context-generators-map';
 import type { BaseNotificationQueueService } from './notification-queue-service/base-notification-queue-service';
+import type {
+  EmailTemplate,
+  EmailTemplateContent,
+} from './notification-template-renderers/base-email-template-renderer';
 import type { BaseNotificationTemplateRenderer } from './notification-template-renderers/base-notification-template-renderer';
 
 type VintaSendOptions = {
   raiseErrorOnFailedSend: boolean;
 };
+
+type RenderEmailTemplateContextInput<Config extends BaseNotificationTypeConfig> =
+  | {
+      context: JsonObject;
+    }
+  | {
+      contextName: string & keyof Config['ContextMap'];
+      contextParameters: JsonObject;
+    };
 
 type VintaSendFactoryCreateParams<
   Config extends BaseNotificationTypeConfig,
@@ -543,6 +556,32 @@ export class VintaSend<
       return await context;
     }
     return Promise.resolve(context);
+  }
+
+  async renderEmailTemplateFromContent(
+    notification: AnyDatabaseNotification<Config>,
+    templateContent: EmailTemplateContent,
+    contextInput: RenderEmailTemplateContextInput<Config>,
+  ): Promise<EmailTemplate> {
+    const adaptersOfType = this.adapters.filter(
+      (adapter) => adapter.notificationType === notification.notificationType,
+    );
+
+    if (adaptersOfType.length === 0) {
+      throw new Error(`No adapter found for notification type ${notification.notificationType}`);
+    }
+
+    const adapter = adaptersOfType[0];
+
+    const context =
+      'context' in contextInput
+        ? contextInput.context
+        : await this.getNotificationContext(
+            contextInput.contextName,
+            contextInput.contextParameters as never,
+          );
+
+    return adapter.renderFromTemplateContent(notification, templateContent, context);
   }
 
   async sendPendingNotifications(): Promise<void> {

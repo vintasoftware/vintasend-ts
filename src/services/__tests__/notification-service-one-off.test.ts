@@ -53,6 +53,7 @@ const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
 // biome-ignore lint/suspicious/noExplicitAny: any for testing
 const mockTemplateRenderer: jest.Mocked<BaseEmailTemplateRenderer<any>> = {
   render: jest.fn(),
+  renderFromTemplateContent: jest.fn(),
 };
 
 const mockLogger: jest.Mocked<BaseLogger> = {

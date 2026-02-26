@@ -3,6 +3,7 @@ import type { JsonObject, JsonValue } from '../../types/json-values';
 import type { AnyDatabaseNotification, DatabaseOneOffNotification } from '../../types/notification';
 import type { NotificationType } from '../../types/notification-type';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
+import type { EmailTemplate, EmailTemplateContent } from '../notification-template-renderers/base-email-template-renderer';
 import type { BaseLogger } from '../loggers/base-logger';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseNotificationTemplateRenderer } from '../notification-template-renderers/base-notification-template-renderer';
@@ -122,5 +123,23 @@ export abstract class BaseNotificationAdapter<
 
   injectLogger(logger: BaseLogger): void {
     this.logger = logger;
+  }
+
+  async renderFromTemplateContent(
+    notification: AnyDatabaseNotification<Config>,
+    templateContent: EmailTemplateContent,
+    context: JsonObject,
+  ): Promise<EmailTemplate> {
+    if (typeof this.templateRenderer.renderFromTemplateContent !== 'function') {
+      throw new Error('Template renderer does not support renderFromTemplateContent.');
+    }
+
+    const rendered = await this.templateRenderer.renderFromTemplateContent(
+      notification,
+      templateContent,
+      context,
+    );
+
+    return rendered as EmailTemplate;
   }
 }

@@ -88,6 +88,7 @@ const mockBackend = {
 
 const mockTemplateRenderer: jest.Mocked<BaseNotificationTemplateRenderer<Config>> = {
   render: jest.fn(),
+  renderFromTemplateContent: jest.fn(),
 };
 
 

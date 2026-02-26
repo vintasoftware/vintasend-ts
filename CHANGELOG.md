@@ -1,5 +1,11 @@
 # Changelog
 
+## Version 0.7.1
+
+* Add `renderEmailTemplateFromContent` method to the VintaSend service, so users can preview older notifications by providing the template content at the time.
+* Implement this capability in all the supported template renderers.
+
+
 ## Version 0.7.0
 
 * **Git Commit SHA tracking added across core + official backends**:
