@@ -9,6 +9,7 @@ import type { BaseNotificationTypeConfig } from './notification-type-config';
  * One-off notifications are sent directly to an email/phone without requiring a user account.
  */
 export type OneOffNotificationInput<Config extends BaseNotificationTypeConfig> = {
+  id?: Config['NotificationIdType'];
   emailOrPhone: string;
   firstName: string;
   lastName: string;
@@ -31,6 +32,7 @@ export type OneOffNotificationInput<Config extends BaseNotificationTypeConfig> =
  * Similar to OneOffNotificationInput but includes the contextUsed field.
  */
 export type OneOffNotificationResendWithContextInput<Config extends BaseNotificationTypeConfig> = {
+  id?: Config['NotificationIdType'];
   emailOrPhone: string;
   firstName: string;
   lastName: string;

@@ -18,6 +18,7 @@ export type {
 } from './one-off-notification';
 
 export type NotificationInput<Config extends BaseNotificationTypeConfig> = {
+  id?: Config['NotificationIdType'];
   userId: Config['UserIdType'];
   notificationType: NotificationType;
   title: string | null;
@@ -34,6 +35,7 @@ export type NotificationInput<Config extends BaseNotificationTypeConfig> = {
 };
 
 export type NotificationResendWithContextInput<Config extends BaseNotificationTypeConfig> = {
+  id?: Config['NotificationIdType'];
   userId: Config['UserIdType'];
   notificationType: NotificationType;
   title: string | null;

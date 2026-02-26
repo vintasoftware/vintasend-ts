@@ -127,7 +127,7 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     pageSize: number,
   ): Promise<DatabaseNotification<Config>[]>;
   persistNotification(
-    notification: Omit<Notification<Config>, 'id'>,
+    notification: Omit<Notification<Config>, 'id'> & { id?: Config['NotificationIdType'] },
   ): Promise<DatabaseNotification<Config>>;
   getAllNotifications(): Promise<AnyDatabaseNotification<Config>[]>;
   getNotifications(page: number, pageSize: number): Promise<AnyDatabaseNotification<Config>[]>;
@@ -174,7 +174,9 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
 
   // One-off notification methods
   persistOneOffNotification(
-    notification: Omit<OneOffNotificationInput<Config>, 'id'>,
+    notification: Omit<OneOffNotificationInput<Config>, 'id'> & {
+      id?: Config['NotificationIdType'];
+    },
   ): Promise<DatabaseOneOffNotification<Config>>;
   persistOneOffNotificationUpdate(
     notificationId: Config['NotificationIdType'],
