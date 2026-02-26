@@ -3,8 +3,82 @@
 ## Progress Summary
 
 - Last updated: 2026-02-26
-- Current phase: Phase 4 (Implement multi-backend write operations)
+- Current phase: Phase 5 (Implement Multi-Backend Read Operations)
 - Overall status: In progress
+
+## Phase 5 — Implement Multi-Backend Read Operations
+
+### Status
+
+- ✅ Phase 5 implementation started
+- ✅ Backend-targeted read routing added (with primary default)
+- ✅ Backend identifier listing/helper methods added
+- ✅ Initial Phase 5 read tests added and passing
+- ⏳ Remaining: read consistency tests and full Phase 5 acceptance coverage
+
+### Completed Items (Current Slice)
+
+1. **Added backend management helper methods in `VintaSend`**
+   - Added new public methods:
+      - `getPrimaryBackendIdentifier()`
+      - `getAllBackendIdentifiers()`
+      - `getAdditionalBackendIdentifiers()`
+      - `hasBackend(identifier)`
+   - File: `src/services/notification-service.ts`
+
+2. **Updated read/list methods to support optional backend selection**
+   - Added optional `backendIdentifier?: string` parameter and routed calls through `getBackend(backendIdentifier)` for:
+      - `getNotification`
+      - `getOneOffNotification`
+      - `getNotifications`
+      - `getOneOffNotifications`
+      - `getPendingNotifications`
+      - `getFutureNotifications`
+      - `getFutureNotificationsFromUser`
+      - `getAllFutureNotifications`
+      - `getAllFutureNotificationsFromUser`
+      - `getInAppUnread`
+      - `filterNotifications`
+      - `getBackendSupportedFilterCapabilities`
+   - Behavior preserved:
+      - no `backendIdentifier` => uses primary backend
+      - unknown identifier => throws clear `Backend not found: <identifier>` error
+   - File: `src/services/notification-service.ts`
+
+3. **Added Phase 5 test coverage (initial)**
+   - New test suite: `src/services/__tests__/multi-backend-reads.test.ts`
+      - default read behavior uses primary backend
+      - targeted reads route to specified backend
+      - invalid backend identifier errors
+      - backend-specific filter capabilities
+      - backend listing/helper methods behavior
+
+### Test Results (Executed)
+
+- Targeted run executed and passing.
+- Result: **25 passed, 0 failed**
+- Executed files:
+   - `src/services/__tests__/multi-backend-initialization.test.ts`
+   - `src/services/__tests__/multi-backend-writes.test.ts`
+   - `src/services/__tests__/multi-backend-error-handling.test.ts`
+   - `src/services/__tests__/multi-backend-reads.test.ts`
+
+### Phase 5 Acceptance Criteria Check (Current)
+
+- [x] Methods default to primary backend when parameter not provided
+- [x] Methods query specified backend when parameter provided
+- [x] Invalid backend identifier throws clear error
+- [x] Backend listing methods return correct identifiers
+- [ ] All read methods accept optional `backendIdentifier` parameter *(initial core set implemented in this slice; remaining Phase 5 surfaces to complete)*
+- [ ] Internal batch operations use primary backend
+- [ ] All existing tests pass (backward compatibility)
+- [ ] New multi-backend read tests pass *(initial suite passing)*
+- [ ] Data consistency tests pass
+
+### Notes
+
+- This increment starts Phase 5 and focuses on core backend-targeted reads plus backend identifier management APIs.
+- Existing Phase 4 pending work (attachment replication paths) remains unchanged and still pending.
 
 ## Phase 4 — Implement Multi-Backend Write Operations
 

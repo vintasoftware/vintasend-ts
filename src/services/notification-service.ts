@@ -303,6 +303,24 @@ export class VintaSend<
       .map(([, backend]) => backend);
   }
 
+  getPrimaryBackendIdentifier(): string {
+    return this.primaryBackendIdentifier;
+  }
+
+  getAllBackendIdentifiers(): string[] {
+    return Array.from(this.backends.keys());
+  }
+
+  getAdditionalBackendIdentifiers(): string[] {
+    return this.getAllBackendIdentifiers().filter(
+      (identifier) => identifier !== this.primaryBackendIdentifier,
+    );
+  }
+
+  hasBackend(identifier: string): boolean {
+    return this.backends.has(identifier);
+  }
+
   private async executeMultiBackendWrite<T>(
     operation: string,
     primaryWrite: (backend: Backend) => Promise<T>,
@@ -689,24 +707,28 @@ export class VintaSend<
     }
   }
 
-  async getAllFutureNotifications() {
-    return this.getBackend().getAllFutureNotifications();
+  async getAllFutureNotifications(backendIdentifier?: string) {
+    return this.getBackend(backendIdentifier).getAllFutureNotifications();
   }
 
-  async getAllFutureNotificationsFromUser(userId: Config['NotificationIdType']) {
-    return this.getBackend().getAllFutureNotificationsFromUser(userId);
+  async getAllFutureNotificationsFromUser(
+    userId: Config['NotificationIdType'],
+    backendIdentifier?: string,
+  ) {
+    return this.getBackend(backendIdentifier).getAllFutureNotificationsFromUser(userId);
   }
 
   async getFutureNotificationsFromUser(
     userId: Config['NotificationIdType'],
     page: number,
     pageSize: number,
+    backendIdentifier?: string,
   ) {
-    return this.getBackend().getFutureNotificationsFromUser(userId, page, pageSize);
+    return this.getBackend(backendIdentifier).getFutureNotificationsFromUser(userId, page, pageSize);
   }
 
-  async getFutureNotifications(page: number, pageSize: number) {
-    return this.getBackend().getFutureNotifications(page, pageSize);
+  async getFutureNotifications(page: number, pageSize: number, backendIdentifier?: string) {
+    return this.getBackend(backendIdentifier).getFutureNotifications(page, pageSize);
   }
 
   async getNotificationContext<ContextName extends string & keyof Config['ContextMap']>(
@@ -754,30 +776,39 @@ export class VintaSend<
     await Promise.all(pendingNotifications.map((notification) => this.send(notification)));
   }
 
-  async getPendingNotifications(page: number, pageSize: number) {
-    return this.getBackend().getPendingNotifications(page, pageSize);
+  async getPendingNotifications(page: number, pageSize: number, backendIdentifier?: string) {
+    return this.getBackend(backendIdentifier).getPendingNotifications(page, pageSize);
   }
 
-  async getNotifications(page: number, pageSize: number) {
-    return this.getBackend().getNotifications(page, pageSize);
+  async getNotifications(page: number, pageSize: number, backendIdentifier?: string) {
+    return this.getBackend(backendIdentifier).getNotifications(page, pageSize);
   }
 
-  async getOneOffNotifications(page: number, pageSize: number) {
-    return this.getBackend().getOneOffNotifications(page, pageSize);
+  async getOneOffNotifications(page: number, pageSize: number, backendIdentifier?: string) {
+    return this.getBackend(backendIdentifier).getOneOffNotifications(page, pageSize);
   }
 
-  async getNotification(notificationId: Config['NotificationIdType'], forUpdate = false) {
-    return this.getBackend().getNotification(notificationId, forUpdate);
+  async getNotification(
+    notificationId: Config['NotificationIdType'],
+    forUpdate = false,
+    backendIdentifier?: string,
+  ) {
+    return this.getBackend(backendIdentifier).getNotification(notificationId, forUpdate);
   }
 
-  async filterNotifications(filter: NotificationFilterFields<Config>, page: number, pageSize: number) {
-    return this.getBackend().filterNotifications(filter, page, pageSize);
+  async filterNotifications(
+    filter: NotificationFilterFields<Config>,
+    page: number,
+    pageSize: number,
+    backendIdentifier?: string,
+  ) {
+    return this.getBackend(backendIdentifier).filterNotifications(filter, page, pageSize);
   }
 
-  async getBackendSupportedFilterCapabilities() {
+  async getBackendSupportedFilterCapabilities(backendIdentifier?: string) {
     return {
       ...DEFAULT_BACKEND_FILTER_CAPABILITIES,
-      ...(this.getBackend().getFilterCapabilities?.() ?? {}),
+      ...(this.getBackend(backendIdentifier).getFilterCapabilities?.() ?? {}),
     };
   }
 
@@ -791,8 +822,9 @@ export class VintaSend<
   async getOneOffNotification(
     notificationId: Config['NotificationIdType'],
     forUpdate = false,
+    backendIdentifier?: string,
   ): Promise<DatabaseOneOffNotification<Config> | null> {
-    return this.getBackend().getOneOffNotification(notificationId, forUpdate);
+    return this.getBackend(backendIdentifier).getOneOffNotification(notificationId, forUpdate);
   }
 
   async markRead(
@@ -812,8 +844,8 @@ export class VintaSend<
     return notification;
   }
 
-  async getInAppUnread(userId: Config['NotificationIdType']) {
-    return this.getBackend().filterAllInAppUnreadNotifications(userId);
+  async getInAppUnread(userId: Config['NotificationIdType'], backendIdentifier?: string) {
+    return this.getBackend(backendIdentifier).filterAllInAppUnreadNotifications(userId);
   }
 
   async cancelNotification(notificationId: Config['NotificationIdType']): Promise<void> {
