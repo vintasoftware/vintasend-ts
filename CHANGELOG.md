@@ -1,6 +1,6 @@
 # Changelog
 
-## Version 0.8.0
+## Version 0.8.1
 
 * **Multi-backend support added to VintaSend**:
   * Added support for configuring one primary backend plus optional additional backends.
