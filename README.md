@@ -106,6 +106,59 @@ export function sendWelcomeEmail(userId: number) {
 } 
 ```
 
+## Multi-Backend Configuration
+
+VintaSend supports configuring multiple backends for redundancy, data distribution, and migration use cases.
+
+### Basic Setup
+
+```typescript
+import { VintaSendFactory } from 'vintasend';
+
+const vintasend = new VintaSendFactory<NotificationTypeConfig>().create({
+  adapters,
+  backend: primaryBackend,
+  additionalBackends: [replicaBackend],
+  logger,
+  contextGeneratorsMap,
+});
+```
+
+### How It Works
+
+- **Writes**: VintaSend writes to the primary backend first, then replicates to additional backends on a best-effort basis.
+- **Reads**: Read methods use the primary backend by default, but support optional backend targeting by identifier.
+
+```typescript
+// Read from primary backend (default)
+const notification = await vintasend.getNotification(notificationId);
+
+// Read from a specific backend
+const notificationFromReplica = await vintasend.getNotification(
+  notificationId,
+  false,
+  'replica-backend',
+);
+```
+
+### Backend Management Operations
+
+```typescript
+const report = await vintasend.verifyNotificationSync(notificationId);
+
+if (!report.synced) {
+  await vintasend.replicateNotification(notificationId);
+}
+
+const backendStats = await vintasend.getBackendSyncStats();
+```
+
+### Failure Handling
+
+- Primary backend failures fail the operation.
+- Additional backend replication failures are logged and do not fail the primary operation.
+- This keeps primary workflows available while still enabling redundancy.
+
 ## Attachment Support
 
 VintaSend supports file attachments for notifications with an extensible architecture that allows you to choose your preferred storage backend.

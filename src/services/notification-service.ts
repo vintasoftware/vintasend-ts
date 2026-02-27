@@ -215,6 +215,15 @@ export class VintaSend<
   private contextGeneratorsMap: NotificationContextGeneratorsMap<Config['ContextMap']>;
   private backends: Map<string, Backend>;
   private primaryBackendIdentifier: string;
+
+  /**
+   * Creates a VintaSend instance with one primary backend and optional additional backends.
+   *
+   * In multi-backend mode:
+   * - writes execute on the primary backend first
+   * - additional backends receive best-effort replication
+   * - reads default to primary unless a backend identifier is provided
+   */
   constructor(
     private adapters: AdaptersList,
     private backend: Backend,
@@ -776,10 +785,16 @@ export class VintaSend<
     await Promise.all(pendingNotifications.map((notification) => this.send(notification)));
   }
 
+  /**
+   * Gets pending notifications from the primary backend by default or from a specific backend.
+   */
   async getPendingNotifications(page: number, pageSize: number, backendIdentifier?: string) {
     return this.getBackend(backendIdentifier).getPendingNotifications(page, pageSize);
   }
 
+  /**
+   * Gets notifications from the primary backend by default or from a specific backend.
+   */
   async getNotifications(page: number, pageSize: number, backendIdentifier?: string) {
     return this.getBackend(backendIdentifier).getNotifications(page, pageSize);
   }
@@ -788,6 +803,9 @@ export class VintaSend<
     return this.getBackend(backendIdentifier).getOneOffNotifications(page, pageSize);
   }
 
+  /**
+   * Gets a notification by ID from the primary backend by default or from a specific backend.
+   */
   async getNotification(
     notificationId: Config['NotificationIdType'],
     forUpdate = false,
@@ -796,6 +814,9 @@ export class VintaSend<
     return this.getBackend(backendIdentifier).getNotification(notificationId, forUpdate);
   }
 
+  /**
+   * Filters notifications in the primary backend by default or in a specific backend.
+   */
   async filterNotifications(
     filter: NotificationFilterFields<Config>,
     page: number,
@@ -805,6 +826,9 @@ export class VintaSend<
     return this.getBackend(backendIdentifier).filterNotifications(filter, page, pageSize);
   }
 
+  /**
+   * Returns the effective filter capabilities for the primary backend by default or for a specific backend.
+   */
   async getBackendSupportedFilterCapabilities(backendIdentifier?: string) {
     return {
       ...DEFAULT_BACKEND_FILTER_CAPABILITIES,
@@ -817,6 +841,7 @@ export class VintaSend<
    *
    * @param notificationId - The ID of the one-off notification to retrieve
    * @param forUpdate - Whether the notification is being retrieved for update (default: false)
+    * @param backendIdentifier - Optional backend identifier. When omitted, the primary backend is used.
    * @returns The one-off notification or null if not found
    */
   async getOneOffNotification(
@@ -844,6 +869,9 @@ export class VintaSend<
     return notification;
   }
 
+  /**
+   * Gets unread in-app notifications from the primary backend by default or from a specific backend.
+   */
   async getInAppUnread(userId: Config['NotificationIdType'], backendIdentifier?: string) {
     return this.getBackend(backendIdentifier).filterAllInAppUnreadNotifications(userId);
   }
@@ -1088,6 +1116,12 @@ export class VintaSend<
     return String(value);
   }
 
+  /**
+   * Verifies whether a notification is synchronized across all configured backends.
+   *
+   * The report includes backend-level existence/errors and field-level discrepancies
+   * when comparing additional backends against the primary backend.
+   */
   async verifyNotificationSync(
     notificationId: Config['NotificationIdType'],
   ): Promise<{
@@ -1205,6 +1239,12 @@ export class VintaSend<
     return report;
   }
 
+  /**
+   * Replicates one notification from the primary backend to all additional backends.
+   *
+   * If a notification already exists in an additional backend, it is updated.
+   * Otherwise, it is created.
+   */
   async replicateNotification(
     notificationId: Config['NotificationIdType'],
   ): Promise<{
@@ -1262,6 +1302,9 @@ export class VintaSend<
     return result;
   }
 
+  /**
+   * Returns a lightweight health snapshot for each configured backend.
+   */
   async getBackendSyncStats(): Promise<{
     backends: Record<
       string,
@@ -1304,6 +1347,13 @@ export class VintaSend<
     return stats;
   }
 
+  /**
+   * Migrates notifications from a source backend (primary by default) to a destination backend.
+   *
+   * @param destinationBackend - Backend receiving migrated records
+   * @param batchSize - Page size used while iterating source records
+   * @param sourceBackendIdentifier - Optional source backend identifier. Defaults to primary backend.
+   */
   async migrateToBackend<DestinationBackend extends BaseNotificationBackend<Config>>(
     destinationBackend: DestinationBackend,
     batchSize = 5000,

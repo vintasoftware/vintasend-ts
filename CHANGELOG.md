@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 0.8.0
+
+* **Multi-backend support added to VintaSend**:
+  * Added support for configuring one primary backend plus optional additional backends.
+  * Implemented primary-first write replication with best-effort propagation to additional backends.
+  * Added backend-targeted read operations with optional `backendIdentifier` parameters.
+  * Added backend management operations: `verifyNotificationSync`, `replicateNotification`, and `getBackendSyncStats`.
+  * Enhanced `migrateToBackend` with optional source backend selection.
+* **Documentation and examples**:
+  * Added multi-backend configuration section to README.
+  * Added `MULTI_BACKEND_MIGRATION.md` migration guide.
+  * Added `src/examples/multi-backend-example.ts` with setup, read-routing, and management operation examples.
+
 ## Version 0.7.1
 
 * Add `renderEmailTemplateFromContent` method to the VintaSend service, so users can preview older notifications by providing the template content at the time.
