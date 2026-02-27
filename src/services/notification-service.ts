@@ -1064,12 +1064,254 @@ export class VintaSend<
     );
   }
 
+  private normalizeValueForSyncComparison(value: unknown): string {
+    if (value === null) {
+      return 'null';
+    }
+
+    if (value === undefined) {
+      return 'undefined';
+    }
+
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return '[unserializable-object]';
+      }
+    }
+
+    return String(value);
+  }
+
+  async verifyNotificationSync(
+    notificationId: Config['NotificationIdType'],
+  ): Promise<{
+    synced: boolean;
+    backends: Record<
+      string,
+      {
+        exists: boolean;
+        notification?: AnyDatabaseNotification<Config>;
+        error?: string;
+      }
+    >;
+    discrepancies: string[];
+  }> {
+    const report: {
+      synced: boolean;
+      backends: Record<
+        string,
+        {
+          exists: boolean;
+          notification?: AnyDatabaseNotification<Config>;
+          error?: string;
+        }
+      >;
+      discrepancies: string[];
+    } = {
+      synced: true,
+      backends: {},
+      discrepancies: [],
+    };
+
+    for (const [identifier, backend] of this.backends.entries()) {
+      try {
+        const notification = await backend.getNotification(notificationId, false);
+        report.backends[identifier] = {
+          exists: notification !== null,
+          notification: notification ?? undefined,
+        };
+      } catch (error) {
+        report.backends[identifier] = {
+          exists: false,
+          error: String(error),
+        };
+        report.discrepancies.push(`Backend ${identifier}: ${String(error)}`);
+        report.synced = false;
+      }
+    }
+
+    const primaryNotification = report.backends[this.primaryBackendIdentifier]?.notification;
+    if (!primaryNotification) {
+      report.synced = false;
+      report.discrepancies.push('Notification not found in primary backend');
+      return report;
+    }
+
+    for (const [identifier, backendReport] of Object.entries(report.backends)) {
+      if (identifier === this.primaryBackendIdentifier) {
+        continue;
+      }
+
+      if (!backendReport.exists) {
+        report.synced = false;
+        report.discrepancies.push(`Notification missing in backend: ${identifier}`);
+        continue;
+      }
+
+      if (backendReport.notification?.status !== primaryNotification.status) {
+        report.synced = false;
+        report.discrepancies.push(
+          `Status mismatch in ${identifier}: ${String(backendReport.notification?.status)} vs ${String(primaryNotification.status)}`,
+        );
+      }
+
+      const primaryNotificationRecord = primaryNotification as unknown as Record<string, unknown>;
+      const backendNotificationRecord = backendReport.notification as unknown as Record<
+        string,
+        unknown
+      >;
+
+      const fieldsToCompare = [
+        'notificationType',
+        'title',
+        'bodyTemplate',
+        'subjectTemplate',
+        'contextName',
+        'contextParameters',
+        'contextUsed',
+        'extraParams',
+        'adapterUsed',
+        'sendAfter',
+        'sentAt',
+        'readAt',
+        'createdAt',
+        'updatedAt',
+        'gitCommitSha',
+      ] as const;
+
+      for (const fieldName of fieldsToCompare) {
+        const primaryValue = this.normalizeValueForSyncComparison(
+          primaryNotificationRecord[fieldName],
+        );
+        const backendValue = this.normalizeValueForSyncComparison(
+          backendNotificationRecord[fieldName],
+        );
+
+        if (primaryValue !== backendValue) {
+          report.synced = false;
+          report.discrepancies.push(
+            `Field mismatch in ${identifier} for ${fieldName}: ${backendValue} vs ${primaryValue}`,
+          );
+        }
+      }
+    }
+
+    return report;
+  }
+
+  async replicateNotification(
+    notificationId: Config['NotificationIdType'],
+  ): Promise<{
+    successes: string[];
+    failures: {
+      backend: string;
+      error: string;
+    }[];
+  }> {
+    const primaryNotification = await this.backend.getNotification(notificationId, false);
+
+    if (!primaryNotification) {
+      throw new Error(`Notification ${String(notificationId)} not found in primary backend`);
+    }
+
+    const result: {
+      successes: string[];
+      failures: {
+        backend: string;
+        error: string;
+      }[];
+    } = {
+      successes: [],
+      failures: [],
+    };
+
+    for (const backend of this.getAdditionalBackends()) {
+      const backendIdentifier = this.getBackendIdentifier(backend);
+
+      try {
+        const existingNotification = await backend.getNotification(notificationId, false);
+
+        if (existingNotification) {
+          await backend.persistNotificationUpdate(
+            notificationId,
+            primaryNotification as unknown as Partial<Omit<Notification<Config>, 'id'>>,
+          );
+        } else {
+          await backend.persistNotification(
+            primaryNotification as unknown as Omit<Notification<Config>, 'id'> & {
+              id?: Config['NotificationIdType'];
+            },
+          );
+        }
+
+        result.successes.push(backendIdentifier);
+      } catch (error) {
+        result.failures.push({
+          backend: backendIdentifier,
+          error: String(error),
+        });
+      }
+    }
+
+    return result;
+  }
+
+  async getBackendSyncStats(): Promise<{
+    backends: Record<
+      string,
+      {
+        totalNotifications: number;
+        status: 'healthy' | 'error';
+        error?: string;
+      }
+    >;
+  }> {
+    const stats: {
+      backends: Record<
+        string,
+        {
+          totalNotifications: number;
+          status: 'healthy' | 'error';
+          error?: string;
+        }
+      >;
+    } = {
+      backends: {},
+    };
+
+    for (const [identifier, backend] of this.backends.entries()) {
+      try {
+        const notifications = await backend.getAllNotifications();
+        stats.backends[identifier] = {
+          totalNotifications: notifications.length,
+          status: 'healthy',
+        };
+      } catch (error) {
+        stats.backends[identifier] = {
+          totalNotifications: 0,
+          status: 'error',
+          error: String(error),
+        };
+      }
+    }
+
+    return stats;
+  }
+
   async migrateToBackend<DestinationBackend extends BaseNotificationBackend<Config>>(
     destinationBackend: DestinationBackend,
     batchSize = 5000,
+    sourceBackendIdentifier?: string,
   ): Promise<void> {
+    const sourceBackend = this.getBackend(sourceBackendIdentifier);
     let pageNumber = 0;
-    let allNotifications: AnyDatabaseNotification<Config>[] = await this.backend.getNotifications(
+    let allNotifications: AnyDatabaseNotification<Config>[] = await sourceBackend.getNotifications(
       pageNumber,
       batchSize,
     );
@@ -1084,7 +1326,7 @@ export class VintaSend<
 
       await destinationBackend.bulkPersistNotifications(notificationsWithoutId);
 
-      allNotifications = await this.backend.getNotifications(pageNumber, batchSize);
+      allNotifications = await sourceBackend.getNotifications(pageNumber, batchSize);
     }
   }
 }

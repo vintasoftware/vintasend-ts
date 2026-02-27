@@ -2,9 +2,120 @@
 
 ## Progress Summary
 
-- Last updated: 2026-02-26
-- Current phase: Phase 5 (Implement Multi-Backend Read Operations)
+- Last updated: 2026-02-27
+- Current phase: Phase 6 (Add Backend Management Operations)
 - Overall status: In progress
+
+## Phase 6 — Add Backend Management Operations
+
+### Status
+
+- ✅ Phase 6 implementation started
+- ✅ Added core backend management methods in `VintaSend`
+- ✅ Added source backend selection support for migration
+- ✅ Initial Phase 6 management tests added and passing
+- ✅ Broader sync discrepancy checks implemented
+- ✅ Additional Phase 6 edge-case coverage added
+- ⏳ Remaining: full repository validation and final Phase 6 acceptance closure
+
+### Completed Items (Current Slice — Increment 2)
+
+1. **Expanded sync verification discrepancy checks**
+   - Enhanced `verifyNotificationSync(notificationId)` to compare additional fields between primary and additional backends.
+   - Added field-level mismatch reporting for:
+      - `notificationType`, `title`, `bodyTemplate`, `subjectTemplate`
+      - `contextName`, `contextParameters`, `contextUsed`, `extraParams`
+      - `adapterUsed`, `sendAfter`, `sentAt`, `readAt`, `createdAt`, `updatedAt`, `gitCommitSha`
+   - Added normalization for comparisons to safely compare null/undefined, dates, and objects.
+   - File: `src/services/notification-service.ts`
+
+2. **Expanded management edge-case tests**
+   - Updated `src/services/__tests__/multi-backend-management.test.ts` with additional scenarios:
+      - field-level sync mismatch detection
+      - backend read error + primary-missing sync report behavior
+      - invalid source backend identifier in `migrateToBackend`
+
+### Test Results (Executed — Increment 2)
+
+- Targeted run executed and passing.
+- Result: **27 passed, 0 failed**
+- Executed files:
+   - `src/services/__tests__/multi-backend-management.test.ts`
+   - `src/services/__tests__/multi-backend-reads.test.ts`
+   - `src/services/__tests__/multi-backend-writes.test.ts`
+
+### Completed Items (Current Slice)
+
+1. **Added sync verification API**
+   - Added `verifyNotificationSync(notificationId)`.
+   - Behavior:
+      - queries all configured backends for the notification
+      - reports backend existence/result and per-backend errors
+      - marks sync status and reports discrepancies for:
+         - missing notification in primary backend
+         - missing notification in additional backends
+         - status mismatches versus primary
+   - File: `src/services/notification-service.ts`
+
+2. **Added manual replication API**
+   - Added `replicateNotification(notificationId)`.
+   - Behavior:
+      - reads from primary backend
+      - throws clear error if notification is missing in primary backend
+      - for each additional backend:
+         - creates notification when missing
+         - updates notification when already present
+      - returns structured replication outcome (`successes` and `failures`)
+   - File: `src/services/notification-service.ts`
+
+3. **Added backend sync stats API**
+   - Added `getBackendSyncStats()`.
+   - Behavior:
+      - gathers per-backend total notification counts
+      - marks backend status as `healthy` or `error`
+      - captures backend-specific errors when counting fails
+   - File: `src/services/notification-service.ts`
+
+4. **Enhanced migration source backend selection**
+   - Updated `migrateToBackend(destinationBackend, batchSize, sourceBackendIdentifier?)`.
+   - Behavior:
+      - defaults to primary backend when source identifier is not provided
+      - supports selecting a specific configured source backend by identifier
+   - File: `src/services/notification-service.ts`
+
+5. **Added Phase 6 management test coverage (initial)**
+   - New test suite: `src/services/__tests__/multi-backend-management.test.ts`
+      - sync verification (synced/missing/status mismatch)
+      - manual replication create/update and partial failure behavior
+      - primary-missing replication error handling
+      - backend sync stats healthy/error reporting
+      - migration source default (primary) and source override behavior
+
+### Test Results (Executed)
+
+- Targeted run executed and passing.
+- Result: **34 passed, 0 failed**
+- Executed files:
+   - `src/services/__tests__/multi-backend-management.test.ts`
+   - `src/services/__tests__/multi-backend-initialization.test.ts`
+   - `src/services/__tests__/multi-backend-writes.test.ts`
+   - `src/services/__tests__/multi-backend-error-handling.test.ts`
+   - `src/services/__tests__/multi-backend-reads.test.ts`
+
+### Phase 6 Acceptance Criteria Check (Current)
+
+- [x] Sync verification detects missing notifications *(initial implementation + tests)*
+- [x] Sync verification detects data discrepancies *(status + broader field mismatches implemented + tested)*
+- [x] Manual replication creates or updates as needed
+- [x] Manual replication handles partial failures gracefully
+- [x] Sync stats provide health overview
+- [x] Migration supports source backend selection
+- [ ] All tests pass *(targeted Phase 3–6 suites pass; full repository run pending)*
+
+### Notes
+
+- Increment 1 started Phase 6 and delivered the core management APIs plus baseline coverage.
+- Increment 2 expands `verifyNotificationSync` to broad field-level parity checks and adds edge-case test coverage.
 
 ## Phase 5 — Implement Multi-Backend Read Operations
 
