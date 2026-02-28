@@ -587,7 +587,7 @@ VintaSend has many backend, adapter, and template renderer implementations. If y
 
 ##### Backends
 
-* **[vintasend-prisma](https://github.com/vintasoftware/vintasend-prisma/)**: Uses Prisma Client to manage the notifications in the database.
+* **[vintasend-prisma](https://github.com/vintasoftware/vintasend-ts-prisma/)**: Uses Prisma Client to manage the notifications in the database.
 * **[vintasend-medplum](https://github.com/vintasoftware/vintasend-medplum/)**: Uses Medplum FHIR resources (Communication, Binary, Media) to manage notifications in healthcare applications.
 
 ##### Adapters
