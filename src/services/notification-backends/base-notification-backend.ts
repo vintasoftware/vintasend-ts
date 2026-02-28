@@ -29,6 +29,20 @@ export type StringFilterLookup = {
 
 export type StringFieldFilter = string | StringFilterLookup;
 
+export type NotificationOrderByField =
+  | 'sendAfter'
+  | 'sentAt'
+  | 'readAt'
+  | 'createdAt'
+  | 'updatedAt';
+
+export type NotificationOrderDirection = 'asc' | 'desc';
+
+export type NotificationOrderBy = {
+  field: NotificationOrderByField;
+  direction: NotificationOrderDirection;
+};
+
 /**
  * Flat dotted key capability map describing which filter features a backend supports.
  * Use flat dotted keys for logical operators, fields, and negations:
@@ -97,6 +111,11 @@ export const DEFAULT_BACKEND_FILTER_CAPABILITIES = {
   'stringLookups.endsWith': true,
   'stringLookups.includes': true,
   'stringLookups.caseInsensitive': true,
+  'orderBy.sendAfter': true,
+  'orderBy.sentAt': true,
+  'orderBy.readAt': true,
+  'orderBy.createdAt': true,
+  'orderBy.updatedAt': true,
 };
 
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
@@ -207,6 +226,7 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     filter: NotificationFilter<Config>,
     page: number,
     pageSize: number,
+    orderBy?: NotificationOrderBy,
   ): Promise<AnyDatabaseNotification<Config>[]>;
 
   /**

@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 0.8.2
+
+* **`orderBy` support added to `filterNotifications`**:
+  * Added optional `orderBy` contract to service/backend filtering flow with date-based fields: `sendAfter`, `sentAt`, `readAt`, `createdAt`, `updatedAt`.
+  * Added explicit ordering direction support: `asc` and `desc`.
+  * Added/extended backend filter capability keys for ordering: `orderBy.sendAfter`, `orderBy.sentAt`, `orderBy.readAt`, `orderBy.createdAt`, `orderBy.updatedAt`.
+  * Updated service-level capability merge behavior coverage for multi-backend reads (`defaults + backend overrides`).
+* **Backend behavior**:
+  * Prisma backend supports all `orderBy.*` fields.
+  * Medplum backend supports ordering by `sendAfter`, `sentAt`, `createdAt`, `updatedAt`; `orderBy.readAt` is unsupported and reported as `false`.
+* **Documentation updates**:
+  * Added README section describing `filterNotifications(..., orderBy)`, `NotificationOrderBy` shape, and capability discovery with `getBackendSupportedFilterCapabilities()`.
+
 ## Version 0.8.1
 
 * **Multi-backend support added to VintaSend**:

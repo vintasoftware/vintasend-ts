@@ -159,6 +159,57 @@ const backendStats = await vintasend.getBackendSyncStats();
 - Additional backend replication failures are logged and do not fail the primary operation.
 - This keeps primary workflows available while still enabling redundancy.
 
+## Filtering and Ordering Notifications
+
+Use `filterNotifications` to query notifications with pagination and optional ordering.
+
+```typescript
+const notifications = await vintasend.filterNotifications(
+  {
+    status: 'PENDING_SEND',
+  },
+  1,
+  25,
+  {
+    field: 'createdAt',
+    direction: 'desc',
+  },
+);
+```
+
+### `orderBy` shape
+
+```typescript
+type NotificationOrderBy = {
+  field: 'sendAfter' | 'sentAt' | 'readAt' | 'createdAt' | 'updatedAt';
+  direction: 'asc' | 'desc';
+};
+```
+
+Examples:
+- `{ field: 'createdAt', direction: 'desc' }`
+- `{ field: 'sendAfter', direction: 'asc' }`
+
+### Checking backend support
+
+Use `getBackendSupportedFilterCapabilities()` to detect support gaps per backend.
+
+```typescript
+const capabilities = await vintasend.getBackendSupportedFilterCapabilities();
+
+if (!capabilities['orderBy.readAt']) {
+  // Fallback to another ordering field
+}
+```
+
+When using multiple backends, you can check capabilities for a specific backend identifier:
+
+```typescript
+const replicaCapabilities = await vintasend.getBackendSupportedFilterCapabilities('replica-backend');
+```
+
+`vintasend-medplum` currently does not support `orderBy.readAt`, and reports `orderBy.readAt: false`.
+
 ## Attachment Support
 
 VintaSend supports file attachments for notifications with an extensible architecture that allows you to choose your preferred storage backend.

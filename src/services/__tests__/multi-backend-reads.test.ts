@@ -4,6 +4,7 @@ import type { BaseNotificationAdapter } from '../notification-adapters/base-noti
 import type {
   BaseNotificationBackend,
   NotificationFilterFields,
+  NotificationOrderBy,
 } from '../notification-backends/base-notification-backend';
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
 
@@ -250,11 +251,48 @@ describe('VintaSend multi-backend reads (Phase 5)', () => {
       contextGeneratorsMap: contextGenerators,
     });
 
-    await service.filterNotifications(filter, 1, 25, 'replica');
+    await service.filterNotifications(filter, 1, 25, undefined, 'replica');
     await service.getInAppUnread('user-1', 'replica');
 
-    expect(replicaBackend.filterNotifications).toHaveBeenCalledWith(filter, 1, 25);
+    expect(replicaBackend.filterNotifications).toHaveBeenCalledWith(filter, 1, 25, undefined);
     expect(replicaBackend.filterAllInAppUnreadNotifications).toHaveBeenCalledWith('user-1');
+  });
+
+  it('forwards orderBy to the selected backend unchanged', async () => {
+    const primaryBackend = createMockBackend('primary');
+    const replicaBackend = createMockBackend('replica');
+
+    const filter: NotificationFilterFields<Config> = { status: 'PENDING_SEND' };
+    const ascOrderBy: NotificationOrderBy = { field: 'createdAt', direction: 'asc' };
+    const descOrderBy: NotificationOrderBy = { field: 'createdAt', direction: 'desc' };
+
+    replicaBackend.filterNotifications.mockResolvedValue([]);
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend: primaryBackend,
+      additionalBackends: [replicaBackend],
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    await service.filterNotifications(filter, 1, 25, ascOrderBy, 'replica');
+    await service.filterNotifications(filter, 1, 25, descOrderBy, 'replica');
+
+    expect(replicaBackend.filterNotifications).toHaveBeenNthCalledWith(
+      1,
+      filter,
+      1,
+      25,
+      ascOrderBy,
+    );
+    expect(replicaBackend.filterNotifications).toHaveBeenNthCalledWith(
+      2,
+      filter,
+      1,
+      25,
+      descOrderBy,
+    );
   });
 
   it('gets filter capabilities from the specified backend', async () => {
@@ -267,6 +305,8 @@ describe('VintaSend multi-backend reads (Phase 5)', () => {
     replicaBackend.getFilterCapabilities.mockReturnValue({
       'fields.adapterUsed': false,
       'logical.or': false,
+      'orderBy.readAt': false,
+      'orderBy.updatedAt': false,
     });
 
     const service = new VintaSendFactory<Config>().create({
@@ -281,6 +321,11 @@ describe('VintaSend multi-backend reads (Phase 5)', () => {
 
     expect(capabilities['fields.adapterUsed']).toBe(false);
     expect(capabilities['logical.or']).toBe(false);
+    expect(capabilities['orderBy.sendAfter']).toBe(true);
+    expect(capabilities['orderBy.sentAt']).toBe(true);
+    expect(capabilities['orderBy.readAt']).toBe(false);
+    expect(capabilities['orderBy.createdAt']).toBe(true);
+    expect(capabilities['orderBy.updatedAt']).toBe(false);
   });
 
   it('exposes backend identifier management helpers', () => {
