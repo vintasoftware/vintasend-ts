@@ -5,6 +5,7 @@ import type { BaseLogger } from '../loggers/base-logger';
 import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseNotificationQueueService } from '../notification-queue-service/base-notification-queue-service';
+import type { BaseNotificationReplicationQueueService } from '../notification-queue-service/base-notification-replication-queue-service';
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
 
 // Mock implementations
@@ -78,6 +79,11 @@ const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any>> = {
 // biome-ignore lint/suspicious/noExplicitAny: any just for testing
 const mockQueueService: jest.Mocked<BaseNotificationQueueService<any>> = {
   enqueueNotification: jest.fn(),
+};
+
+// biome-ignore lint/suspicious/noExplicitAny: any just for testing
+const mockReplicationQueueService: jest.Mocked<BaseNotificationReplicationQueueService<any>> = {
+  enqueueReplication: jest.fn(),
 };
 
 const mockGitCommitShaProvider: jest.Mocked<BaseGitCommitShaProvider> = {
@@ -656,6 +662,59 @@ describe('NotificationService', () => {
       service.registerQueueService(mockQueueService);
       // biome-ignore lint/complexity/useLiteralKeys: access to private property for testing
       expect(service['queueService']).toBe(mockQueueService);
+    });
+
+    it('should register replication queue service', () => {
+      service.registerReplicationQueueService(mockReplicationQueueService);
+      // biome-ignore lint/complexity/useLiteralKeys: access to private property for testing
+      expect(service['replicationQueueService']).toBe(mockReplicationQueueService);
+    });
+
+    it('should create service with replication queue service via object params', () => {
+      const serviceWithReplicationQueue = new VintaSendFactory<Config>().create({
+        adapters: [mockAdapter],
+        backend: mockBackend,
+        logger: mockLogger,
+        contextGeneratorsMap: notificationContextgenerators,
+        replicationQueueService: mockReplicationQueueService,
+      });
+
+      // biome-ignore lint/complexity/useLiteralKeys: access to private property for testing
+      expect(serviceWithReplicationQueue['replicationQueueService']).toBe(
+        mockReplicationQueueService,
+      );
+    });
+
+    it('should create service without replication queue service by default', () => {
+      const serviceWithoutReplicationQueue = new VintaSendFactory<Config>().create({
+        adapters: [mockAdapter],
+        backend: mockBackend,
+        logger: mockLogger,
+        contextGeneratorsMap: notificationContextgenerators,
+      });
+
+      // biome-ignore lint/complexity/useLiteralKeys: access to private property for testing
+      expect(serviceWithoutReplicationQueue['replicationQueueService']).toBeUndefined();
+    });
+
+    it('should support deprecated positional overload with replication queue service', () => {
+      const serviceWithPositionalReplicationQueue = new VintaSendFactory<Config>().create(
+        [mockAdapter],
+        mockBackend,
+        mockLogger,
+        notificationContextgenerators,
+        undefined,
+        undefined,
+        { raiseErrorOnFailedSend: false },
+        undefined,
+        undefined,
+        mockReplicationQueueService,
+      );
+
+      // biome-ignore lint/complexity/useLiteralKeys: access to private property for testing
+      expect(serviceWithPositionalReplicationQueue['replicationQueueService']).toBe(
+        mockReplicationQueueService,
+      );
     });
   });
 

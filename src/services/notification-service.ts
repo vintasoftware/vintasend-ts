@@ -23,6 +23,7 @@ import {
 } from './notification-backends/base-notification-backend';
 import { NotificationContextGeneratorsMap } from './notification-context-generators-map';
 import type { BaseNotificationQueueService } from './notification-queue-service/base-notification-queue-service';
+import type { BaseNotificationReplicationQueueService } from './notification-queue-service/base-notification-replication-queue-service';
 import type {
   EmailTemplate,
   EmailTemplateContent,
@@ -31,6 +32,7 @@ import type { BaseNotificationTemplateRenderer } from './notification-template-r
 
 type VintaSendOptions = {
   raiseErrorOnFailedSend: boolean;
+  replicationMode?: 'inline' | 'queued';
 };
 
 type RenderEmailTemplateContextInput<Config extends BaseNotificationTypeConfig> =
@@ -59,6 +61,7 @@ type VintaSendFactoryCreateParams<
   logger: Logger;
   contextGeneratorsMap: BaseNotificationTypeConfig['ContextMap'];
   queueService?: QueueService;
+  replicationQueueService?: BaseNotificationReplicationQueueService<Config>;
   attachmentManager?: AttachmentMgr;
   options?: VintaSendOptions;
   gitCommitShaProvider?: BaseGitCommitShaProvider;
@@ -133,6 +136,7 @@ export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
     options?: VintaSendOptions,
     gitCommitShaProvider?: BaseGitCommitShaProvider,
     additionalBackends?: Backend[],
+    replicationQueueService?: BaseNotificationReplicationQueueService<Config>,
   ): VintaSend<Config, AdaptersList, Backend, Logger, QueueService, AttachmentMgr>;
 
   create<
@@ -165,6 +169,7 @@ export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
     },
     gitCommitShaProvider?: BaseGitCommitShaProvider,
     additionalBackends?: Backend[],
+    replicationQueueService?: BaseNotificationReplicationQueueService<Config>,
   ): VintaSend<Config, AdaptersList, Backend, Logger, QueueService, AttachmentMgr> {
     if (!Array.isArray(adaptersOrParams)) {
       return new VintaSend<Config, AdaptersList, Backend, Logger, QueueService, AttachmentMgr>(
@@ -179,6 +184,7 @@ export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
         },
         adaptersOrParams.gitCommitShaProvider,
         adaptersOrParams.additionalBackends,
+        adaptersOrParams.replicationQueueService,
       );
     }
 
@@ -192,6 +198,7 @@ export class VintaSendFactory<Config extends BaseNotificationTypeConfig> {
       options,
       gitCommitShaProvider,
       additionalBackends,
+      replicationQueueService,
     );
   }
 }
@@ -241,6 +248,7 @@ export class VintaSend<
     },
     private gitCommitShaProvider?: BaseGitCommitShaProvider,
     additionalBackends: Backend[] = [],
+    private replicationQueueService?: BaseNotificationReplicationQueueService<Config>,
   ) {
     this.contextGeneratorsMap = new NotificationContextGeneratorsMap(contextGeneratorsMap);
     this.backends = new Map();
@@ -339,6 +347,9 @@ export class VintaSend<
     operation: string,
     primaryWrite: (backend: Backend) => Promise<T>,
     additionalWrite?: (backend: Backend, primaryResult: T) => Promise<void>,
+    replicationNotificationId?:
+      | Config['NotificationIdType']
+      | ((primaryResult: T) => Config['NotificationIdType'] | undefined),
   ): Promise<T> {
     const primaryResult = await primaryWrite(this.backend);
 
@@ -346,24 +357,131 @@ export class VintaSend<
       return primaryResult;
     }
 
-    for (const additionalBackend of this.getAdditionalBackends()) {
-      const backendIdentifier = this.getBackendIdentifier(additionalBackend);
+    const additionalBackends = this.getAdditionalBackends();
+    if (additionalBackends.length === 0) {
+      return primaryResult;
+    }
 
-      try {
-        await additionalWrite(additionalBackend, primaryResult);
-        this.logger.info(`${operation} replicated to backend ${backendIdentifier}`);
-      } catch (replicationError) {
+    const resolveReplicationNotificationId = (): Config['NotificationIdType'] | undefined => {
+      if (typeof replicationNotificationId === 'function') {
+        return replicationNotificationId(primaryResult);
+      }
+
+      if (replicationNotificationId !== undefined) {
+        return replicationNotificationId;
+      }
+
+      const idFromPrimaryResult = (primaryResult as { id?: Config['NotificationIdType'] }).id;
+      return idFromPrimaryResult;
+    };
+
+    const executeInlineReplication = async (): Promise<void> => {
+      for (const additionalBackend of additionalBackends) {
+        const backendIdentifier = this.getBackendIdentifier(additionalBackend);
+
+        try {
+          await additionalWrite(additionalBackend, primaryResult);
+          this.logger.info(`${operation} replicated to backend ${backendIdentifier} in inline mode`);
+        } catch (replicationError) {
+          this.logger.error(
+            `Failed to replicate ${operation} to backend ${backendIdentifier}: ${replicationError}`,
+          );
+        }
+      }
+    };
+
+    if (this.options.replicationMode === 'queued') {
+      const notificationIdToReplicate = resolveReplicationNotificationId();
+
+      if (!notificationIdToReplicate) {
+        this.logger.warn(
+          `Replication mode is queued, but no notification id was resolved for ${operation}. Falling back to inline replication.`,
+        );
+        await executeInlineReplication();
+        return primaryResult;
+      }
+
+      if (!this.replicationQueueService) {
+        this.logger.warn(
+          `Replication mode is queued, but no replication queue service is registered for ${operation}. Falling back to inline replication.`,
+        );
+        await executeInlineReplication();
+        return primaryResult;
+      }
+
+      const enqueueResults = await Promise.all(
+        additionalBackends.map(async (additionalBackend) => {
+          const backendIdentifier = this.getBackendIdentifier(additionalBackend);
+
+          try {
+            await this.replicationQueueService?.enqueueReplication(
+              notificationIdToReplicate,
+              backendIdentifier,
+            );
+
+            return {
+              backendIdentifier,
+              backend: additionalBackend,
+              error: null,
+            };
+          } catch (enqueueReplicationError) {
+            return {
+              backendIdentifier,
+              backend: additionalBackend,
+              error: String(enqueueReplicationError),
+            };
+          }
+        }),
+      );
+
+      const failedEnqueues = enqueueResults.filter((enqueueResult) => enqueueResult.error);
+
+      if (failedEnqueues.length === 0) {
+        this.logger.info(
+          `${operation} replication enqueued for notification ${String(notificationIdToReplicate)} to ${additionalBackends.length} backend(s) in queued mode`,
+        );
+        return primaryResult;
+      }
+
+      for (const failedEnqueue of failedEnqueues) {
         this.logger.error(
-          `Failed to replicate ${operation} to backend ${backendIdentifier}: ${replicationError}`,
+          `Failed to enqueue replication for ${operation}, notification ${String(notificationIdToReplicate)} and backend ${failedEnqueue.backendIdentifier}: ${failedEnqueue.error}`,
         );
       }
+
+      this.logger.warn(
+        `Falling back to inline replication for ${operation} in ${failedEnqueues.length} backend(s) after queue enqueue failure.`,
+      );
+
+      for (const failedEnqueue of failedEnqueues) {
+        try {
+          await additionalWrite(failedEnqueue.backend, primaryResult);
+          this.logger.info(
+            `${operation} replicated to backend ${failedEnqueue.backendIdentifier} in inline fallback mode`,
+          );
+        } catch (replicationError) {
+          this.logger.error(
+            `Failed to replicate ${operation} to backend ${failedEnqueue.backendIdentifier} in inline fallback mode: ${replicationError}`,
+          );
+        }
+      }
+
+      return primaryResult;
     }
+
+    await executeInlineReplication();
 
     return primaryResult;
   }
 
   registerQueueService(queueService: QueueService): void {
     this.queueService = queueService;
+  }
+
+  registerReplicationQueueService(
+    replicationQueueService: BaseNotificationReplicationQueueService<Config>,
+  ): void {
+    this.replicationQueueService = replicationQueueService;
   }
 
   private normalizeGitCommitSha(gitCommitSha: string): string {
@@ -411,6 +529,7 @@ export class VintaSend<
         async (backend) => {
           await backend.persistOneOffNotificationUpdate(notification.id, oneOffNotificationUpdate);
         },
+        notification.id,
       );
     }
 
@@ -426,6 +545,7 @@ export class VintaSend<
       async (backend) => {
         await backend.persistNotificationUpdate(notification.id, notificationUpdate);
       },
+      notification.id,
     );
   }
 
@@ -527,6 +647,7 @@ export class VintaSend<
             async (backend) => {
               await backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
             },
+            notificationWithExecutionGitCommitSha.id,
           );
         } catch (markFailedError) {
           this.logger.error(
@@ -545,6 +666,7 @@ export class VintaSend<
           async (backend) => {
             await backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
           },
+          notificationWithExecutionGitCommitSha.id,
         );
       } catch (markSentError) {
         this.logger.error(
@@ -569,6 +691,7 @@ export class VintaSend<
               context ?? {},
             );
           },
+          notificationWithExecutionGitCommitSha.id,
         );
       } catch (storeContextError) {
         this.logger.error(
@@ -621,6 +744,7 @@ export class VintaSend<
       async (backend) => {
         await backend.persistNotificationUpdate(notificationId, notification);
       },
+      notificationId,
     );
     this.logger.info(`Notification ${notificationId} updated`);
     return updatedNotification;
@@ -689,6 +813,7 @@ export class VintaSend<
       async (backend) => {
         await backend.persistOneOffNotificationUpdate(notificationId, notification);
       },
+      notificationId,
     );
     this.logger.info(`One-off notification ${notificationId} updated`);
 
@@ -870,6 +995,7 @@ export class VintaSend<
       async (backend) => {
         await backend.markAsRead(notificationId, checkIsSent);
       },
+      notificationId,
     );
     this.logger.info(`Notification ${notificationId} marked as read`);
     return notification;
@@ -891,6 +1017,7 @@ export class VintaSend<
       async (backend) => {
         await backend.cancelNotification(notificationId);
       },
+      notificationId,
     );
     this.logger.info(`Notification ${notificationId} cancelled`);
   }
@@ -1025,6 +1152,7 @@ export class VintaSend<
               async (backend) => {
                 await backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
               },
+              notificationWithExecutionGitCommitSha.id,
             );
         } catch (markFailedError) {
           this.logger.error(
@@ -1042,6 +1170,7 @@ export class VintaSend<
           async (backend) => {
             await backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
           },
+          notificationWithExecutionGitCommitSha.id,
         );
       } catch (markSentError) {
         this.logger.error(
@@ -1067,6 +1196,7 @@ export class VintaSend<
             context,
           );
         },
+        notificationWithExecutionGitCommitSha.id,
       );
     } catch (storeContextError) {
       this.logger.error(
@@ -1120,6 +1250,17 @@ export class VintaSend<
     }
 
     return String(value);
+  }
+
+  private isLikelyDuplicateReplicationConflict(error: unknown): boolean {
+    const normalizedError = String(error).toLowerCase();
+
+    return (
+      normalizedError.includes('duplicate') ||
+      normalizedError.includes('unique') ||
+      normalizedError.includes('already exists') ||
+      normalizedError.includes('conflict')
+    );
   }
 
   /**
@@ -1246,13 +1387,13 @@ export class VintaSend<
   }
 
   /**
-   * Replicates one notification from the primary backend to all additional backends.
+   * Worker-facing replication entrypoint.
    *
-   * If a notification already exists in an additional backend, it is updated.
-   * Otherwise, it is created.
+   * Reads the notification from the primary backend and upserts into additional backends.
    */
-  async replicateNotification(
+  async processReplication(
     notificationId: Config['NotificationIdType'],
+    targetBackendIdentifier?: string,
   ): Promise<{
     successes: string[];
     failures: {
@@ -1277,35 +1418,120 @@ export class VintaSend<
       failures: [],
     };
 
-    for (const backend of this.getAdditionalBackends()) {
-      const backendIdentifier = this.getBackendIdentifier(backend);
-
-      try {
-        const existingNotification = await backend.getNotification(notificationId, false);
-
-        if (existingNotification) {
-          await backend.persistNotificationUpdate(
-            notificationId,
-            primaryNotification as unknown as Partial<Omit<Notification<Config>, 'id'>>,
-          );
-        } else {
-          await backend.persistNotification(
-            primaryNotification as unknown as Omit<Notification<Config>, 'id'> & {
-              id?: Config['NotificationIdType'];
-            },
-          );
+    const replicationTargets = this.getAdditionalBackends()
+      .map((backend) => {
+        return {
+          backend,
+          backendIdentifier: this.getBackendIdentifier(backend),
+        };
+      })
+      .filter(({ backendIdentifier }) => {
+        if (!targetBackendIdentifier) {
+          return true;
         }
 
-        result.successes.push(backendIdentifier);
-      } catch (error) {
+        return backendIdentifier === targetBackendIdentifier;
+      });
+
+    if (targetBackendIdentifier && replicationTargets.length === 0) {
+      throw new Error(`Additional backend not found: ${targetBackendIdentifier}`);
+    }
+
+    const replicationTaskResults = await Promise.all(
+      replicationTargets.map(async ({ backend, backendIdentifier }) => {
+
+        try {
+          if (typeof backend.applyReplicationSnapshotIfNewer === 'function') {
+            const conditionalApplyResult = await backend.applyReplicationSnapshotIfNewer(
+              primaryNotification,
+            );
+
+            if (!conditionalApplyResult.applied) {
+              this.logger.info(
+                `Skipped replication for notification ${String(notificationId)} on backend ${backendIdentifier} because destination state is newer or equal`,
+              );
+            }
+
+            return {
+              backendIdentifier,
+              error: null,
+            };
+          }
+
+          const existingNotification = await backend.getNotification(notificationId, false);
+
+          if (existingNotification) {
+            await backend.persistNotificationUpdate(
+              notificationId,
+              primaryNotification as unknown as Partial<Omit<Notification<Config>, 'id'>>,
+            );
+          } else {
+            try {
+              await backend.persistNotification(
+                primaryNotification as unknown as Omit<Notification<Config>, 'id'> & {
+                  id?: Config['NotificationIdType'];
+                },
+              );
+            } catch (createError) {
+              if (!this.isLikelyDuplicateReplicationConflict(createError)) {
+                throw createError;
+              }
+
+              this.logger.warn(
+                `Detected duplicate replication create on backend ${backendIdentifier} for notification ${String(notificationId)}. Retrying as update for idempotency.`,
+              );
+
+              await backend.persistNotificationUpdate(
+                notificationId,
+                primaryNotification as unknown as Partial<Omit<Notification<Config>, 'id'>>,
+              );
+            }
+          }
+
+          return {
+            backendIdentifier,
+            error: null,
+          };
+        } catch (error) {
+          return {
+            backendIdentifier,
+            error: String(error),
+          };
+        }
+      }),
+    );
+
+    for (const taskResult of replicationTaskResults) {
+      if (taskResult.error) {
         result.failures.push({
-          backend: backendIdentifier,
-          error: String(error),
+          backend: taskResult.backendIdentifier,
+          error: taskResult.error,
         });
+        continue;
       }
+
+      result.successes.push(taskResult.backendIdentifier);
     }
 
     return result;
+  }
+
+  /**
+   * Replicates one notification from the primary backend to all additional backends.
+   *
+   * If a notification already exists in an additional backend, it is updated.
+   * Otherwise, it is created.
+   */
+  async replicateNotification(
+    notificationId: Config['NotificationIdType'],
+  ): Promise<{
+    successes: string[];
+    failures: {
+      backend: string;
+      error: string;
+    }[];
+  }> {
+    return this.processReplication(notificationId);
   }
 
   /**

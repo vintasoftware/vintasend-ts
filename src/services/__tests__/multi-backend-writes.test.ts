@@ -7,6 +7,7 @@ import type {
 import type { BaseLogger } from '../loggers/base-logger';
 import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
+import type { BaseNotificationReplicationQueueService } from '../notification-queue-service/base-notification-replication-queue-service';
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
 
 type ContextGenerators = {
@@ -57,6 +58,10 @@ const contextGenerators: ContextGenerators = {
   testContext: {
     generate: jest.fn(),
   },
+};
+
+const replicationQueueService: jest.Mocked<BaseNotificationReplicationQueueService<Config>> = {
+  enqueueReplication: jest.fn(),
 };
 
 function createMockBackend(identifier: string): MockBackend {
@@ -174,6 +179,138 @@ describe('VintaSend multi-backend writes (Phase 4)', () => {
       ...baseNotificationInput,
       id: 'notif-1',
     });
+  });
+
+  it('preserves inline replication behavior when replicationMode is inline', async () => {
+    const primaryBackend = createMockBackend('primary');
+    const replicaBackend = createMockBackend('replica');
+
+    primaryBackend.persistNotification.mockResolvedValue({
+      ...baseNotificationInput,
+      id: 'notif-inline-1',
+      status: 'PENDING_SEND',
+      contextUsed: null,
+      adapterUsed: null,
+      sentAt: null,
+      readAt: null,
+      gitCommitSha: null,
+    } as DatabaseNotification<Config>);
+    replicaBackend.persistNotification.mockResolvedValue({
+      ...baseNotificationInput,
+      id: 'notif-inline-1',
+      status: 'PENDING_SEND',
+      contextUsed: null,
+      adapterUsed: null,
+      sentAt: null,
+      readAt: null,
+      gitCommitSha: null,
+    } as DatabaseNotification<Config>);
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend: primaryBackend,
+      additionalBackends: [replicaBackend],
+      logger,
+      contextGeneratorsMap: contextGenerators,
+      replicationQueueService,
+      options: { raiseErrorOnFailedSend: false, replicationMode: 'inline' },
+    });
+
+    await service.createNotification(baseNotificationInput);
+
+    expect(replicaBackend.persistNotification).toHaveBeenCalledWith({
+      ...baseNotificationInput,
+      id: 'notif-inline-1',
+    });
+    expect(replicationQueueService.enqueueReplication).not.toHaveBeenCalled();
+  });
+
+  it('enqueues replication and skips immediate additional writes when replicationMode is queued', async () => {
+    const primaryBackend = createMockBackend('primary');
+    const replicaA = createMockBackend('replica-a');
+    const replicaB = createMockBackend('replica-b');
+
+    primaryBackend.persistNotification.mockResolvedValue({
+      ...baseNotificationInput,
+      id: 'notif-queued-1',
+      status: 'PENDING_SEND',
+      contextUsed: null,
+      adapterUsed: null,
+      sentAt: null,
+      readAt: null,
+      gitCommitSha: null,
+    } as DatabaseNotification<Config>);
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend: primaryBackend,
+      additionalBackends: [replicaA, replicaB],
+      logger,
+      contextGeneratorsMap: contextGenerators,
+      replicationQueueService,
+      options: { raiseErrorOnFailedSend: false, replicationMode: 'queued' },
+    });
+
+    await service.createNotification(baseNotificationInput);
+
+    expect(replicationQueueService.enqueueReplication).toHaveBeenCalledTimes(2);
+    expect(replicationQueueService.enqueueReplication).toHaveBeenNthCalledWith(
+      1,
+      'notif-queued-1',
+      'replica-a',
+    );
+    expect(replicationQueueService.enqueueReplication).toHaveBeenNthCalledWith(
+      2,
+      'notif-queued-1',
+      'replica-b',
+    );
+    expect(replicaA.persistNotification).not.toHaveBeenCalled();
+    expect(replicaB.persistNotification).not.toHaveBeenCalled();
+  });
+
+  it('falls back to inline replication when replicationMode is queued but no replication queue service is provided', async () => {
+    const primaryBackend = createMockBackend('primary');
+    const replicaBackend = createMockBackend('replica');
+
+    primaryBackend.persistNotification.mockResolvedValue({
+      ...baseNotificationInput,
+      id: 'notif-fallback-1',
+      status: 'PENDING_SEND',
+      contextUsed: null,
+      adapterUsed: null,
+      sentAt: null,
+      readAt: null,
+      gitCommitSha: null,
+    } as DatabaseNotification<Config>);
+    replicaBackend.persistNotification.mockResolvedValue({
+      ...baseNotificationInput,
+      id: 'notif-fallback-1',
+      status: 'PENDING_SEND',
+      contextUsed: null,
+      adapterUsed: null,
+      sentAt: null,
+      readAt: null,
+      gitCommitSha: null,
+    } as DatabaseNotification<Config>);
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend: primaryBackend,
+      additionalBackends: [replicaBackend],
+      logger,
+      contextGeneratorsMap: contextGenerators,
+      options: { raiseErrorOnFailedSend: false, replicationMode: 'queued' },
+    });
+
+    await service.createNotification(baseNotificationInput);
+
+    expect(replicaBackend.persistNotification).toHaveBeenCalledWith({
+      ...baseNotificationInput,
+      id: 'notif-fallback-1',
+    });
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('no replication queue service is registered'),
+    );
   });
 
   it('replicates updateNotification to additional backends', async () => {

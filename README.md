@@ -126,7 +126,7 @@ const vintasend = new VintaSendFactory<NotificationTypeConfig>().create({
 
 ### How It Works
 
-- **Writes**: VintaSend writes to the primary backend first, then replicates to additional backends on a best-effort basis.
+- **Writes**: VintaSend writes to the primary backend first, then replicates to additional backends either inline (default) or through a per-backend replication queue.
 - **Reads**: Read methods use the primary backend by default, but support optional backend targeting by identifier.
 
 ```typescript
@@ -153,11 +153,71 @@ if (!report.synced) {
 const backendStats = await vintasend.getBackendSyncStats();
 ```
 
+### Asynchronous Replication Queue (Per Backend)
+
+VintaSend supports asynchronous replication to additional backends with one queued task per destination backend.
+
+#### Replication mode
+
+Use `replicationMode: 'queued'` to enqueue replication instead of replicating inline in the request path.
+
+```typescript
+const vintasend = new VintaSendFactory<NotificationTypeConfig>().create({
+  adapters,
+  backend: primaryBackend,
+  additionalBackends: [replicaA, replicaB],
+  logger,
+  contextGeneratorsMap,
+  replicationQueueService,
+  options: {
+    raiseErrorOnFailedSend: false,
+    replicationMode: 'queued',
+  },
+});
+```
+
+#### Replication queue contract
+
+The replication queue service receives both the notification id and the target backend identifier:
+
+```typescript
+export interface BaseNotificationReplicationQueueService<Config extends BaseNotificationTypeConfig> {
+  enqueueReplication(notificationId: Config['NotificationIdType'], backendIdentifier: string): Promise<void>;
+}
+```
+
+When queued replication is enabled, VintaSend enqueues one replication task for each additional backend.
+
+#### Worker processing
+
+Workers should process replication with a backend target to apply replication only for the queued destination:
+
+```typescript
+await vintasend.processReplication(notificationId, backendIdentifier);
+```
+
+You can still call `processReplication(notificationId)` without a target to process all additional backends.
+
+#### Ordering and idempotency safety
+
+To reduce out-of-order replication issues, backends can optionally implement conditional apply:
+
+```typescript
+applyReplicationSnapshotIfNewer?(snapshot): Promise<{ applied: boolean }>;
+```
+
+- If destination state is newer/equal, replication is skipped (`applied: false`).
+- If destination is older, snapshot is applied.
+- Duplicate-create race conditions are handled with create→update fallback in worker replication flow.
+
+Official backends `vintasend-prisma` and `vintasend-medplum` implement this conditional apply behavior.
+
 ### Failure Handling
 
 - Primary backend failures fail the operation.
 - Additional backend replication failures are logged and do not fail the primary operation.
-- This keeps primary workflows available while still enabling redundancy.
+- In queued mode, enqueue failures fall back to inline replication for affected backends.
+- This keeps primary workflows available while still enabling redundancy and eventual consistency.
 
 ## Filtering and Ordering Notifications
 

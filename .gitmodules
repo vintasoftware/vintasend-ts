@@ -15,8 +15,7 @@
 	url = git@github.com:vintasoftware/vintasend-ts-examples.git
 [submodule "src/implementations/vintasend-aws-s3-attachments"]
 	path = src/implementations/vintasend-aws-s3-attachments
-	url = git@github.com:vintasoftware/vintasend-aws-s3-attachements.git
-	url = git@github.com:vintasoftware/vintasend-ts-examples.git
+	url = git@github.com:vintasoftware/vintasend-aws-s3-attachments.git
 [submodule "src/implementations/vintasend-medplum"]
 	path = src/implementations/vintasend-medplum
 	url = git@github.com:vintasoftware/vintasend-medplum.git
@@ -28,7 +27,10 @@
 	url = git@github.com:vintasoftware/vintasend-ts-dashboard.git
 [submodule "src/implementations/vintasend-ts-mailgun"]
 	path = src/implementations/vintasend-ts-mailgun
-	url = https://github.com/vintasoftware/vintasend-ts-mailgun
+	url = git@github.com:vintasoftware/vintasend-ts-mailgun.git
 [submodule "src/implementations/vintasend-ts-twilio"]
 	path = src/implementations/vintasend-ts-twilio
-	url = https://github.com/vintasoftware/vintasend-ts-twilio
+	url = git@github.com:vintasoftware/vintasend-ts-twilio.git
+[submodule "src/implementations/vintasend-aws-sqs"]
+	path = src/implementations/vintasend-aws-sqs
+	url = git@github.com:vintasoftware/vintasend-aws-sqs.git

@@ -157,6 +157,16 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     notificationId: Config['NotificationIdType'],
     notification: Partial<Omit<Notification<Config>, 'id'>>,
   ): Promise<DatabaseNotification<Config>>;
+  /**
+   * Applies a replication snapshot only when the destination state is older.
+   *
+   * This is used to mitigate out-of-order async replication deliveries.
+   * Implementations should return `applied: false` when the destination notification
+   * is already newer or equal to the snapshot.
+   */
+  applyReplicationSnapshotIfNewer?(
+    snapshot: AnyDatabaseNotification<Config>,
+  ): Promise<{ applied: boolean }>;
   markAsSent(
     notificationId: Config['NotificationIdType'],
     checkIsPending: boolean,

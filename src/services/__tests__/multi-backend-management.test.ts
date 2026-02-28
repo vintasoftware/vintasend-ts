@@ -340,6 +340,232 @@ describe('VintaSend multi-backend management (Phase 6)', () => {
     );
   });
 
+  it('processReplication replicates to all additional backends', async () => {
+    const primaryBackend = createMockBackend('primary');
+    const replicaA = createMockBackend('replica-a');
+    const replicaB = createMockBackend('replica-b');
+
+    const primaryNotification = createDatabaseNotification('notif-1', 'SENT');
+
+    primaryBackend.getNotification.mockResolvedValue(primaryNotification);
+    replicaA.getNotification.mockResolvedValue(null);
+    replicaB.getNotification.mockResolvedValue(null);
+    replicaA.persistNotification.mockResolvedValue(primaryNotification);
+    replicaB.persistNotification.mockResolvedValue(primaryNotification);
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend: primaryBackend,
+      additionalBackends: [replicaA, replicaB],
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const result = await service.processReplication('notif-1');
+
+    expect(replicaA.persistNotification).toHaveBeenCalledWith(primaryNotification);
+    expect(replicaB.persistNotification).toHaveBeenCalledWith(primaryNotification);
+    expect(result.successes).toEqual(['replica-a', 'replica-b']);
+    expect(result.failures).toEqual([]);
+  });
+
+  it('processReplication runs additional backend replication in parallel', async () => {
+    const primaryBackend = createMockBackend('primary');
+    const replicaA = createMockBackend('replica-a');
+    const replicaB = createMockBackend('replica-b');
+
+    const primaryNotification = createDatabaseNotification('notif-1', 'SENT');
+
+    primaryBackend.getNotification.mockResolvedValue(primaryNotification);
+
+    let releaseReplicaAGetNotification: () => void = () => {};
+    const replicaAGetNotificationGate = new Promise<void>((resolve) => {
+      releaseReplicaAGetNotification = resolve;
+    });
+
+    replicaA.getNotification.mockImplementation(async () => {
+      await replicaAGetNotificationGate;
+      return null;
+    });
+    replicaA.persistNotification.mockResolvedValue(primaryNotification);
+
+    replicaB.getNotification.mockResolvedValue(null);
+    replicaB.persistNotification.mockResolvedValue(primaryNotification);
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend: primaryBackend,
+      additionalBackends: [replicaA, replicaB],
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const processingPromise = service.processReplication('notif-1');
+    await Promise.resolve();
+
+    expect(replicaA.getNotification).toHaveBeenCalledTimes(1);
+    expect(replicaB.getNotification).toHaveBeenCalledTimes(1);
+
+    releaseReplicaAGetNotification();
+    const result = await processingPromise;
+
+    expect(result.successes).toEqual(['replica-a', 'replica-b']);
+    expect(result.failures).toEqual([]);
+  });
+
+  it('processReplication returns partial failures per backend', async () => {
+    const primaryBackend = createMockBackend('primary');
+    const replicaOk = createMockBackend('replica-ok');
+    const replicaFail = createMockBackend('replica-fail');
+
+    const primaryNotification = createDatabaseNotification('notif-1', 'SENT');
+
+    primaryBackend.getNotification.mockResolvedValue(primaryNotification);
+    replicaOk.getNotification.mockResolvedValue(null);
+    replicaFail.getNotification.mockResolvedValue(null);
+    replicaOk.persistNotification.mockResolvedValue(primaryNotification);
+    replicaFail.persistNotification.mockRejectedValue(new Error('write failed'));
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend: primaryBackend,
+      additionalBackends: [replicaOk, replicaFail],
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const result = await service.processReplication('notif-1');
+
+    expect(result.successes).toEqual(['replica-ok']);
+    expect(result.failures).toEqual([
+      {
+        backend: 'replica-fail',
+        error: 'Error: write failed',
+      },
+    ]);
+  });
+
+  it('processReplication is idempotent when notification already exists in destination', async () => {
+    const primaryBackend = createMockBackend('primary');
+    const replicaExisting = createMockBackend('replica-existing');
+
+    const primaryNotification = createDatabaseNotification('notif-1', 'SENT');
+    const existingNotification = createDatabaseNotification('notif-1', 'PENDING_SEND');
+
+    primaryBackend.getNotification.mockResolvedValue(primaryNotification);
+    replicaExisting.getNotification.mockResolvedValue(existingNotification);
+    replicaExisting.persistNotificationUpdate.mockResolvedValue(primaryNotification);
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend: primaryBackend,
+      additionalBackends: [replicaExisting],
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const result = await service.processReplication('notif-1');
+
+    expect(replicaExisting.persistNotification).not.toHaveBeenCalled();
+    expect(replicaExisting.persistNotificationUpdate).toHaveBeenCalledWith(
+      'notif-1',
+      primaryNotification,
+    );
+    expect(result.successes).toEqual(['replica-existing']);
+    expect(result.failures).toEqual([]);
+  });
+
+  it('processReplication is idempotent on duplicate create race by retrying as update', async () => {
+    const primaryBackend = createMockBackend('primary');
+    const replicaBackend = createMockBackend('replica');
+
+    const primaryNotification = createDatabaseNotification('notif-1', 'SENT');
+
+    primaryBackend.getNotification.mockResolvedValue(primaryNotification);
+    replicaBackend.getNotification.mockResolvedValue(null);
+    replicaBackend.persistNotification.mockRejectedValue(
+      new Error('duplicate key value violates unique constraint'),
+    );
+    replicaBackend.persistNotificationUpdate.mockResolvedValue(primaryNotification);
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend: primaryBackend,
+      additionalBackends: [replicaBackend],
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const result = await service.processReplication('notif-1');
+
+    expect(replicaBackend.persistNotification).toHaveBeenCalledTimes(1);
+    expect(replicaBackend.persistNotificationUpdate).toHaveBeenCalledWith(
+      'notif-1',
+      primaryNotification,
+    );
+    expect(result.successes).toEqual(['replica']);
+    expect(result.failures).toEqual([]);
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Retrying as update for idempotency'),
+    );
+  });
+
+  it('processReplication prefers backend apply-only-if-newer operation when implemented', async () => {
+    const primaryBackend = createMockBackend('primary');
+    const replicaBackend = createMockBackend('replica');
+
+    const primaryNotification = createDatabaseNotification('notif-1', 'SENT');
+
+    primaryBackend.getNotification.mockResolvedValue(primaryNotification);
+    const applyReplicationSnapshotIfNewer = jest.fn().mockResolvedValue({ applied: false });
+    Object.assign(replicaBackend, { applyReplicationSnapshotIfNewer });
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend: primaryBackend,
+      additionalBackends: [replicaBackend],
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const result = await service.processReplication('notif-1');
+
+    expect(applyReplicationSnapshotIfNewer).toHaveBeenCalledWith(primaryNotification);
+    expect(replicaBackend.persistNotification).not.toHaveBeenCalled();
+    expect(replicaBackend.persistNotificationUpdate).not.toHaveBeenCalled();
+    expect(result.successes).toEqual(['replica']);
+    expect(result.failures).toEqual([]);
+  });
+
+  it('processReplication targets only the specified additional backend', async () => {
+    const primaryBackend = createMockBackend('primary');
+    const replicaA = createMockBackend('replica-a');
+    const replicaB = createMockBackend('replica-b');
+
+    const primaryNotification = createDatabaseNotification('notif-1', 'SENT');
+
+    primaryBackend.getNotification.mockResolvedValue(primaryNotification);
+    replicaA.getNotification.mockResolvedValue(null);
+    replicaB.getNotification.mockResolvedValue(null);
+    replicaA.persistNotification.mockResolvedValue(primaryNotification);
+    replicaB.persistNotification.mockResolvedValue(primaryNotification);
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend: primaryBackend,
+      additionalBackends: [replicaA, replicaB],
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const result = await service.processReplication('notif-1', 'replica-b');
+
+    expect(replicaA.persistNotification).not.toHaveBeenCalled();
+    expect(replicaB.persistNotification).toHaveBeenCalledWith(primaryNotification);
+    expect(result.successes).toEqual(['replica-b']);
+    expect(result.failures).toEqual([]);
+  });
+
   it('getBackendSyncStats returns healthy and error backend statuses', async () => {
     const primaryBackend = createMockBackend('primary');
     const replicaBackend = createMockBackend('replica');

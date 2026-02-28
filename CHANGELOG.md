@@ -1,5 +1,25 @@
 # Changelog
 
+## Version 0.9.0
+
+* **Asynchronous replication queue (per backend) added**:
+  * Added replication queue contract `BaseNotificationReplicationQueueService.enqueueReplication(notificationId, backendIdentifier)`.
+  * Added queued replication mode support in `VintaSend` (`options.replicationMode = 'queued'`) with one enqueue per additional backend.
+  * Added safe fallback behavior: if enqueue fails for a backend, replication falls back to inline for that backend.
+* **Worker targeting support**:
+  * `processReplication` now accepts an optional `targetBackendIdentifier`.
+  * Workers can process one queued replication task for one backend: `processReplication(notificationId, backendIdentifier)`.
+  * Calling `processReplication(notificationId)` still processes all additional backends.
+* **Ordering safety and idempotency improvements**:
+  * Added optional backend contract `applyReplicationSnapshotIfNewer(snapshot): Promise<{ applied: boolean }>`.
+  * `processReplication` prefers this contract when implemented to skip stale/out-of-order updates.
+  * Maintained duplicate-create idempotency guard (create→update fallback on duplicate/unique conflict errors).
+* **Official backend updates**:
+  * `vintasend-prisma` implements conditional apply-only-if-newer replication behavior.
+  * `vintasend-medplum` implements conditional apply-only-if-newer replication behavior.
+* **Notes for implementers**:
+  * ⚠️ If you implemented a custom replication queue service, update the method signature to accept `backendIdentifier`.
+
 ## Version 0.8.2
 
 * **`orderBy` support added to `filterNotifications`**:

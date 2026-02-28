@@ -20,6 +20,7 @@ export type {
   StringFieldFilter,
 } from './services/notification-backends/base-notification-backend';
 export type { BaseNotificationQueueService } from './services/notification-queue-service/base-notification-queue-service';
+export type { BaseNotificationReplicationQueueService } from './services/notification-queue-service/base-notification-replication-queue-service';
 export type { VintaSend } from './services/notification-service';
 export { VintaSendFactory } from './services/notification-service';
 export type { BaseEmailTemplateRenderer } from './services/notification-template-renderers/base-email-template-renderer';
