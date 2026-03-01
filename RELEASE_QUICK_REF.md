@@ -15,6 +15,12 @@ Edit the file manually with release notes.
 ### Step 3: Publish
 ```bash
 npm run release:publish
+
+# Skip specific implementation packages
+npm run release:publish -- --skip=vintasend-medplum,vintasend-ts-twilio
+
+# Skip root package
+npm run release:publish -- --skip-root
 ```
 
 ## What Happens

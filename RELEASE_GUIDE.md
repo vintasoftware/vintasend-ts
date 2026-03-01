@@ -21,6 +21,15 @@ Manually update the changelog with release notes.
 **Step 3: Publish**
 ```bash
 npm run release:publish
+
+# Skip specific implementation packages
+npm run release:publish -- --skip=vintasend-medplum,vintasend-ts-twilio
+
+# Skip root package only
+npm run release:publish -- --skip-root
+
+# Skip root package + specific implementations
+npm run release:publish -- --skip=root,vintasend-medplum
 ```
 
 ## Two-Step Release Process
@@ -120,6 +129,7 @@ npm publish --tag alpha
 ✅ **Building**: Builds all packages before publishing  
 ✅ **Publishing**: Publishes to npm (main package first, then implementations)  
 ✅ **Git Commits**: Creates separate commits for each package  
+✅ **Optional Skip List**: Supports `--skip=<comma-separated-package-names>` and `--skip-root`  
 
 ## What You Do Manually
 

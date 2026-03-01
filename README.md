@@ -642,6 +642,11 @@ This project uses a two-step automated release process:
 2. **Update CHANGELOG.md**: Edit manually
 3. **Publish**: `npm run release:publish`
 
+Optional publish skips:
+- `npm run release:publish -- --skip=vintasend-medplum,vintasend-ts-twilio`
+- `npm run release:publish -- --skip-root`
+- `npm run release:publish -- --skip=root,vintasend-medplum`
+
 For detailed instructions, see:
 - [Release Guide](RELEASE_GUIDE.md) - Complete walkthrough with examples
 - [Quick Reference](RELEASE_QUICK_REF.md) - Command cheatsheet
