@@ -1,6 +1,6 @@
 {
   "name": "vintasend",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "main": "dist/index.js",
   "files": [
     "dist"
@@ -13,9 +13,9 @@
     "check": "biome check --write .",
     "build": "tsc",
     "prepublishOnly": "npm run build",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "test:implementations:local": "node scripts/test-implementations-local.js",
     "release:bump": "node scripts/release-bump.js",
     "release:bump:patch": "node scripts/release-bump.js --bump=patch",
@@ -26,12 +26,11 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
-    "@types/jest": "^30.0.0",
     "@types/mime-types": "^3.0.1",
     "@types/node": "^25.0.8",
-    "jest": "^30.2.0",
-    "ts-jest": "^29.4.6",
-    "typescript": "^5.9.3"
+    "@vitest/coverage-v8": "4.0.18",
+    "typescript": "^5.9.3",
+    "vitest": "4.0.18"
   },
   "dependencies": {
     "mime-types": "^3.0.2"

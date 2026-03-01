@@ -46,7 +46,7 @@ describe('TemplateAttachmentManager', () => {
       // 2. Delete the file
       // 3. Verify file is deleted (getFile returns null)
 
-      await expect(manager.deleteFile('test-id')).rejects.toThrow('not implemented');
+      await expect(manager.deleteFileByIdentifiers({ id: 'test-id' })).rejects.toThrow('not implemented');
     });
   });
 
@@ -55,6 +55,7 @@ describe('TemplateAttachmentManager', () => {
       const storageMetadata = {
         // TODO: Add storage-specific metadata structure
         // Example for S3: { bucket: 'test-bucket', key: 'test-key' }
+        id: 'test-id',
       };
 
       // TODO: Implement test once reconstructAttachmentFile is implemented
@@ -76,7 +77,7 @@ describe('TemplateAttachmentManager', () => {
       expect(manager.detectContentType('document.pdf')).toBe('application/pdf');
       expect(manager.detectContentType('image.png')).toBe('image/png');
       expect(manager.detectContentType('data.json')).toBe('application/json');
-      expect(manager.detectContentType('unknown.xyz')).toBe('application/octet-stream');
+      expect(manager.detectContentType('unknown.unknownext')).toBe('application/octet-stream');
     });
 
     it('should calculate SHA-256 checksum', () => {

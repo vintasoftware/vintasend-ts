@@ -11,7 +11,7 @@ describe('BaseNotificationReplicationQueueService Interface', () => {
   describe('Type Compatibility', () => {
     it('should accept a valid replication queue implementation', async () => {
       const mockReplicationQueueService: BaseNotificationReplicationQueueService<TestConfig> = {
-        enqueueReplication: jest.fn().mockResolvedValue(undefined),
+        enqueueReplication: vi.fn().mockResolvedValue(undefined),
       };
 
       await mockReplicationQueueService.enqueueReplication('notification-1', 'replica-backend');
@@ -24,7 +24,7 @@ describe('BaseNotificationReplicationQueueService Interface', () => {
 
     it('should keep existing notification queue contract independently valid', async () => {
       const mockNotificationQueueService: BaseNotificationQueueService<TestConfig> = {
-        enqueueNotification: jest.fn().mockResolvedValue(undefined),
+        enqueueNotification: vi.fn().mockResolvedValue(undefined),
       };
 
       await mockNotificationQueueService.enqueueNotification('notification-1');

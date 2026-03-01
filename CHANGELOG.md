@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.9.1
+
+* Migrate vintasend and all officially supported packages from jest to vitest
+* Update dependencies on all officially supported packages
+
 ## Version 0.9.0
 
 * **Asynchronous replication queue (per backend) added**:

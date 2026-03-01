@@ -11,65 +11,65 @@ import type { BaseEmailTemplateRenderer } from '../notification-template-rendere
 
 // Mock implementations
 // biome-ignore lint/suspicious/noExplicitAny: any for testing
-const mockBackend: jest.Mocked<BaseNotificationBackend<any>> = {
-  persistNotification: jest.fn(),
-  persistNotificationUpdate: jest.fn(),
-  getAllFutureNotifications: jest.fn(),
-  getAllFutureNotificationsFromUser: jest.fn(),
-  getFutureNotificationsFromUser: jest.fn(),
-  getFutureNotifications: jest.fn(),
-  getAllPendingNotifications: jest.fn(),
-  getPendingNotifications: jest.fn(),
-  getNotification: jest.fn(),
-  markAsRead: jest.fn(),
-  filterAllInAppUnreadNotifications: jest.fn(),
-  cancelNotification: jest.fn(),
-  markAsSent: jest.fn(),
-  markAsFailed: jest.fn(),
-  storeAdapterAndContextUsed: jest.fn(),
-  getUserEmailFromNotification: jest.fn(),
-  filterInAppUnreadNotifications: jest.fn(),
-  filterNotifications: jest.fn(),
-  bulkPersistNotifications: jest.fn(),
-  getAllNotifications: jest.fn(),
-  getNotifications: jest.fn(),
-  persistOneOffNotification: jest.fn(),
-  persistOneOffNotificationUpdate: jest.fn(),
-  getOneOffNotification: jest.fn(),
-  getAllOneOffNotifications: jest.fn(),
-  getOneOffNotifications: jest.fn(),
+const mockBackend: vi.Mocked<BaseNotificationBackend<any>> = {
+  persistNotification: vi.fn(),
+  persistNotificationUpdate: vi.fn(),
+  getAllFutureNotifications: vi.fn(),
+  getAllFutureNotificationsFromUser: vi.fn(),
+  getFutureNotificationsFromUser: vi.fn(),
+  getFutureNotifications: vi.fn(),
+  getAllPendingNotifications: vi.fn(),
+  getPendingNotifications: vi.fn(),
+  getNotification: vi.fn(),
+  markAsRead: vi.fn(),
+  filterAllInAppUnreadNotifications: vi.fn(),
+  cancelNotification: vi.fn(),
+  markAsSent: vi.fn(),
+  markAsFailed: vi.fn(),
+  storeAdapterAndContextUsed: vi.fn(),
+  getUserEmailFromNotification: vi.fn(),
+  filterInAppUnreadNotifications: vi.fn(),
+  filterNotifications: vi.fn(),
+  bulkPersistNotifications: vi.fn(),
+  getAllNotifications: vi.fn(),
+  getNotifications: vi.fn(),
+  persistOneOffNotification: vi.fn(),
+  persistOneOffNotificationUpdate: vi.fn(),
+  getOneOffNotification: vi.fn(),
+  getAllOneOffNotifications: vi.fn(),
+  getOneOffNotifications: vi.fn(),
 
   // Attachment methods
-  storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
-  getAttachmentFileRecord: jest.fn().mockResolvedValue(null),
-  getAttachmentFile: jest.fn().mockResolvedValue(null),
-  findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
-  deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
-  getOrphanedAttachmentFiles: jest.fn().mockResolvedValue([]),
-  getAttachments: jest.fn().mockResolvedValue([]),
-  deleteNotificationAttachment: jest.fn().mockResolvedValue(undefined),
+  storeAttachmentFileRecord: vi.fn().mockResolvedValue(undefined),
+  getAttachmentFileRecord: vi.fn().mockResolvedValue(null),
+  getAttachmentFile: vi.fn().mockResolvedValue(null),
+  findAttachmentFileByChecksum: vi.fn().mockResolvedValue(null),
+  deleteAttachmentFile: vi.fn().mockResolvedValue(undefined),
+  getOrphanedAttachmentFiles: vi.fn().mockResolvedValue([]),
+  getAttachments: vi.fn().mockResolvedValue([]),
+  deleteNotificationAttachment: vi.fn().mockResolvedValue(undefined),
 };
 
 // biome-ignore lint/suspicious/noExplicitAny: any for testing
-const mockTemplateRenderer: jest.Mocked<BaseEmailTemplateRenderer<any>> = {
-  render: jest.fn(),
-  renderFromTemplateContent: jest.fn(),
+const mockTemplateRenderer: vi.Mocked<BaseEmailTemplateRenderer<any>> = {
+  render: vi.fn(),
+  renderFromTemplateContent: vi.fn(),
 };
 
-const mockLogger: jest.Mocked<BaseLogger> = {
-  info: jest.fn(),
-  error: jest.fn(),
-  warn: jest.fn(),
+const mockLogger: vi.Mocked<BaseLogger> = {
+  info: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
 };
 
 // biome-ignore lint/suspicious/noExplicitAny: any for testing
-const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any>> = {
+const mockAdapter: vi.Mocked<BaseNotificationAdapter<any, any>> = {
   notificationType: 'EMAIL',
   key: 'test-adapter',
   enqueueNotifications: false,
-  send: jest.fn(),
-  injectBackend: jest.fn(),
-  injectLogger: jest.fn(),
+  send: vi.fn(),
+  injectBackend: vi.fn(),
+  injectLogger: vi.fn(),
   backend: mockBackend,
   templateRenderer: mockTemplateRenderer,
   logger: mockLogger,
@@ -79,12 +79,12 @@ const mockAdapter: jest.Mocked<BaseNotificationAdapter<any, any>> = {
 
 const notificationContextgenerators = {
   testContext: {
-    generate: jest.fn(),
+    generate: vi.fn(),
   },
 };
 
-const mockGitCommitShaProvider: jest.Mocked<BaseGitCommitShaProvider> = {
-  getCurrentGitCommitSha: jest.fn(),
+const mockGitCommitShaProvider: vi.Mocked<BaseGitCommitShaProvider> = {
+  getCurrentGitCommitSha: vi.fn(),
 };
 
 type Config = {
@@ -101,7 +101,7 @@ describe('NotificationService - One-Off Notifications', () => {
   let mockOneOffNotificationInput: Omit<OneOffNotificationInput<any>, 'id'>;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockGitCommitShaProvider.getCurrentGitCommitSha.mockReset();
 
     const factory = new VintaSendFactory<Config>();

@@ -105,7 +105,7 @@ export class TemplateAttachmentManager extends BaseAttachmentManager {
  * This class provides access to a stored file. Create an implementation
  * specific to your storage backend.
  */
-class TemplateAttachmentFile implements AttachmentFile {
+export class TemplateAttachmentFile implements AttachmentFile {
   constructor(
     private fileId: string,
     private storageIdentifiers: StorageIdentifiers,

@@ -30,50 +30,50 @@ type BackendWithIdentifier = BaseNotificationBackend<TestConfig> & {
 
 function createBackendBase(): BaseNotificationBackend<TestConfig> {
   return {
-    getAllPendingNotifications: jest.fn().mockResolvedValue([]),
-    getPendingNotifications: jest.fn().mockResolvedValue([]),
-    getAllFutureNotifications: jest.fn().mockResolvedValue([]),
-    getFutureNotifications: jest.fn().mockResolvedValue([]),
-    getAllFutureNotificationsFromUser: jest.fn().mockResolvedValue([]),
-    getFutureNotificationsFromUser: jest.fn().mockResolvedValue([]),
-    persistNotification: jest
+    getAllPendingNotifications: vi.fn().mockResolvedValue([]),
+    getPendingNotifications: vi.fn().mockResolvedValue([]),
+    getAllFutureNotifications: vi.fn().mockResolvedValue([]),
+    getFutureNotifications: vi.fn().mockResolvedValue([]),
+    getAllFutureNotificationsFromUser: vi.fn().mockResolvedValue([]),
+    getFutureNotificationsFromUser: vi.fn().mockResolvedValue([]),
+    persistNotification: vi
       .fn()
       .mockResolvedValue({} as unknown as DatabaseNotification<TestConfig>),
-    getAllNotifications: jest.fn().mockResolvedValue([]),
-    getNotifications: jest.fn().mockResolvedValue([]),
-    bulkPersistNotifications: jest
+    getAllNotifications: vi.fn().mockResolvedValue([]),
+    getNotifications: vi.fn().mockResolvedValue([]),
+    bulkPersistNotifications: vi
       .fn()
       .mockResolvedValue([] as TestConfig['NotificationIdType'][]),
-    persistNotificationUpdate: jest
+    persistNotificationUpdate: vi
       .fn()
       .mockResolvedValue({} as unknown as DatabaseNotification<TestConfig>),
-    markAsSent: jest.fn().mockResolvedValue({} as unknown as AnyDatabaseNotification<TestConfig>),
-    markAsFailed: jest.fn().mockResolvedValue({} as unknown as AnyDatabaseNotification<TestConfig>),
-    markAsRead: jest.fn().mockResolvedValue({} as unknown as DatabaseNotification<TestConfig>),
-    cancelNotification: jest.fn().mockResolvedValue(undefined),
-    getNotification: jest.fn().mockResolvedValue(null),
-    filterAllInAppUnreadNotifications: jest.fn().mockResolvedValue([]),
-    filterInAppUnreadNotifications: jest.fn().mockResolvedValue([]),
-    getUserEmailFromNotification: jest.fn().mockResolvedValue(undefined),
-    storeAdapterAndContextUsed: jest.fn().mockResolvedValue(undefined),
-    persistOneOffNotification: jest
+    markAsSent: vi.fn().mockResolvedValue({} as unknown as AnyDatabaseNotification<TestConfig>),
+    markAsFailed: vi.fn().mockResolvedValue({} as unknown as AnyDatabaseNotification<TestConfig>),
+    markAsRead: vi.fn().mockResolvedValue({} as unknown as DatabaseNotification<TestConfig>),
+    cancelNotification: vi.fn().mockResolvedValue(undefined),
+    getNotification: vi.fn().mockResolvedValue(null),
+    filterAllInAppUnreadNotifications: vi.fn().mockResolvedValue([]),
+    filterInAppUnreadNotifications: vi.fn().mockResolvedValue([]),
+    getUserEmailFromNotification: vi.fn().mockResolvedValue(undefined),
+    storeAdapterAndContextUsed: vi.fn().mockResolvedValue(undefined),
+    persistOneOffNotification: vi
       .fn()
       .mockResolvedValue({} as unknown as DatabaseOneOffNotification<TestConfig>),
-    persistOneOffNotificationUpdate: jest
+    persistOneOffNotificationUpdate: vi
       .fn()
       .mockResolvedValue({} as unknown as DatabaseOneOffNotification<TestConfig>),
-    getOneOffNotification: jest.fn().mockResolvedValue(null),
-    getAllOneOffNotifications: jest.fn().mockResolvedValue([]),
-    getOneOffNotifications: jest.fn().mockResolvedValue([]),
-    filterNotifications: jest.fn().mockResolvedValue([]),
-    storeAttachmentFileRecord: jest.fn().mockResolvedValue(undefined),
-    getAttachmentFileRecord: jest.fn().mockResolvedValue(null),
-    getAttachmentFile: jest.fn().mockResolvedValue(null),
-    findAttachmentFileByChecksum: jest.fn().mockResolvedValue(null),
-    deleteAttachmentFile: jest.fn().mockResolvedValue(undefined),
-    getOrphanedAttachmentFiles: jest.fn().mockResolvedValue([]),
-    getAttachments: jest.fn().mockResolvedValue([]),
-    deleteNotificationAttachment: jest.fn().mockResolvedValue(undefined),
+    getOneOffNotification: vi.fn().mockResolvedValue(null),
+    getAllOneOffNotifications: vi.fn().mockResolvedValue([]),
+    getOneOffNotifications: vi.fn().mockResolvedValue([]),
+    filterNotifications: vi.fn().mockResolvedValue([]),
+    storeAttachmentFileRecord: vi.fn().mockResolvedValue(undefined),
+    getAttachmentFileRecord: vi.fn().mockResolvedValue(null),
+    getAttachmentFile: vi.fn().mockResolvedValue(null),
+    findAttachmentFileByChecksum: vi.fn().mockResolvedValue(null),
+    deleteAttachmentFile: vi.fn().mockResolvedValue(undefined),
+    getOrphanedAttachmentFiles: vi.fn().mockResolvedValue([]),
+    getAttachments: vi.fn().mockResolvedValue([]),
+    deleteNotificationAttachment: vi.fn().mockResolvedValue(undefined),
   };
 }
 
