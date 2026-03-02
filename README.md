@@ -605,6 +605,7 @@ VintaSend has many backend, adapter, and template renderer implementations. If y
 
 ##### Template Renderers
 * **[vintasend-pug](https://github.com/vintasoftware/vintasend-pug/)**: Renders emails using Pug.
+* **[vintasend-react-email](https://github.com/vintasoftware/vintasend-react-email/)**: Renders emails using React Email, including uncompiled TS/TSX template support.
 
 ##### Loggers
 * **[vintasend-winston](https://github.com/vintasoftware/vintasend-winston/)**: Uses Winston to allow `NotificationService` to create log entries.

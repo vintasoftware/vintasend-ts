@@ -4,6 +4,30 @@ This directory contains automation scripts for releasing new versions of vintase
 
 ## Scripts
 
+### `generate-implementation.js`
+Creates a new implementation package from `vintasend-implementation-template`.
+
+What it does:
+- Copies the template to a new directory under `src/implementations`
+- Updates the new package `name` in `package.json`
+- Keeps only selected components (backend, attachment-manager, adapter, template-renderer, logger)
+- Deletes unused component source and test files
+- Rewrites `src/index.ts` exports to match selected components
+- Replaces `README.md` with a concise package-specific version
+
+Usage:
+```bash
+npm run implementation:generate -- --dir=vintasend-aws-ses --package=@acme/vintasend-aws-ses --components=backend,adapter,template-renderer
+```
+
+Optional flags:
+- `--force` to overwrite an existing target directory
+- `--help` to show all options
+
+Interactive mode:
+- If `--dir`, `--package`, or `--components` are not passed, the script prompts for missing values.
+- If the target directory already exists and `--force` is not passed, it prompts for overwrite confirmation.
+
 ### `release.js`
 Main orchestration script that handles the entire release process.
 

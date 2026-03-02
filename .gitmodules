@@ -34,3 +34,6 @@
 [submodule "src/implementations/vintasend-aws-sqs"]
 	path = src/implementations/vintasend-aws-sqs
 	url = git@github.com:vintasoftware/vintasend-aws-sqs.git
+[submodule "src/implementations/vintasend-react-email"]
+	path = src/implementations/vintasend-react-email
+	url = git@github.com:vintasoftware/vintasend-react-email.git

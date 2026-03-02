@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "implementation:generate": "node scripts/generate-implementation.js",
     "test:implementations:local": "node scripts/test-implementations-local.js",
     "release:bump": "node scripts/release-bump.js",
     "release:bump:patch": "node scripts/release-bump.js --bump=patch",
