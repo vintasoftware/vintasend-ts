@@ -495,4 +495,5 @@ describe('Notification Types with Attachments', () => {
         expect(notification.gitCommitSha).toBeNull();
       });
     });
-  });});
+  });
+});

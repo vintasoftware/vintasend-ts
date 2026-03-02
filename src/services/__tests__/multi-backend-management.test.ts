@@ -34,7 +34,6 @@ const logger: vi.Mocked<BaseLogger> = {
   warn: vi.fn(),
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: test adapter mock
 const adapter: vi.Mocked<BaseNotificationAdapter<any, Config>> = {
   notificationType: 'EMAIL',
   key: 'adapter-1',
@@ -46,7 +45,6 @@ const adapter: vi.Mocked<BaseNotificationAdapter<any, Config>> = {
   templateRenderer,
   logger,
   supportsAttachments: false,
-  // biome-ignore lint/suspicious/noExplicitAny: test-only cast
 } as any;
 
 const contextGenerators: ContextGenerators = {
@@ -193,9 +191,7 @@ describe('VintaSend multi-backend management (Phase 6)', () => {
     const report = await service.verifyNotificationSync('notif-1');
 
     expect(report.synced).toBe(false);
-    expect(report.discrepancies).toContain(
-      'Status mismatch in replica: FAILED vs SENT',
-    );
+    expect(report.discrepancies).toContain('Status mismatch in replica: FAILED vs SENT');
   });
 
   it('verifyNotificationSync reports additional field mismatches', async () => {
@@ -266,7 +262,9 @@ describe('VintaSend multi-backend management (Phase 6)', () => {
 
     primaryBackend.getNotification.mockResolvedValue(primaryNotification);
     replicaCreate.getNotification.mockResolvedValue(null);
-    replicaUpdate.getNotification.mockResolvedValue(createDatabaseNotification('notif-1', 'PENDING_SEND'));
+    replicaUpdate.getNotification.mockResolvedValue(
+      createDatabaseNotification('notif-1', 'PENDING_SEND'),
+    );
     replicaCreate.persistNotification.mockResolvedValue(primaryNotification);
     replicaUpdate.persistNotificationUpdate.mockResolvedValue(primaryNotification);
 

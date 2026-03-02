@@ -444,8 +444,7 @@ See [src/implementations/vintasend-implementation-template/src/attachment-manage
 Your custom `AttachmentManager` must implement:
 
 ```typescript
-import { BaseAttachmentManager } from 'vintasend/dist/services/attachment-manager/base-attachment-manager';
-import type { AttachmentFile } from 'vintasend/dist/types/attachment';
+import { BaseAttachmentManager, type AttachmentFile } from 'vintasend';
 
 export class MyAttachmentManager extends BaseAttachmentManager {
   /**
@@ -518,7 +517,7 @@ You can override these utility methods from `BaseAttachmentManager`:
 ### Example: Azure Blob Storage
 
 ```typescript
-import { BaseAttachmentManager } from 'vintasend/dist/services/attachment-manager/base-attachment-manager';
+import { BaseAttachmentManager } from 'vintasend';
 import { BlobServiceClient, ContainerClient } from '@azure/storage-blob';
 
 export class AzureBlobAttachmentManager extends BaseAttachmentManager {
@@ -879,8 +878,7 @@ await vintaSend.sendNotification({
 To add attachment support to a custom adapter:
 
 ```typescript
-import { BaseNotificationAdapter } from 'vintasend';
-import type { StoredAttachment } from 'vintasend/dist/types/attachment';
+import { BaseNotificationAdapter, type StoredAttachment } from 'vintasend';
 
 export class MyAdapter extends BaseNotificationAdapter {
   // Declare that this adapter supports attachments

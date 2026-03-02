@@ -29,7 +29,9 @@ describe('BaseNotificationReplicationQueueService Interface', () => {
 
       await mockNotificationQueueService.enqueueNotification('notification-1');
 
-      expect(mockNotificationQueueService.enqueueNotification).toHaveBeenCalledWith('notification-1');
+      expect(mockNotificationQueueService.enqueueNotification).toHaveBeenCalledWith(
+        'notification-1',
+      );
     });
   });
 });

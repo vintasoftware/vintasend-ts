@@ -250,7 +250,7 @@ See [`vintasend-aws-s3-attachments`](../vintasend-aws-s3-attachments) for a comp
 - **Deduplication**: Implement `findFileByChecksum()` to prevent storing duplicate files
 - **Presigned URLs**: Generate temporary URLs for secure file access without exposing credentials
 - **Streaming**: Support streaming for large files to avoid memory issues
-- **Type Safety**: All methods use strict TypeScript types from `vintasend/dist/types/attachment`
+- **Type Safety**: All methods use strict TypeScript types from `vintasend`
 
 ### Logger
 

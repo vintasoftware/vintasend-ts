@@ -9,10 +9,7 @@ import type {
 } from '../../../types/notification';
 import type { AttachmentFileRecord } from '../../../types/attachment';
 import type { InputJsonValue } from '../../../types/json-values';
-import type {
-  BaseNotificationBackend,
-  NotificationFilter,
-} from '../base-notification-backend';
+import type { BaseNotificationBackend, NotificationFilter } from '../base-notification-backend';
 
 type TestConfig = BaseNotificationTypeConfig & {
   ContextMap: {
@@ -41,9 +38,7 @@ function createBackendBase(): BaseNotificationBackend<TestConfig> {
       .mockResolvedValue({} as unknown as DatabaseNotification<TestConfig>),
     getAllNotifications: vi.fn().mockResolvedValue([]),
     getNotifications: vi.fn().mockResolvedValue([]),
-    bulkPersistNotifications: vi
-      .fn()
-      .mockResolvedValue([] as TestConfig['NotificationIdType'][]),
+    bulkPersistNotifications: vi.fn().mockResolvedValue([] as TestConfig['NotificationIdType'][]),
     persistNotificationUpdate: vi
       .fn()
       .mockResolvedValue({} as unknown as DatabaseNotification<TestConfig>),

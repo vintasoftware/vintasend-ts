@@ -1,20 +1,18 @@
-import type { BaseNotificationBackend } from 'vintasend/dist/services/notification-backends/base-notification-backend';
-import type { BaseEmailTemplateRenderer } from 'vintasend/dist/services/notification-template-renderers/base-email-template-renderer';
 import type {
+  BaseEmailTemplateRenderer,
+  BaseNotificationBackend,
   DatabaseNotification,
   DatabaseOneOffNotification,
-} from 'vintasend/dist/types/notification';
+} from 'vintasend';
+import { type Mocked, vi } from 'vitest';
 import { NotificationAdapterFactory } from '../adapter';
-import { vi, type Mocked } from 'vitest';
 
 describe('NotificationAdapter', () => {
   const mockTemplateRenderer = {
     render: vi.fn(),
     renderFromTemplateContent: vi.fn(),
-    // biome-ignore lint/suspicious/noExplicitAny: any just for testing
   } as Mocked<BaseEmailTemplateRenderer<any>>;
 
-  // biome-ignore lint/suspicious/noExplicitAny: any just for testing
   const mockBackend: Mocked<BaseNotificationBackend<any>> = {
     persistNotification: vi.fn(),
     persistNotificationUpdate: vi.fn(),
@@ -50,7 +48,6 @@ describe('NotificationAdapter', () => {
     filterNotifications: vi.fn(),
   };
 
-  // biome-ignore lint/suspicious/noExplicitAny: any just for testing
   let mockNotification: DatabaseNotification<any>;
 
   beforeEach(() => {
@@ -117,7 +114,9 @@ describe('NotificationAdapter', () => {
 
       mockNotification.id = undefined;
 
-      await expect(adapter.send(mockNotification, {})).rejects.toThrow('Notification ID is required');
+      await expect(adapter.send(mockNotification, {})).rejects.toThrow(
+        'Notification ID is required',
+      );
     });
 
     it('should throw error if user email is not found', async () => {
@@ -135,7 +134,6 @@ describe('NotificationAdapter', () => {
   });
 
   describe('one-off notifications', () => {
-    // biome-ignore lint/suspicious/noExplicitAny: scaffold for future one-off adapter support
     let mockOneOffNotification: DatabaseOneOffNotification<any>;
 
     beforeEach(() => {

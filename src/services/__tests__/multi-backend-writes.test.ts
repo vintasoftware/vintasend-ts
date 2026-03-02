@@ -39,7 +39,6 @@ const logger: vi.Mocked<BaseLogger> = {
   warn: vi.fn(),
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: test adapter mock
 const adapter: vi.Mocked<BaseNotificationAdapter<any, Config>> = {
   notificationType: 'EMAIL',
   key: 'adapter-1',
@@ -51,7 +50,6 @@ const adapter: vi.Mocked<BaseNotificationAdapter<any, Config>> = {
   templateRenderer: mockTemplateRenderer,
   logger,
   supportsAttachments: false,
-  // biome-ignore lint/suspicious/noExplicitAny: test-only cast
 } as any;
 
 const contextGenerators: ContextGenerators = {
@@ -504,7 +502,9 @@ describe('VintaSend multi-backend writes (Phase 4)', () => {
       contextGeneratorsMap: contextGenerators,
     });
 
-    await expect(service.createNotification(baseNotificationInput)).rejects.toThrow('primary error');
+    await expect(service.createNotification(baseNotificationInput)).rejects.toThrow(
+      'primary error',
+    );
     expect(replicaBackend.persistNotification).not.toHaveBeenCalled();
   });
 

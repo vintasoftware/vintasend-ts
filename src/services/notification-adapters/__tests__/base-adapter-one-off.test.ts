@@ -11,7 +11,6 @@ import { BaseNotificationAdapter, isOneOffNotification } from '../base-notificat
 // Test adapter implementation
 class TestAdapter<
   TemplateRenderer extends BaseNotificationTemplateRenderer<Config>,
-  // biome-ignore lint/suspicious/noExplicitAny: Testing with generic config
   Config extends { ContextMap: any; NotificationIdType: string; UserIdType: string },
 > extends BaseNotificationAdapter<TemplateRenderer, Config> {
   async send(notification: AnyDatabaseNotification<Config>, context: JsonObject): Promise<void> {
@@ -33,20 +32,17 @@ class TestAdapter<
     notification: AnyDatabaseNotification<Config>,
     context: JsonObject | null,
   ): { firstName: string; lastName: string } {
-    // biome-ignore lint/suspicious/noExplicitAny: Test method needs flexibility
     return this.getRecipientName(notification, context as any);
   }
 }
 
 type Config = {
-  // biome-ignore lint/suspicious/noExplicitAny: Testing with generic config
   ContextMap: any;
   NotificationIdType: string;
   UserIdType: string;
 };
 
 // Mock implementations
-// biome-ignore lint/suspicious/noExplicitAny: any config for testing
 const mockBackend = {
   persistNotification: vi.fn(),
   persistNotificationUpdate: vi.fn(),
@@ -91,8 +87,6 @@ const mockTemplateRenderer: vi.Mocked<BaseNotificationTemplateRenderer<Config>> 
   renderFromTemplateContent: vi.fn(),
 };
 
-
-
 describe('BaseNotificationAdapter - One-Off Notifications', () => {
   let adapter: TestAdapter<typeof mockTemplateRenderer, Config>;
 
@@ -121,8 +115,8 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         status: 'PENDING_SEND',
         sentAt: null,
         readAt: null,
-          sendAfter: null,
-          gitCommitSha: null,
+        sendAfter: null,
+        gitCommitSha: null,
       };
 
       expect(isOneOffNotification(oneOffNotification)).toBe(true);
@@ -144,8 +138,8 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         status: 'PENDING_SEND',
         sentAt: null,
         readAt: null,
-          sendAfter: null,
-          gitCommitSha: null,
+        sendAfter: null,
+        gitCommitSha: null,
       };
 
       expect(isOneOffNotification(regularNotification)).toBe(false);
@@ -196,8 +190,8 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         status: 'PENDING_SEND',
         sentAt: null,
         readAt: null,
-          sendAfter: null,
-          gitCommitSha: null,
+        sendAfter: null,
+        gitCommitSha: null,
       };
 
       mockBackend.getUserEmailFromNotification.mockResolvedValue('user@example.com');
@@ -223,8 +217,8 @@ describe('BaseNotificationAdapter - One-Off Notifications', () => {
         status: 'PENDING_SEND',
         sentAt: null,
         readAt: null,
-          sendAfter: null,
-          gitCommitSha: null,
+        sendAfter: null,
+        gitCommitSha: null,
       };
 
       mockBackend.getUserEmailFromNotification.mockResolvedValue(undefined);

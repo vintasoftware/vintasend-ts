@@ -683,7 +683,6 @@ describe('OneOffNotification Types', () => {
         expect(inputWithGitCommitSha).toBeDefined();
       });
 
-
       it('should require gitCommitSha field (nullable) in database one-off notification', () => {
         const notification: DatabaseOneOffNotification<TestConfig> = {
           id: 'notif-123',

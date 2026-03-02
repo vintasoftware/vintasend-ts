@@ -224,7 +224,7 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
   /**
    * Filter notifications using composable query filters.
    * Supports filtering by status, notification type, adapter, recipient,
-    * body/subject templates, context, and date ranges (sendAfter, created, sent).
+   * body/subject templates, context, and date ranges (sendAfter, created, sent).
    * Filters can be combined with logical operators (and, or, not).
    *
    * @param filter - Composable filter expression
@@ -324,9 +324,7 @@ export function isFieldFilter<Config extends BaseNotificationTypeConfig>(
   return !('and' in filter) && !('or' in filter) && !('not' in filter);
 }
 
-export function isStringFilterLookup(
-  value: StringFieldFilter,
-): value is StringFilterLookup {
+export function isStringFilterLookup(value: StringFieldFilter): value is StringFilterLookup {
   return typeof value === 'object' && value !== null && 'lookup' in value && 'value' in value;
 }
 

@@ -5,9 +5,7 @@ import type { BaseNotificationTypeConfig } from '../../../types/notification-typ
 
 // Mock implementations
 interface MockConfig extends BaseNotificationTypeConfig {
-  // biome-ignore lint/suspicious/noExplicitAny: any for testing
   Backend: any;
-  // biome-ignore lint/suspicious/noExplicitAny: any for testing
   ContextMap: any;
   NotificationIdType: string;
   UserIdType: string;

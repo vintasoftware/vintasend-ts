@@ -1,8 +1,10 @@
-import { BaseNotificationAdapter } from 'vintasend/dist/services/notification-adapters/base-notification-adapter';
-import type { BaseEmailTemplateRenderer } from 'vintasend/dist/services/notification-template-renderers/base-email-template-renderer';
-import type { JsonObject } from 'vintasend/dist/types/json-values';
-import type { DatabaseNotification } from 'vintasend/dist/types/notification';
-import type { BaseNotificationTypeConfig } from 'vintasend/dist/types/notification-type-config';
+import type {
+  BaseEmailTemplateRenderer,
+  BaseNotificationTypeConfig,
+  DatabaseNotification,
+  JsonObject,
+} from 'vintasend';
+import { BaseNotificationAdapter } from 'vintasend';
 
 export class NotificationAdapter<
   TemplateRenderer extends BaseEmailTemplateRenderer<Config>,

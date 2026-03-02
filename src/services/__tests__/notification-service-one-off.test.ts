@@ -10,7 +10,6 @@ import type { BaseNotificationBackend } from '../notification-backends/base-noti
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
 
 // Mock implementations
-// biome-ignore lint/suspicious/noExplicitAny: any for testing
 const mockBackend: vi.Mocked<BaseNotificationBackend<any>> = {
   persistNotification: vi.fn(),
   persistNotificationUpdate: vi.fn(),
@@ -50,7 +49,6 @@ const mockBackend: vi.Mocked<BaseNotificationBackend<any>> = {
   deleteNotificationAttachment: vi.fn().mockResolvedValue(undefined),
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: any for testing
 const mockTemplateRenderer: vi.Mocked<BaseEmailTemplateRenderer<any>> = {
   render: vi.fn(),
   renderFromTemplateContent: vi.fn(),
@@ -62,7 +60,6 @@ const mockLogger: vi.Mocked<BaseLogger> = {
   warn: vi.fn(),
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: any for testing
 const mockAdapter: vi.Mocked<BaseNotificationAdapter<any, any>> = {
   notificationType: 'EMAIL',
   key: 'test-adapter',
@@ -74,7 +71,6 @@ const mockAdapter: vi.Mocked<BaseNotificationAdapter<any, any>> = {
   templateRenderer: mockTemplateRenderer,
   logger: mockLogger,
   supportsAttachments: false,
-  // biome-ignore lint/suspicious/noExplicitAny: any for testing
 } as any;
 
 const notificationContextgenerators = {
@@ -95,9 +91,7 @@ type Config = {
 
 describe('NotificationService - One-Off Notifications', () => {
   let service: ReturnType<VintaSendFactory<Config>['create']>;
-  // biome-ignore lint/suspicious/noExplicitAny: any just for testing
   let mockOneOffNotification: DatabaseOneOffNotification<any>;
-  // biome-ignore lint/suspicious/noExplicitAny: any just for testing
   let mockOneOffNotificationInput: Omit<OneOffNotificationInput<any>, 'id'>;
 
   beforeEach(() => {
@@ -499,11 +493,9 @@ describe('NotificationService - One-Off Notifications', () => {
 
       await service.createOneOffNotification(mockOneOffNotificationInput);
 
-      expect(mockBackend.storeAdapterAndContextUsed).toHaveBeenCalledWith(
-        '123',
-        'test-adapter',
-        { test: 'context' },
-      );
+      expect(mockBackend.storeAdapterAndContextUsed).toHaveBeenCalledWith('123', 'test-adapter', {
+        test: 'context',
+      });
     });
 
     it('should mark as failed if send fails', async () => {

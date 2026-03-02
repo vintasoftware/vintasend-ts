@@ -39,7 +39,6 @@ const mockLogger: vi.Mocked<BaseLogger> = {
   warn: vi.fn(),
 };
 
-// biome-ignore lint/suspicious/noExplicitAny: testing adapter mocking
 const mockAdapter: vi.Mocked<BaseNotificationAdapter<any, Config>> = {
   notificationType: 'EMAIL',
   key: 'adapter-1',
@@ -51,7 +50,6 @@ const mockAdapter: vi.Mocked<BaseNotificationAdapter<any, Config>> = {
   templateRenderer: mockTemplateRenderer,
   logger: mockLogger,
   supportsAttachments: false,
-  // biome-ignore lint/suspicious/noExplicitAny: test-only mock
 } as any;
 
 const contextGenerators: ContextGenerators = {

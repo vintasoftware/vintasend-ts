@@ -3,8 +3,8 @@ import type {
   BaseNotificationTemplateRenderer,
   BaseNotificationTypeConfig,
   DatabaseNotification,
+  JsonObject,
 } from 'vintasend';
-import type { JsonObject } from 'vintasend/dist/types/json-values';
 
 export class TemplateRenderer<Config extends BaseNotificationTypeConfig>
   implements BaseNotificationTemplateRenderer<Config>
@@ -13,7 +13,11 @@ export class TemplateRenderer<Config extends BaseNotificationTypeConfig>
     throw new Error('Not implemented');
   }
 
-  async renderFromTemplateContent(notification: AnyNotification<Config>, templateContent: unknown, context: JsonObject): Promise<unknown> {
+  async renderFromTemplateContent(
+    notification: AnyNotification<Config>,
+    templateContent: unknown,
+    context: JsonObject,
+  ): Promise<unknown> {
     throw new Error('Not implemented');
   }
 }

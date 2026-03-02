@@ -262,4 +262,3 @@ describe('Attachment Type Definitions', () => {
     });
   });
 });
-

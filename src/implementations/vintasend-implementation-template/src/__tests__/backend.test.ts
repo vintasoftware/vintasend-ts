@@ -1,4 +1,4 @@
-import type { BaseLogger } from 'vintasend/dist/services/loggers/base-logger';
+import type { BaseLogger } from 'vintasend';
 import { NotificationBackend } from '../backend';
 
 describe('NotificationBackend', () => {
@@ -36,21 +36,27 @@ describe('NotificationBackend', () => {
       };
 
       // TODO: When implemented, assert persistence payload and mapped result.
-      await expect(backend.persistNotification(input as any)).rejects.toThrow('Method not implemented.');
+      await expect(backend.persistNotification(input as any)).rejects.toThrow(
+        'Method not implemented.',
+      );
     });
   });
 
   describe('markAsSent', () => {
     it('should mark a notification as sent', async () => {
       // TODO: When implemented, assert updated status and sentAt timestamp.
-      await expect(backend.markAsSent('notification-1', true)).rejects.toThrow('Method not implemented.');
+      await expect(backend.markAsSent('notification-1', true)).rejects.toThrow(
+        'Method not implemented.',
+      );
     });
   });
 
   describe('getNotification', () => {
     it('should fetch a notification by id', async () => {
       // TODO: When implemented, assert lookup by ID and return type.
-      await expect(backend.getNotification('notification-1', false)).rejects.toThrow('Method not implemented.');
+      await expect(backend.getNotification('notification-1', false)).rejects.toThrow(
+        'Method not implemented.',
+      );
     });
   });
 
@@ -61,7 +67,9 @@ describe('NotificationBackend', () => {
       };
 
       // TODO: Check filter translation assertions for your data source.
-      await expect(backend.filterNotifications(filter as any, 1, 20)).rejects.toThrow('Method not implemented.');
+      await expect(backend.filterNotifications(filter as any, 1, 20)).rejects.toThrow(
+        'Method not implemented.',
+      );
     });
   });
 
@@ -73,7 +81,9 @@ describe('NotificationBackend', () => {
     });
 
     it('should retrieve attachments from a notification', async () => {
-      await expect(backend.getAttachments('notification-1')).rejects.toThrow('Method not implemented.');
+      await expect(backend.getAttachments('notification-1')).rejects.toThrow(
+        'Method not implemented.',
+      );
     });
 
     it('should delete a notification attachment', async () => {

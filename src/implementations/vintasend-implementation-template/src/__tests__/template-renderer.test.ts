@@ -1,4 +1,4 @@
-import type { DatabaseNotification } from 'vintasend/dist/types/notification';
+import type { DatabaseNotification } from 'vintasend';
 import { TemplateRendererFactory } from '../template-renderer';
 
 type MockConfig = {

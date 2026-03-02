@@ -189,7 +189,9 @@ describe('LocalFileAttachmentManager', () => {
     });
 
     it('should throw error if storage metadata is invalid', () => {
-      expect(() => manager.reconstructAttachmentFile({ id: 'test' })).toThrow('Invalid storage identifiers');
+      expect(() => manager.reconstructAttachmentFile({ id: 'test' })).toThrow(
+        'Invalid storage identifiers',
+      );
     });
   });
 

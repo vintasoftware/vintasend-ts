@@ -1,10 +1,10 @@
-import { BaseAttachmentManager } from 'vintasend/dist/services/attachment-manager/base-attachment-manager';
 import type {
-  AttachmentFileRecord,
   AttachmentFile,
+  AttachmentFileRecord,
   FileAttachment,
   StorageIdentifiers,
-} from 'vintasend/dist/types/attachment';
+} from 'vintasend';
+import { BaseAttachmentManager } from 'vintasend';
 
 /**
  * Template AttachmentManager implementation.

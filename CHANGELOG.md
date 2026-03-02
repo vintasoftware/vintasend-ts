@@ -1,5 +1,10 @@
 # Changelog
 
+# Version 0.11.0
+
+* Centralized most type exports in the root package, so all usages can import directly from 'vintasend'.
+* Adjusted linter/formatter rules and scripts to ensure consistency between the root package and all implementations.
+
 ## Version 0.10.0
 
 * Support vintasend-react-email.

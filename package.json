@@ -1,6 +1,6 @@
 {
   "name": "vintasend",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "main": "dist/index.js",
   "files": [
     "dist"
@@ -9,7 +9,7 @@
   "license": "MIT",
   "scripts": {
     "lint": "biome check .",
-    "format": "biome format .",
+    "format": "biome check --write .",
     "check": "biome check --write .",
     "build": "tsc",
     "prepublishOnly": "npm run build",
@@ -17,19 +17,25 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "implementation:generate": "node scripts/generate-implementation.js",
+    "lint:implementations": "node scripts/run-implementations-script.js lint",
+    "format:implementations": "node scripts/run-implementations-script.js format",
     "test:implementations:local": "node scripts/test-implementations-local.js",
+    "build:implementations:local": "node scripts/test-implementations-local.js --command=build",
+    "release:prepare": "npm run format:implementations && npm run test:implementations:local && npm run build:implementations:local",
     "release:bump": "node scripts/release-bump.js",
     "release:bump:patch": "node scripts/release-bump.js --bump=patch",
     "release:bump:minor": "node scripts/release-bump.js --bump=minor",
     "release:bump:alpha": "node scripts/release-bump.js --bump=alpha",
     "release:bump:promote": "node scripts/release-bump.js --bump=promote",
-    "release:publish": "node scripts/release-publish.js"
+    "release:publish": "node scripts/release-publish.js",
+    "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.11",
+    "@biomejs/biome": "^2.4.5",
     "@types/mime-types": "^3.0.1",
     "@types/node": "^25.0.8",
     "@vitest/coverage-v8": "4.0.18",
+    "husky": "^9.1.7",
     "typescript": "^5.9.3",
     "vitest": "4.0.18"
   },

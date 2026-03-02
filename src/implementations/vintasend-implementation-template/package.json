@@ -6,6 +6,9 @@
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build",
+    "prepare": "husky",
+    "lint": "biome check .",
+    "format": "biome check --write .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
@@ -17,7 +20,9 @@
     "vintasend": "^0.9.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.5",
     "@vitest/coverage-v8": "4.0.18",
+    "husky": "^9.1.7",
     "typescript": "^5.9.3",
     "vitest": "4.0.18"
   }

@@ -1,5 +1,9 @@
 import type { BaseNotificationBackend } from '../base-notification-backend';
-import { supportsAttachments, isFieldFilter, isStringFilterLookup } from '../base-notification-backend';
+import {
+  supportsAttachments,
+  isFieldFilter,
+  isStringFilterLookup,
+} from '../base-notification-backend';
 import type {
   NotificationFilter,
   NotificationFilterFields,
@@ -153,10 +157,7 @@ class TestBackendWithAttachments implements BaseNotificationBackend<TestConfig> 
     return [];
   }
 
-  async deleteNotificationAttachment(
-    notificationId: string,
-    attachmentId: string,
-  ): Promise<void> {
+  async deleteNotificationAttachment(notificationId: string, attachmentId: string): Promise<void> {
     // Implementation
   }
 }
@@ -261,8 +262,7 @@ describe('BaseNotificationBackend Interface', () => {
     });
 
     it('should allow calling typed methods after type guard', () => {
-      const backend: BaseNotificationBackend<TestConfig> =
-        new TestBackendWithAttachments();
+      const backend: BaseNotificationBackend<TestConfig> = new TestBackendWithAttachments();
 
       if (supportsAttachments(backend)) {
         // These should compile without errors
@@ -452,11 +452,7 @@ describe('BaseNotificationBackend Interface', () => {
     it('should accept an explicit AND filter', async () => {
       const backend = new TestBackendWithAttachments();
       const filter: NotificationFilter<TestConfig> = {
-        and: [
-          { status: 'SENT' },
-          { notificationType: 'EMAIL' },
-          { userId: 'user-789' },
-        ],
+        and: [{ status: 'SENT' }, { notificationType: 'EMAIL' }, { userId: 'user-789' }],
       };
       const result = await backend.filterNotifications(filter, 1, 10);
       expect(result).toEqual([]);
@@ -465,10 +461,7 @@ describe('BaseNotificationBackend Interface', () => {
     it('should accept an OR filter', async () => {
       const backend = new TestBackendWithAttachments();
       const filter: NotificationFilter<TestConfig> = {
-        or: [
-          { status: 'SENT' },
-          { status: 'FAILED' },
-        ],
+        or: [{ status: 'SENT' }, { status: 'FAILED' }],
       };
       const result = await backend.filterNotifications(filter, 1, 10);
       expect(result).toEqual([]);
@@ -492,10 +485,7 @@ describe('BaseNotificationBackend Interface', () => {
             or: [
               { status: 'SENT', sentAtRange: { from: new Date('2025-01-01') } },
               {
-                and: [
-                  { status: 'PENDING_SEND' },
-                  { not: { adapterUsed: 'deprecated-adapter' } },
-                ],
+                and: [{ status: 'PENDING_SEND' }, { not: { adapterUsed: 'deprecated-adapter' } }],
               },
             ],
           },
@@ -510,10 +500,7 @@ describe('BaseNotificationBackend Interface', () => {
       const backend = new TestBackendWithAttachments();
       const filter: NotificationFilter<TestConfig> = {
         not: {
-          or: [
-            { status: 'CANCELLED' },
-            { status: 'FAILED' },
-          ],
+          or: [{ status: 'CANCELLED' }, { status: 'FAILED' }],
         },
       };
       const result = await backend.filterNotifications(filter, 1, 10);

@@ -61,7 +61,39 @@ function ensureLocalVintaSend(pkgJson, localSpec) {
 const repoRoot = process.cwd();
 const implementationsRoot = path.join(repoRoot, "src", "implementations");
 const originalContents = new Map();
-const requestedImplementations = process.argv.slice(2);
+
+function parseArgs(argv) {
+  let command = "test";
+  const implementations = [];
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+
+    if (arg.startsWith("--command=")) {
+      command = arg.slice("--command=".length);
+      continue;
+    }
+
+    if (arg === "--command") {
+      const next = argv[i + 1];
+      if (!next) {
+        throw new Error("Missing value for --command");
+      }
+
+      command = next;
+      i += 1;
+      continue;
+    }
+
+    implementations.push(arg);
+  }
+
+  return { command, implementations };
+}
+
+const { command, implementations: requestedImplementations } = parseArgs(
+  process.argv.slice(2),
+);
 
 const allImplementationDirs = fs
   .readdirSync(implementationsRoot, { withFileTypes: true })
@@ -99,6 +131,7 @@ if (implementationDirs.length === 0) {
 }
 
 try {
+  console.log(`Running implementation script: ${command}`);
   console.log("Building local vintasend...");
   run("npm", ["run", "build"], repoRoot);
 
@@ -117,9 +150,9 @@ try {
 
   for (const packageDir of implementationDirs) {
     const name = path.basename(packageDir);
-    console.log(`\nTesting ${name} with local vintasend...`);
+    console.log(`\nRunning ${command} on ${name} with local vintasend...`);
     run("npm", ["install", "--no-package-lock"], packageDir);
-    run("npm", ["test"], packageDir);
+    run("npm", ["run", command], packageDir);
   }
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);

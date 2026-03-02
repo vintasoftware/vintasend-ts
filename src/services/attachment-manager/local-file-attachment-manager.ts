@@ -2,7 +2,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Readable } from 'node:stream';
 import { promisify } from 'node:util';
-import type { AttachmentFile, AttachmentFileRecord, FileAttachment, StorageIdentifiers } from '../../types/attachment';
+import type {
+  AttachmentFile,
+  AttachmentFileRecord,
+  FileAttachment,
+  StorageIdentifiers,
+} from '../../types/attachment';
 import { BaseAttachmentManager } from './base-attachment-manager';
 
 const writeFile = promisify(fs.writeFile);

@@ -24,7 +24,9 @@ describe('TemplateAttachmentManager', () => {
       //   storageMetadata: expect.any(Object),
       // });
 
-      await expect(manager.uploadFile(buffer, filename, contentType)).rejects.toThrow('not implemented');
+      await expect(manager.uploadFile(buffer, filename, contentType)).rejects.toThrow(
+        'not implemented',
+      );
     });
 
     it('should auto-detect content type if not provided', async () => {
@@ -46,7 +48,9 @@ describe('TemplateAttachmentManager', () => {
       // 2. Delete the file
       // 3. Verify file is deleted (getFile returns null)
 
-      await expect(manager.deleteFileByIdentifiers({ id: 'test-id' })).rejects.toThrow('not implemented');
+      await expect(manager.deleteFileByIdentifiers({ id: 'test-id' })).rejects.toThrow(
+        'not implemented',
+      );
     });
   });
 

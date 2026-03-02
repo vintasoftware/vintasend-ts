@@ -1,9 +1,21 @@
-import type { BaseNotificationBackend, NotificationFilter, NotificationFilterCapabilities, NotificationOrderBy } from 'vintasend/dist/services/notification-backends/base-notification-backend';
-import type { InputJsonValue } from 'vintasend/dist/types/json-values';
-import type { AnyDatabaseNotification, AnyNotification, DatabaseNotification, DatabaseOneOffNotification, Notification, NotificationInput, OneOffNotificationInput } from 'vintasend/dist/types/notification';
-import type { BaseNotificationTypeConfig } from 'vintasend/dist/types/notification-type-config';
-import { BaseLogger } from '../../../../dist/services/loggers/base-logger';
-import { AttachmentFileRecord, StoredAttachment } from '../../../../dist';
+import type {
+  AnyDatabaseNotification,
+  AnyNotification,
+  AttachmentFileRecord,
+  BaseLogger,
+  BaseNotificationBackend,
+  BaseNotificationTypeConfig,
+  DatabaseNotification,
+  DatabaseOneOffNotification,
+  InputJsonValue,
+  Notification,
+  NotificationFilter,
+  NotificationFilterCapabilities,
+  NotificationInput,
+  NotificationOrderBy,
+  OneOffNotificationInput,
+  StoredAttachment,
+} from 'vintasend';
 
 export class NotificationBackend<Config extends BaseNotificationTypeConfig>
   implements BaseNotificationBackend<Config>
@@ -12,13 +24,16 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
 
   getBackendIdentifier?(): string {
     return 'vintasend-implementation-template'; // Return a unique identifier for this backend implementation (e.g., 'postgresql', 'mongodb', 'dynamodb', etc.)
-  };
+  }
 
   getAllPendingNotifications(): Promise<AnyDatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  getPendingNotifications(page: number, pageSize: number): Promise<AnyDatabaseNotification<Config>[]> {
+  getPendingNotifications(
+    page: number,
+    pageSize: number,
+  ): Promise<AnyDatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
@@ -26,21 +41,32 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
     throw new Error('Method not implemented.');
   }
 
-  getFutureNotifications(page: number, pageSize: number): Promise<AnyDatabaseNotification<Config>[]> {
+  getFutureNotifications(
+    page: number,
+    pageSize: number,
+  ): Promise<AnyDatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  getAllFutureNotificationsFromUser(userId: Config['UserIdType']): Promise<DatabaseNotification<Config>[]> {
+  getAllFutureNotificationsFromUser(
+    userId: Config['UserIdType'],
+  ): Promise<DatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  getFutureNotificationsFromUser(userId: Config['UserIdType'], page: number, pageSize: number): Promise<DatabaseNotification<Config>[]> {
+  getFutureNotificationsFromUser(
+    userId: Config['UserIdType'],
+    page: number,
+    pageSize: number,
+  ): Promise<DatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  persistNotification(notification: Omit<Notification<Config>, 'id'> & {
+  persistNotification(
+    notification: Omit<Notification<Config>, 'id'> & {
       id?: Config['NotificationIdType'];
-  }): Promise<DatabaseNotification<Config>> {
+    },
+  ): Promise<DatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
 
@@ -52,29 +78,43 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
     throw new Error('Method not implemented.');
   }
 
-  bulkPersistNotifications(notifications: Omit<AnyNotification<Config>, 'id'>[]): Promise<Config['NotificationIdType'][]> {
+  bulkPersistNotifications(
+    notifications: Omit<AnyNotification<Config>, 'id'>[],
+  ): Promise<Config['NotificationIdType'][]> {
     throw new Error('Method not implemented.');
   }
 
-  persistNotificationUpdate(notificationId: Config['NotificationIdType'], notification: Partial<Omit<Notification<Config>, 'id'>>): Promise<DatabaseNotification<Config>> {
+  persistNotificationUpdate(
+    notificationId: Config['NotificationIdType'],
+    notification: Partial<Omit<Notification<Config>, 'id'>>,
+  ): Promise<DatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
 
   applyReplicationSnapshotIfNewer?(snapshot: AnyDatabaseNotification<Config>): Promise<{
-      applied: boolean;
+    applied: boolean;
   }> {
     throw new Error('Method not implemented.');
   }
 
-  markAsSent(notificationId: Config['NotificationIdType'], checkIsPending: boolean): Promise<AnyDatabaseNotification<Config>> {
+  markAsSent(
+    notificationId: Config['NotificationIdType'],
+    checkIsPending: boolean,
+  ): Promise<AnyDatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
 
-  markAsFailed(notificationId: Config['NotificationIdType'], checkIsPending: boolean): Promise<AnyDatabaseNotification<Config>> {
+  markAsFailed(
+    notificationId: Config['NotificationIdType'],
+    checkIsPending: boolean,
+  ): Promise<AnyDatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
 
-  markAsRead(notificationId: Config['NotificationIdType'], checkIsSent: boolean): Promise<DatabaseNotification<Config>> {
+  markAsRead(
+    notificationId: Config['NotificationIdType'],
+    checkIsSent: boolean,
+  ): Promise<DatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
 
@@ -82,37 +122,60 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
     throw new Error('Method not implemented.');
   }
 
-  getNotification(notificationId: Config['NotificationIdType'], forUpdate: boolean): Promise<AnyDatabaseNotification<Config> | null> {
+  getNotification(
+    notificationId: Config['NotificationIdType'],
+    forUpdate: boolean,
+  ): Promise<AnyDatabaseNotification<Config> | null> {
     throw new Error('Method not implemented.');
   }
 
-  filterAllInAppUnreadNotifications(userId: Config['UserIdType']): Promise<DatabaseNotification<Config>[]> {
+  filterAllInAppUnreadNotifications(
+    userId: Config['UserIdType'],
+  ): Promise<DatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  filterInAppUnreadNotifications(userId: Config['UserIdType'], page: number, pageSize: number): Promise<DatabaseNotification<Config>[]> {
+  filterInAppUnreadNotifications(
+    userId: Config['UserIdType'],
+    page: number,
+    pageSize: number,
+  ): Promise<DatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  getUserEmailFromNotification(notificationId: Config['NotificationIdType']): Promise<string | undefined> {
+  getUserEmailFromNotification(
+    notificationId: Config['NotificationIdType'],
+  ): Promise<string | undefined> {
     throw new Error('Method not implemented.');
   }
 
-  storeAdapterAndContextUsed(notificationId: Config['NotificationIdType'], adapterKey: string, context: InputJsonValue): Promise<void> {
+  storeAdapterAndContextUsed(
+    notificationId: Config['NotificationIdType'],
+    adapterKey: string,
+    context: InputJsonValue,
+  ): Promise<void> {
     throw new Error('Method not implemented.');
   }
 
-  persistOneOffNotification(notification: Omit<OneOffNotificationInput<Config>, 'id'> & {
+  persistOneOffNotification(
+    notification: Omit<OneOffNotificationInput<Config>, 'id'> & {
       id?: Config['NotificationIdType'];
-  }): Promise<DatabaseOneOffNotification<Config>> {
+    },
+  ): Promise<DatabaseOneOffNotification<Config>> {
     throw new Error('Method not implemented.');
   }
 
-  persistOneOffNotificationUpdate(notificationId: Config['NotificationIdType'], notification: Partial<Omit<OneOffNotificationInput<Config>, 'id'>>): Promise<DatabaseOneOffNotification<Config>> {
+  persistOneOffNotificationUpdate(
+    notificationId: Config['NotificationIdType'],
+    notification: Partial<Omit<OneOffNotificationInput<Config>, 'id'>>,
+  ): Promise<DatabaseOneOffNotification<Config>> {
     throw new Error('Method not implemented.');
   }
 
-  getOneOffNotification(notificationId: Config['NotificationIdType'], forUpdate: boolean): Promise<DatabaseOneOffNotification<Config> | null> {
+  getOneOffNotification(
+    notificationId: Config['NotificationIdType'],
+    forUpdate: boolean,
+  ): Promise<DatabaseOneOffNotification<Config> | null> {
     throw new Error('Method not implemented.');
   }
 
@@ -120,22 +183,30 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
     throw new Error('Method not implemented.');
   }
 
-  getOneOffNotifications(page: number, pageSize: number): Promise<DatabaseOneOffNotification<Config>[]> {
+  getOneOffNotifications(
+    page: number,
+    pageSize: number,
+  ): Promise<DatabaseOneOffNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
   /**
    * Filter notifications using composable query filters.
    * Supports filtering by status, notification type, adapter, recipient,
-    * body/subject templates, context, and date ranges (sendAfter, created, sent).
-    * Filters can be combined with logical operators (and, or, not).
-    *
-    * @param filter - Composable filter expression
-    * @param page - Page number (1-indexed) for pagination
-    * @param pageSize - Number of results per page
-    * @returns Matching notifications
-    */
-  filterNotifications(filter: NotificationFilter<Config>, page: number, pageSize: number, orderBy?: NotificationOrderBy): Promise<AnyDatabaseNotification<Config>[]> {
+   * body/subject templates, context, and date ranges (sendAfter, created, sent).
+   * Filters can be combined with logical operators (and, or, not).
+   *
+   * @param filter - Composable filter expression
+   * @param page - Page number (1-indexed) for pagination
+   * @param pageSize - Number of results per page
+   * @returns Matching notifications
+   */
+  filterNotifications(
+    filter: NotificationFilter<Config>,
+    page: number,
+    pageSize: number,
+    orderBy?: NotificationOrderBy,
+  ): Promise<AnyDatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
@@ -218,14 +289,17 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
   /**
    * Get all attachments for a specific notification
    */
-  getAttachments(notificationId: Config['NotificationIdType']): Promise<StoredAttachment[]> {
+  getAttachments(notificationId: Config['NotificationIdType']): Promise<type[]> {
     throw new Error('Method not implemented.');
   }
 
   /**
    * Delete a specific attachment from a notification
    */
-  deleteNotificationAttachment?(notificationId: Config['NotificationIdType'], attachmentId: string): Promise<void> {
+  deleteNotificationAttachment?(
+    notificationId: Config['NotificationIdType'],
+    attachmentId: string,
+  ): Promise<void> {
     throw new Error('Method not implemented.');
   }
 }

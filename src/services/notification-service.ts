@@ -46,10 +46,7 @@ type RenderEmailTemplateContextInput<Config extends BaseNotificationTypeConfig> 
 
 type VintaSendFactoryCreateParams<
   Config extends BaseNotificationTypeConfig,
-  AdaptersList extends BaseNotificationAdapter<
-    BaseNotificationTemplateRenderer<Config>,
-    Config
-  >[],
+  AdaptersList extends BaseNotificationAdapter<BaseNotificationTemplateRenderer<Config>, Config>[],
   Backend extends BaseNotificationBackend<Config>,
   Logger extends BaseLogger,
   QueueService extends BaseNotificationQueueService<Config>,
@@ -282,7 +279,6 @@ export class VintaSend<
       adapter.injectBackend(backend);
       adapter.injectLogger(logger);
       // Inject logger into template renderer if it supports it
-      // biome-ignore lint/suspicious/noExplicitAny: accessing protected templateRenderer property
       const templateRenderer = (adapter as any).templateRenderer;
       if (templateRenderer && typeof templateRenderer.injectLogger === 'function') {
         templateRenderer.injectLogger(logger);
@@ -381,7 +377,9 @@ export class VintaSend<
 
         try {
           await additionalWrite(additionalBackend, primaryResult);
-          this.logger.info(`${operation} replicated to backend ${backendIdentifier} in inline mode`);
+          this.logger.info(
+            `${operation} replicated to backend ${backendIdentifier} in inline mode`,
+          );
         } catch (replicationError) {
           this.logger.error(
             `Failed to replicate ${operation} to backend ${backendIdentifier}: ${replicationError}`,
@@ -557,12 +555,12 @@ export class VintaSend<
   }
 
   async send(notification: AnyDatabaseNotification<Config>): Promise<void> {
-    const notificationWithExecutionGitCommitSha = await this.resolveAndPersistGitCommitShaForExecution(
-      notification,
-    );
+    const notificationWithExecutionGitCommitSha =
+      await this.resolveAndPersistGitCommitShaForExecution(notification);
 
     const adaptersOfType = this.adapters.filter(
-      (adapter) => adapter.notificationType === notificationWithExecutionGitCommitSha.notificationType,
+      (adapter) =>
+        adapter.notificationType === notificationWithExecutionGitCommitSha.notificationType,
     );
     if (adaptersOfType.length === 0) {
       this.logger.error(
@@ -863,7 +861,11 @@ export class VintaSend<
     pageSize: number,
     backendIdentifier?: string,
   ) {
-    return this.getBackend(backendIdentifier).getFutureNotificationsFromUser(userId, page, pageSize);
+    return this.getBackend(backendIdentifier).getFutureNotificationsFromUser(
+      userId,
+      page,
+      pageSize,
+    );
   }
 
   async getFutureNotifications(page: number, pageSize: number, backendIdentifier?: string) {
@@ -972,7 +974,7 @@ export class VintaSend<
    *
    * @param notificationId - The ID of the one-off notification to retrieve
    * @param forUpdate - Whether the notification is being retrieved for update (default: false)
-    * @param backendIdentifier - Optional backend identifier. When omitted, the primary backend is used.
+   * @param backendIdentifier - Optional backend identifier. When omitted, the primary backend is used.
    * @returns The one-off notification or null if not found
    */
   async getOneOffNotification(
@@ -1125,9 +1127,8 @@ export class VintaSend<
       return;
     }
 
-    const notificationWithExecutionGitCommitSha = await this.resolveAndPersistGitCommitShaForExecution(
-      notification,
-    );
+    const notificationWithExecutionGitCommitSha =
+      await this.resolveAndPersistGitCommitShaForExecution(notification);
 
     const context = await this.getNotificationContext(
       notificationWithExecutionGitCommitSha.contextName,
@@ -1144,16 +1145,16 @@ export class VintaSend<
           `Error sending notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key}: ${sendError}`,
         );
         try {
-            await this.executeMultiBackendWrite(
-              'markAsFailed',
-              async (backend) => {
-                return backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
-              },
-              async (backend) => {
-                await backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
-              },
-              notificationWithExecutionGitCommitSha.id,
-            );
+          await this.executeMultiBackendWrite(
+            'markAsFailed',
+            async (backend) => {
+              return backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
+            },
+            async (backend) => {
+              await backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
+            },
+            notificationWithExecutionGitCommitSha.id,
+          );
         } catch (markFailedError) {
           this.logger.error(
             `Error marking notification ${notificationWithExecutionGitCommitSha.id} as failed: ${markFailedError}`,
@@ -1269,9 +1270,7 @@ export class VintaSend<
    * The report includes backend-level existence/errors and field-level discrepancies
    * when comparing additional backends against the primary backend.
    */
-  async verifyNotificationSync(
-    notificationId: Config['NotificationIdType'],
-  ): Promise<{
+  async verifyNotificationSync(notificationId: Config['NotificationIdType']): Promise<{
     synced: boolean;
     backends: Record<
       string,
@@ -1439,12 +1438,10 @@ export class VintaSend<
 
     const replicationTaskResults = await Promise.all(
       replicationTargets.map(async ({ backend, backendIdentifier }) => {
-
         try {
           if (typeof backend.applyReplicationSnapshotIfNewer === 'function') {
-            const conditionalApplyResult = await backend.applyReplicationSnapshotIfNewer(
-              primaryNotification,
-            );
+            const conditionalApplyResult =
+              await backend.applyReplicationSnapshotIfNewer(primaryNotification);
 
             if (!conditionalApplyResult.applied) {
               this.logger.info(
@@ -1522,9 +1519,7 @@ export class VintaSend<
    * If a notification already exists in an additional backend, it is updated.
    * Otherwise, it is created.
    */
-  async replicateNotification(
-    notificationId: Config['NotificationIdType'],
-  ): Promise<{
+  async replicateNotification(notificationId: Config['NotificationIdType']): Promise<{
     successes: string[];
     failures: {
       backend: string;

@@ -17,7 +17,10 @@ export type TextNotificationTemplateContent = {
 
 export interface BaseTextNotificationTemplateRenderer<Config extends BaseNotificationTypeConfig>
   extends BaseNotificationTemplateRenderer<Config, TextNotificationTemplate> {
-  render(notification: AnyNotification<Config>, context: JsonObject): Promise<TextNotificationTemplate>;
+  render(
+    notification: AnyNotification<Config>,
+    context: JsonObject,
+  ): Promise<TextNotificationTemplate>;
 
   renderFromTemplateContent(
     notification: AnyNotification<Config>,
