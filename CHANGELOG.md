@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 0.10.0
+
+* Support vintasend-react-email.
+* Improve vintasend-implementation-template to help contributors to build new implementations.
+* Create script to clone vintasend-implementation-template to help contributors to build new implementations.
+* **BREAKING CHANGE**: Move pug-inline-email-template-renderer from vintasend-medplum to vintasend-pug.
+
 ## Version 0.9.1
 
 * Migrate vintasend and all officially supported packages from jest to vitest
