@@ -408,6 +408,33 @@ describe('NotificationService', () => {
       expect(result.id).toBe('123');
     });
 
+    it('should wait for persistence before sending immediately', async () => {
+      const notificationWithNullSendAfter = {
+        ...mockNewNotification,
+        sendAfter: null,
+      };
+
+      let resolvePersist: ((value: any) => void) | undefined;
+      const persistPromise = new Promise((resolve) => {
+        resolvePersist = resolve;
+      });
+
+      mockBackend.persistNotification.mockReturnValue(persistPromise as any);
+      vi.spyOn(service, 'send').mockResolvedValue();
+
+      const createPromise = service.createNotification(notificationWithNullSendAfter);
+
+      await Promise.resolve();
+      expect(service.send).not.toHaveBeenCalled();
+
+      resolvePersist?.({ ...notificationWithNullSendAfter, id: '123' });
+      await createPromise;
+
+      expect(service.send).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '123', sendAfter: null }),
+      );
+    });
+
     it('should send immediately when sendAfter is in the past', async () => {
       const pastDate = new Date();
       pastDate.setHours(pastDate.getHours() - 1);

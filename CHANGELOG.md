@@ -1,5 +1,9 @@
 # Changelog
 
+# Version 0.12.2
+
+* Added the missing `getAllPendingNotification` method to the service.
+
 # Version 0.12.1
 
 * Fixed Prisma pending notifications queries in `vintasend-prisma` by moving `OR` conditions to the `where` root level (Prisma-compatible), preventing runtime validation errors in workers.

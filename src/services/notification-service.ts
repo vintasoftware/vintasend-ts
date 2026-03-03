@@ -918,6 +918,13 @@ export class VintaSend<
   }
 
   /**
+   * Gets all pending notifications from the primary backend by default or from a specific backend.
+   */
+  async getAllPendingNotifications(backendIdentifier?: string) {
+    return this.getBackend(backendIdentifier).getAllPendingNotifications();
+  }
+
+  /**
    * Gets pending notifications from the primary backend by default or from a specific backend.
    */
   async getPendingNotifications(page: number, pageSize: number, backendIdentifier?: string) {
