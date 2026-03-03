@@ -1,5 +1,9 @@
 # Changelog
 
+# Version 0.11.4
+
+* Adjust root package tsconfig.json.
+
 # Version 0.11.3
 
 * Add type module to all package.json files.

@@ -4,6 +4,7 @@ import readline from 'node:readline';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
 
 import { readPackageJson, getPackageName } from './utils/package-updater.js';
 import { buildPackage, testPackage, publishPackage } from './utils/publisher.js';
@@ -216,7 +217,6 @@ async function main() {
 
       // Install dependencies (to get the newly published vintasend)
       logInfo('Installing dependencies...');
-      const { execSync } = require('child_process');
       try {
         execSync('npm install', { cwd: pkg.dir, stdio: 'inherit' });
         logSuccess('Dependencies installed');
