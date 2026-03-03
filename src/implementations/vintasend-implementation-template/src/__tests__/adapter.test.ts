@@ -4,7 +4,7 @@ import type {
   DatabaseNotification,
   DatabaseOneOffNotification,
 } from 'vintasend';
-import { type Mocked, vi } from 'vitest';
+import { type Mocked, vi, describe, it, expect, beforeEach } from 'vitest';
 import { NotificationAdapterFactory } from '../adapter';
 
 describe('NotificationAdapter', () => {

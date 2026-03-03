@@ -1,5 +1,10 @@
 # Changelog
 
+# Version 0.11.1
+
+* Adjust test imports
+* Adjust prisma client interface
+
 # Version 0.11.0
 
 * Centralized most type exports in the root package, so all usages can import directly from 'vintasend'.

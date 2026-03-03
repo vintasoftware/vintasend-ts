@@ -1,10 +1,11 @@
-import type { DatabaseNotification } from 'vintasend';
+import type { DatabaseNotification, JsonValue } from 'vintasend';
 import { TemplateRendererFactory } from '../template-renderer';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 type MockConfig = {
   ContextMap: {
     testContext: {
-      generate: (params: Record<string, unknown>) => Promise<Record<string, unknown>>;
+      generate: (params: Record<string, JsonValue | undefined>) => Promise<Record<string, JsonValue | undefined>>;
     };
   };
   NotificationIdType: string;
