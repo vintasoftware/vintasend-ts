@@ -1,18 +1,20 @@
 #!/usr/bin/env node
 
-const readline = require('readline');
-const path = require('path');
-const fs = require('fs');
+import readline from 'node:readline';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
-const { findHighestVersion, getImplementationPackages } = require('./utils/version-finder');
-const { bumpVersion, isValidVersion } = require('./utils/version-bumper');
-const {
+import { findHighestVersion, getImplementationPackages, compareVersions } from './utils/version-finder.js';
+import { bumpVersion, isValidVersion } from './utils/version-bumper.js';
+import {
   updatePackageVersion,
   updateVintasendDependency,
   getPackageName,
   readPackageJson
-} = require('./utils/package-updater');
-const { compareVersions } = require('./utils/version-finder');
+} from './utils/package-updater.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -113,35 +115,35 @@ async function main() {
       logError('Cannot promote alpha: current version is not an alpha version');
       process.exit(1);
     }
-    
+
     // If --bump=alpha was passed and current version is already alpha, ask if user wants to increment
     if (selectedBumpType === 'alpha' && isCurrentAlpha) {
       console.log('\nCurrent version is already an alpha. What would you like to do?');
       console.log('  1) Increment alpha iteration only (e.g., ' + highestVersion + ' → ' + currentAlphaMatch[1] + '-alpha' + (parseInt(currentAlphaMatch[2]) + 1) + ')');
       console.log('  2) Create new alpha version (bump base version first)');
       const alphaChoice = await question('\nEnter choice (1 or 2): ');
-      
+
       if (alphaChoice === '1') {
         selectedBumpType = 'alpha-iteration';
         alphaIteration = parseInt(currentAlphaMatch[2]) + 1;
       }
       // If choice is 2 or anything else, keep selectedBumpType as 'alpha' and continue
     }
-    
+
     if (!selectedBumpType) {
       console.log('\nSelect version bump type:');
       console.log('  1) patch (e.g., 0.4.14 → 0.4.15)');
       console.log('  2) minor (e.g., 0.4.14 → 0.5.0)');
       console.log('  3) alpha (e.g., 0.4.14 → 0.4.15-alpha1)');
-      
+
       if (isCurrentAlpha) {
         console.log(`  4) increment alpha (e.g., ${highestVersion} → ${currentAlphaMatch[1]}-alpha${parseInt(currentAlphaMatch[2]) + 1})`);
         console.log(`  5) promote alpha to stable (e.g., ${highestVersion} → ${currentAlphaMatch[1]})`);
       }
-      
+
       const maxChoice = isCurrentAlpha ? 5 : 3;
       const choice = await question(`\nEnter choice (1, 2, ${isCurrentAlpha ? '3, 4, or 5' : 'or 3'}): `);
-      
+
       if (choice === '2') {
         selectedBumpType = 'minor';
       } else if (choice === '3') {

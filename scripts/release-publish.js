@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 
-const readline = require('readline');
-const path = require('path');
-const fs = require('fs');
+import readline from 'node:readline';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
-const { readPackageJson, getPackageName } = require('./utils/package-updater');
-const { buildPackage, testPackage, publishPackage } = require('./utils/publisher');
-const { stageFiles, commit } = require('./utils/git-handler');
+import { readPackageJson, getPackageName } from './utils/package-updater.js';
+import { buildPackage, testPackage, publishPackage } from './utils/publisher.js';
+import { stageFiles, commit } from './utils/git-handler.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Parse command line arguments
 const args = process.argv.slice(2);

@@ -2,6 +2,7 @@
   "name": "vintasend-implementation-template",
   "version": "0.10.0",
   "description": "",
+  "type": "module",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

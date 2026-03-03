@@ -1,5 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
 
 /**
  * Update version in a package.json file
@@ -70,7 +70,7 @@ function getPackageName(packageJsonPath) {
   return packageJson.name;
 }
 
-module.exports = {
+export {
   updatePackageVersion,
   updateVintasendDependency,
   readPackageJson,

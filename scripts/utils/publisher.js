@@ -1,5 +1,6 @@
-const { execSync } = require('child_process');
-const path = require('path');
+import { execSync } from 'node:child_process';
+import path from 'node:path';
+import fs from 'node:fs';
 
 /**
  * Run a command and return output
@@ -63,7 +64,6 @@ function testPackage(packageDir, dryRun = false) {
  */
 function publishPackage(packageDir, dryRun = false) {
   // Read package.json to check if it's a pre-release version
-  const fs = require('fs');
   const packageJsonPath = path.join(packageDir, 'package.json');
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
   const version = packageJson.version;
@@ -91,7 +91,7 @@ function publishPackage(packageDir, dryRun = false) {
   }
 }
 
-module.exports = {
+export {
   runCommand,
   buildPackage,
   testPackage,

@@ -1,4 +1,4 @@
-const { execSync } = require('child_process');
+import { execSync } from 'node:child_process';
 
 /**
  * Stage files for commit
@@ -67,7 +67,7 @@ function isClean() {
   return status.trim().length === 0;
 }
 
-module.exports = {
+export {
   stageFiles,
   commit,
   getStatus,

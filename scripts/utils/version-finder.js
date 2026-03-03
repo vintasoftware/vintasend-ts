@@ -1,5 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'node:fs';
+import path from 'node:path';
 
 /**
  * Find the highest version among implementation packages
@@ -92,7 +92,7 @@ function getImplementationPackages(implementationsDir) {
     .filter(pkgPath => fs.existsSync(pkgPath));
 }
 
-module.exports = {
+export {
   findHighestVersion,
   compareVersions,
   getImplementationPackages

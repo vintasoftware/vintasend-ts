@@ -1,6 +1,10 @@
 # Changelog
 
-# Version 0.11.1
+# Version 0.11.3
+
+* Add type module to all package.json files.
+
+# Version 0.11.2
 
 * Adjust prisma client interface.
 

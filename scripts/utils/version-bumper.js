@@ -85,7 +85,7 @@ function isValidVersion(version) {
   return semverRegex.test(version);
 }
 
-module.exports = {
+export {
   bumpVersion,
   isValidVersion
 };

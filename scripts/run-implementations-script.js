@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-"use strict";
 
-const fs = require("fs");
-const path = require("path");
-const { spawnSync } = require("child_process");
+import fs from "node:fs";
+import path from "node:path";
+import { spawnSync } from "node:child_process";
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, {

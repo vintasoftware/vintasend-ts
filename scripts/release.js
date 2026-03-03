@@ -1,23 +1,26 @@
 #!/usr/bin/env node
 
-const readline = require('readline');
-const path = require('path');
-const fs = require('fs');
+import readline from 'node:readline';
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
-const { findHighestVersion, getImplementationPackages } = require('./utils/version-finder');
-const { bumpVersion, isValidVersion } = require('./utils/version-bumper');
-const {
+import { findHighestVersion, getImplementationPackages } from './utils/version-finder.js';
+import { bumpVersion, isValidVersion } from './utils/version-bumper.js';
+import {
   updatePackageVersion,
   updateVintasendDependency,
   readPackageJson,
   getPackageName
-} = require('./utils/package-updater');
-const {
+} from './utils/package-updater.js';
+import {
   buildPackage,
   testPackage,
   publishPackage
-} = require('./utils/publisher');
-const { stageFiles, commit, isClean } = require('./utils/git-handler');
+} from './utils/publisher.js';
+import { stageFiles, commit, isClean } from './utils/git-handler.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Parse command line arguments
 const args = process.argv.slice(2);
