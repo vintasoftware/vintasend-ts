@@ -1,5 +1,10 @@
 # Changelog
 
+# Version 0.12.1
+
+* Fixed Prisma pending notifications queries in `vintasend-prisma` by moving `OR` conditions to the `where` root level (Prisma-compatible), preventing runtime validation errors in workers.
+* Updated Prisma backend tests to assert the correct `OR` query shape for pending notifications.
+
 # Version 0.12.0
 
 * Standardized ESM output strategy across the monorepo by migrating `vintasend` and all official implementations to TypeScript `NodeNext` module settings.
