@@ -2,8 +2,12 @@
 
 # Version 0.11.1
 
-* Adjust test imports
-* Adjust prisma client interface
+* Adjust prisma client interface.
+
+# Version 0.11.1
+
+* Adjust test imports.
+* Adjust prisma client interface.
 
 # Version 0.11.0
 
