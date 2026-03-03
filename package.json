@@ -1,6 +1,6 @@
 {
   "name": "vintasend",
-  "version": "0.11.2-alpha6",
+  "version": "0.11.2-alpha7",
   "main": "dist/index.js",
   "files": [
     "dist"
