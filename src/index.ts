@@ -1,21 +1,21 @@
 // Attachment Manager
-export { BaseAttachmentManager } from './services/attachment-manager/base-attachment-manager';
-export type { LocalFileAttachmentManagerConfig } from './services/attachment-manager/local-file-attachment-manager';
-export { LocalFileAttachmentManager } from './services/attachment-manager/local-file-attachment-manager';
+export { BaseAttachmentManager } from './services/attachment-manager/base-attachment-manager.js';
+export type { LocalFileAttachmentManagerConfig } from './services/attachment-manager/local-file-attachment-manager.js';
+export { LocalFileAttachmentManager } from './services/attachment-manager/local-file-attachment-manager.js';
 // Git Commit SHA Provider
-export type { BaseGitCommitShaProvider } from './services/git-commit-sha/base-git-commit-sha-provider';
+export type { BaseGitCommitShaProvider } from './services/git-commit-sha/base-git-commit-sha-provider.js';
 // Logger
-export type { BaseLogger } from './services/loggers/base-logger';
+export type { BaseLogger } from './services/loggers/base-logger.js';
 // Notification Adapters and Backends
 export {
   BaseNotificationAdapter,
   isOneOffNotification,
-} from './services/notification-adapters/base-notification-adapter';
-export type { BaseNotificationBackend } from './services/notification-backends/base-notification-backend';
+} from './services/notification-adapters/base-notification-adapter.js';
+export type { BaseNotificationBackend } from './services/notification-backends/base-notification-backend.js';
 export {
   supportsAttachments,
   isFieldFilter,
-} from './services/notification-backends/base-notification-backend';
+} from './services/notification-backends/base-notification-backend.js';
 export type {
   NotificationFilter,
   NotificationFilterFields,
@@ -26,17 +26,17 @@ export type {
   NotificationOrderDirection,
   StringFilterLookup,
   StringFieldFilter,
-} from './services/notification-backends/base-notification-backend';
-export type { BaseNotificationQueueService } from './services/notification-queue-service/base-notification-queue-service';
-export type { BaseNotificationReplicationQueueService } from './services/notification-queue-service/base-notification-replication-queue-service';
-export type { VintaSend } from './services/notification-service';
-export { VintaSendFactory } from './services/notification-service';
+} from './services/notification-backends/base-notification-backend.js';
+export type { BaseNotificationQueueService } from './services/notification-queue-service/base-notification-queue-service.js';
+export type { BaseNotificationReplicationQueueService } from './services/notification-queue-service/base-notification-replication-queue-service.js';
+export type { VintaSend } from './services/notification-service.js';
+export { VintaSendFactory } from './services/notification-service.js';
 export type {
   BaseEmailTemplateRenderer,
   EmailTemplate,
   EmailTemplateContent,
-} from './services/notification-template-renderers/base-email-template-renderer';
-export type { BaseNotificationTemplateRenderer } from './services/notification-template-renderers/base-notification-template-renderer';
+} from './services/notification-template-renderers/base-email-template-renderer.js';
+export type { BaseNotificationTemplateRenderer } from './services/notification-template-renderers/base-notification-template-renderer.js';
 // Attachment Types
 export type {
   AttachmentFile,
@@ -47,8 +47,8 @@ export type {
   NotificationAttachmentUpload,
   StorageIdentifiers,
   StoredAttachment,
-} from './types/attachment';
-export { isAttachmentReference } from './types/attachment';
+} from './types/attachment.js';
+export { isAttachmentReference } from './types/attachment.js';
 export type {
   InputJsonArray,
   InputJsonObject,
@@ -57,7 +57,7 @@ export type {
   JsonObject,
   JsonPrimitive,
   JsonValue,
-} from './types/json-values';
+} from './types/json-values.js';
 export type {
   AnyDatabaseNotification,
   AnyNotification,
@@ -70,8 +70,8 @@ export type {
   OneOffNotification,
   OneOffNotificationInput,
   OneOffNotificationResendWithContextInput,
-} from './types/notification';
-export type { ContextGenerator } from './types/notification-context-generators';
-export type { NotificationStatus } from './types/notification-status';
-export type { NotificationType } from './types/notification-type';
-export type { BaseNotificationTypeConfig } from './types/notification-type-config';
+} from './types/notification.js';
+export type { ContextGenerator } from './types/notification-context-generators.js';
+export type { NotificationStatus } from './types/notification-status.js';
+export type { NotificationType } from './types/notification-type.js';
+export type { BaseNotificationTypeConfig } from './types/notification-type-config.js';

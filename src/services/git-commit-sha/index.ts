@@ -1,1 +1,1 @@
-export type { BaseGitCommitShaProvider } from './base-git-commit-sha-provider';
+export type { BaseGitCommitShaProvider } from './base-git-commit-sha-provider.js';

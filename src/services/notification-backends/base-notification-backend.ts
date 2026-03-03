@@ -1,7 +1,7 @@
-import type { AttachmentFileRecord, StoredAttachment } from '../../types/attachment';
-import type { InputJsonValue } from '../../types/json-values';
-import type { NotificationStatus } from '../../types/notification-status';
-import type { NotificationType } from '../../types/notification-type';
+import type { AttachmentFileRecord, StoredAttachment } from '../../types/attachment.js';
+import type { InputJsonValue } from '../../types/json-values.js';
+import type { NotificationStatus } from '../../types/notification-status.js';
+import type { NotificationType } from '../../types/notification-type.js';
 import type {
   AnyDatabaseNotification,
   AnyNotification,
@@ -9,9 +9,9 @@ import type {
   DatabaseOneOffNotification,
   Notification,
   OneOffNotificationInput,
-} from '../../types/notification';
-import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
-import type { BaseLogger } from '../loggers/base-logger';
+} from '../../types/notification.js';
+import type { BaseNotificationTypeConfig } from '../../types/notification-type-config.js';
+import type { BaseLogger } from '../loggers/base-logger.js';
 
 /**
  * Date range filter with optional lower and upper bounds.

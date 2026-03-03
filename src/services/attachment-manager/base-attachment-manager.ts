@@ -6,7 +6,7 @@ import type {
   AttachmentFileRecord,
   FileAttachment,
   StorageIdentifiers,
-} from '../../types/attachment';
+} from '../../types/attachment.js';
 
 export abstract class BaseAttachmentManager {
   /**

@@ -1,9 +1,9 @@
 import type { Buffer } from 'node:buffer';
-import type { JsonObject } from '../../types/json-values';
-import type { AnyNotification } from '../../types/notification';
-import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
-import type { BaseLogger } from '../loggers/base-logger';
-import type { BaseNotificationTemplateRenderer } from './base-notification-template-renderer';
+import type { JsonObject } from '../../types/json-values.js';
+import type { AnyNotification } from '../../types/notification.js';
+import type { BaseNotificationTypeConfig } from '../../types/notification-type-config.js';
+import type { BaseLogger } from '../loggers/base-logger.js';
+import type { BaseNotificationTemplateRenderer } from './base-notification-template-renderer.js';
 
 export type Attachment = File | Buffer | string;
 

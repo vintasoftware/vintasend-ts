@@ -1,4 +1,4 @@
-import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
+import type { BaseNotificationTypeConfig } from '../../types/notification-type-config.js';
 
 export interface BaseNotificationReplicationQueueService<
   Config extends BaseNotificationTypeConfig,

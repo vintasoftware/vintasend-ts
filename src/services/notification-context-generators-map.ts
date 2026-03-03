@@ -1,4 +1,4 @@
-import type { ContextGenerator } from '../types/notification-context-generators';
+import type { ContextGenerator } from '../types/notification-context-generators.js';
 
 export class NotificationContextGeneratorsMap<
   ContextMapType extends { [key: string]: ContextGenerator },

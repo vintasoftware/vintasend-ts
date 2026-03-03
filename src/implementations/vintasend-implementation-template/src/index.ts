@@ -1,1 +1,1 @@
-export { TemplateAttachmentManager } from './attachment-manager';
+export { TemplateAttachmentManager } from './attachment-manager.js';

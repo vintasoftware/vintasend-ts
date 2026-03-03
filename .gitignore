@@ -37,6 +37,18 @@ Thumbs.db
 # Ignore built ts files
 dist/**/*
 
+# Generated artifacts accidentally emitted under source tree
+src/services/**/*.js
+src/services/**/*.d.ts
+src/services/**/*.d.ts.map
+src/types/**/*.js
+src/types/**/*.d.ts
+src/types/**/*.d.ts.map
+
+# Local tool artifacts under src
+src/**/coverage/
+src/tools/**/node_modules/
+
 # ignore yarn.lock
 yarn.lock
 

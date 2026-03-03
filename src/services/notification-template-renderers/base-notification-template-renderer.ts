@@ -1,6 +1,6 @@
-import type { JsonObject } from '../../types/json-values';
-import type { AnyNotification } from '../../types/notification';
-import type { BaseNotificationTypeConfig } from '../../types/notification-type-config';
+import type { JsonObject } from '../../types/json-values.js';
+import type { AnyNotification } from '../../types/notification.js';
+import type { BaseNotificationTypeConfig } from '../../types/notification-type-config.js';
 
 export interface BaseNotificationTemplateRenderer<
   Config extends BaseNotificationTypeConfig,

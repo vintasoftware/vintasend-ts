@@ -7,8 +7,8 @@ import type {
   AttachmentFileRecord,
   FileAttachment,
   StorageIdentifiers,
-} from '../../types/attachment';
-import { BaseAttachmentManager } from './base-attachment-manager';
+} from '../../types/attachment.js';
+import { BaseAttachmentManager } from './base-attachment-manager.js';
 
 const writeFile = promisify(fs.writeFile);
 const readFile = promisify(fs.readFile);

@@ -1,34 +1,34 @@
-import type { JsonObject } from '../types/json-values';
+import type { JsonObject } from '../types/json-values.js';
 import type {
   AnyDatabaseNotification,
   AnyNotification,
   DatabaseNotification,
   DatabaseOneOffNotification,
   Notification,
-} from '../types/notification';
-import type { BaseNotificationTypeConfig } from '../types/notification-type-config';
-import type { OneOffNotificationInput } from '../types/one-off-notification';
-import type { BaseAttachmentManager } from './attachment-manager/base-attachment-manager';
-import type { BaseGitCommitShaProvider } from './git-commit-sha/base-git-commit-sha-provider';
-import type { BaseLogger } from './loggers/base-logger';
+} from '../types/notification.js';
+import type { BaseNotificationTypeConfig } from '../types/notification-type-config.js';
+import type { OneOffNotificationInput } from '../types/one-off-notification.js';
+import type { BaseAttachmentManager } from './attachment-manager/base-attachment-manager.js';
+import type { BaseGitCommitShaProvider } from './git-commit-sha/base-git-commit-sha-provider.js';
+import type { BaseLogger } from './loggers/base-logger.js';
 import {
   type BaseNotificationAdapter,
   isOneOffNotification,
-} from './notification-adapters/base-notification-adapter';
+} from './notification-adapters/base-notification-adapter.js';
 import {
   DEFAULT_BACKEND_FILTER_CAPABILITIES,
   type BaseNotificationBackend,
   type NotificationFilterFields,
   type NotificationOrderBy,
-} from './notification-backends/base-notification-backend';
-import { NotificationContextGeneratorsMap } from './notification-context-generators-map';
-import type { BaseNotificationQueueService } from './notification-queue-service/base-notification-queue-service';
-import type { BaseNotificationReplicationQueueService } from './notification-queue-service/base-notification-replication-queue-service';
+} from './notification-backends/base-notification-backend.js';
+import { NotificationContextGeneratorsMap } from './notification-context-generators-map.js';
+import type { BaseNotificationQueueService } from './notification-queue-service/base-notification-queue-service.js';
+import type { BaseNotificationReplicationQueueService } from './notification-queue-service/base-notification-replication-queue-service.js';
 import type {
   EmailTemplate,
   EmailTemplateContent,
-} from './notification-template-renderers/base-email-template-renderer';
-import type { BaseNotificationTemplateRenderer } from './notification-template-renderers/base-notification-template-renderer';
+} from './notification-template-renderers/base-email-template-renderer.js';
+import type { BaseNotificationTemplateRenderer } from './notification-template-renderers/base-notification-template-renderer.js';
 
 type VintaSendOptions = {
   raiseErrorOnFailedSend: boolean;

@@ -1,5 +1,14 @@
 # Changelog
 
+# Version 0.12.0
+
+* Standardized ESM output strategy across the monorepo by migrating `vintasend` and all official implementations to TypeScript `NodeNext` module settings.
+* Added explicit `.js` relative import/export specifiers in implementation and root TypeScript source where required by NodeNext resolution.
+* Updated root package publishing metadata to use explicit ESM exports/types mapping (`exports` + `types`) for clearer consumer resolution.
+* Removed legacy ESM post-processing dependency from build flows and aligned package builds to native TypeScript ESM output.
+* Improved local build hygiene to prevent generated artifacts from polluting `src/` and commits (cleanup step + tighter TS include scope + ignore rules).
+* Replaced deep/internal third-party type imports with stable public typings in adapters (notably Nodemailer and SendGrid) to improve compatibility under NodeNext.
+
 # Version 0.11.4
 
 * Adjust root package tsconfig.json.
