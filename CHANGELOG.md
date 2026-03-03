@@ -1,5 +1,9 @@
 # Changelog
 
+# Version 0.12.3
+
+* Fix notification creation for prisma.
+
 # Version 0.12.2
 
 * Added the missing `getAllPendingNotification` method to the service.
