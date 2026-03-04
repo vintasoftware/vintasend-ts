@@ -2,8 +2,7 @@ import type { Buffer } from 'node:buffer';
 import type { JsonObject } from '../../types/json-values.js';
 import type { AnyNotification } from '../../types/notification.js';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config.js';
-import type { BaseLogger } from '../loggers/base-logger.js';
-import type { BaseNotificationTemplateRenderer } from './base-notification-template-renderer.js';
+import { BaseNotificationTemplateRenderer } from './base-notification-template-renderer.js';
 
 export type Attachment = File | Buffer | string;
 
@@ -17,18 +16,18 @@ export type EmailTemplateContent = {
   body: string;
 };
 
-export interface BaseEmailTemplateRenderer<Config extends BaseNotificationTypeConfig>
-  extends BaseNotificationTemplateRenderer<Config, EmailTemplate> {
-  render(notification: AnyNotification<Config>, context: JsonObject): Promise<EmailTemplate>;
+export abstract class BaseEmailTemplateRenderer<
+  Config extends BaseNotificationTypeConfig,
+> extends BaseNotificationTemplateRenderer<Config, EmailTemplate> {
+  render(_notification: AnyNotification<Config>, _context: JsonObject): Promise<EmailTemplate> {
+    throw 'Not implemented';
+  }
 
   renderFromTemplateContent(
-    notification: AnyNotification<Config>,
-    templateContent: EmailTemplateContent,
-    context: JsonObject,
-  ): Promise<EmailTemplate>;
-
-  /**
-   * Inject logger into the template renderer (optional - called by VintaSend when logger exists)
-   */
-  injectLogger?(logger: BaseLogger): void;
+    _notification: AnyNotification<Config>,
+    _templateContent: EmailTemplateContent,
+    _context: JsonObject,
+  ): Promise<EmailTemplate> {
+    throw 'Not implemented';
+  }
 }

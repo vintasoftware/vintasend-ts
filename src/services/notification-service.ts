@@ -16,8 +16,8 @@ import {
   isOneOffNotification,
 } from './notification-adapters/base-notification-adapter.js';
 import {
-  DEFAULT_BACKEND_FILTER_CAPABILITIES,
   type BaseNotificationBackend,
+  DEFAULT_BACKEND_FILTER_CAPABILITIES,
   type NotificationFilterFields,
   type NotificationOrderBy,
 } from './notification-backends/base-notification-backend.js';
@@ -225,6 +225,40 @@ export class VintaSend<
   private backends: Map<string, Backend>;
   private primaryBackendIdentifier: string;
 
+  private validateUniqueAdapterNotificationTypes(adapters: AdaptersList): void {
+    const adapterKeysByType = new Map<string, string[]>();
+
+    for (const adapter of adapters) {
+      const notificationType = String(adapter.notificationType);
+      const adapterKey = adapter.key ?? 'unknown';
+      const existingAdapterKeys = adapterKeysByType.get(notificationType);
+
+      if (existingAdapterKeys) {
+        existingAdapterKeys.push(adapterKey);
+      } else {
+        adapterKeysByType.set(notificationType, [adapterKey]);
+      }
+    }
+
+    const duplicatedTypes = Array.from(adapterKeysByType.entries()).filter(
+      ([, adapterKeys]) => adapterKeys.length > 1,
+    );
+
+    if (duplicatedTypes.length === 0) {
+      return;
+    }
+
+    const duplicatedTypesDescription = duplicatedTypes
+      .map(([notificationType, adapterKeys]) => {
+        return `${notificationType} (${adapterKeys.join(', ')})`;
+      })
+      .join('; ');
+
+    throw new Error(
+      `Duplicate adapter notification types are not allowed. Found duplicates for: ${duplicatedTypesDescription}`,
+    );
+  }
+
   /**
    * Creates a VintaSend instance with one primary backend and optional additional backends.
    *
@@ -247,6 +281,8 @@ export class VintaSend<
     additionalBackends: Backend[] = [],
     private replicationQueueService?: BaseNotificationReplicationQueueService<Config>,
   ) {
+    this.validateUniqueAdapterNotificationTypes(adapters);
+
     this.contextGeneratorsMap = new NotificationContextGeneratorsMap(contextGeneratorsMap);
     this.backends = new Map();
 
@@ -279,7 +315,7 @@ export class VintaSend<
       adapter.injectBackend(backend);
       adapter.injectLogger(logger);
       // Inject logger into template renderer if it supports it
-      const templateRenderer = (adapter as any).templateRenderer;
+      const templateRenderer = adapter.getTemplateRenderer();
       if (templateRenderer && typeof templateRenderer.injectLogger === 'function') {
         templateRenderer.injectLogger(logger);
       }
@@ -1147,6 +1183,22 @@ export class VintaSend<
       lastAdapterKey = adapter.key ?? 'unknown';
       try {
         await adapter.send(notificationWithExecutionGitCommitSha, context);
+        try {
+          await this.executeMultiBackendWrite(
+            'markAsSent',
+            async (backend) => {
+              return backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
+            },
+            async (backend) => {
+              await backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
+            },
+            notificationWithExecutionGitCommitSha.id,
+          );
+        } catch (markSentError) {
+          this.logger.error(
+            `Error marking notification ${notificationWithExecutionGitCommitSha.id} as sent: ${markSentError}`,
+          );
+        }
       } catch (sendError) {
         this.logger.error(
           `Error sending notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key}: ${sendError}`,
@@ -1167,49 +1219,32 @@ export class VintaSend<
             `Error marking notification ${notificationWithExecutionGitCommitSha.id} as failed: ${markFailedError}`,
           );
         }
-      }
-
-      try {
-        await this.executeMultiBackendWrite(
-          'markAsSent',
-          async (backend) => {
-            return backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
-          },
-          async (backend) => {
-            await backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
-          },
-          notificationWithExecutionGitCommitSha.id,
-        );
-      } catch (markSentError) {
-        this.logger.error(
-          `Error marking notification ${notificationWithExecutionGitCommitSha.id} as sent: ${markSentError}`,
-        );
-      }
-    }
-
-    try {
-      await this.executeMultiBackendWrite(
-        'storeAdapterAndContextUsed',
-        async (backend) => {
-          await backend.storeAdapterAndContextUsed(
+      } finally {
+        try {
+          await this.executeMultiBackendWrite(
+            'storeAdapterAndContextUsed',
+            async (backend) => {
+              await backend.storeAdapterAndContextUsed(
+                notificationWithExecutionGitCommitSha.id,
+                lastAdapterKey,
+                context,
+              );
+            },
+            async (backend) => {
+              await backend.storeAdapterAndContextUsed(
+                notificationWithExecutionGitCommitSha.id,
+                lastAdapterKey,
+                context,
+              );
+            },
             notificationWithExecutionGitCommitSha.id,
-            lastAdapterKey,
-            context,
           );
-        },
-        async (backend) => {
-          await backend.storeAdapterAndContextUsed(
-            notificationWithExecutionGitCommitSha.id,
-            lastAdapterKey,
-            context,
+        } catch (storeContextError) {
+          this.logger.error(
+            `Error storing adapter and context for notification ${notificationWithExecutionGitCommitSha.id}: ${storeContextError}`,
           );
-        },
-        notificationWithExecutionGitCommitSha.id,
-      );
-    } catch (storeContextError) {
-      this.logger.error(
-        `Error storing adapter and context for notification ${notificationWithExecutionGitCommitSha.id}: ${storeContextError}`,
-      );
+        }
+      }
     }
   }
 

@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import type { NotificationAttachment, StoredAttachment } from '../attachment';
 import type {
   DatabaseNotification,

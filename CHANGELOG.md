@@ -1,5 +1,13 @@
 # Changelog
 
+# Version 0.13.0
+
+* Fix bug on VintaSend service that was mistakenly trying to notification as success after it has just failed. 
+* **BREAKING CHANGE**: The service now can't be instatiated with multiple adapters for the same notification type. Doing this would end up messing with the statuses, as notification could be sent successfuly by one adapter and fail on another.
+* Fixed the root package tests' imports
+* Adjust logger definition in template renderers
+
+
 # Version 0.12.3
 
 * Fix notification creation for prisma.

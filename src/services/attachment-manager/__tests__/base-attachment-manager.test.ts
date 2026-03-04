@@ -1,5 +1,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { beforeEach, describe, expect, it } from 'vitest';
 import type {
   AttachmentFile,
   AttachmentFileRecord,

@@ -1,11 +1,12 @@
+import { describe, expect, it } from 'vitest';
 import {
   type AttachmentFile,
   type AttachmentFileRecord,
-  type StorageIdentifiers,
   isAttachmentReference,
   type NotificationAttachment,
   type NotificationAttachmentReference,
   type NotificationAttachmentUpload,
+  type StorageIdentifiers,
 } from '../attachment';
 
 describe('Attachment Type Definitions', () => {

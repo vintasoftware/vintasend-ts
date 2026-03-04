@@ -1,4 +1,6 @@
-import type { BaseNotificationTypeConfig } from '../../../types/notification-type-config';
+import { describe, expect, it, vi } from 'vitest';
+import type { AttachmentFileRecord } from '../../../types/attachment';
+import type { InputJsonValue } from '../../../types/json-values';
 import type {
   AnyDatabaseNotification,
   AnyNotification,
@@ -7,8 +9,7 @@ import type {
   Notification,
   OneOffNotificationInput,
 } from '../../../types/notification';
-import type { AttachmentFileRecord } from '../../../types/attachment';
-import type { InputJsonValue } from '../../../types/json-values';
+import type { BaseNotificationTypeConfig } from '../../../types/notification-type-config';
 import type { BaseNotificationBackend, NotificationFilter } from '../base-notification-backend';
 
 type TestConfig = BaseNotificationTypeConfig & {

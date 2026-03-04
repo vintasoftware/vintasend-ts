@@ -167,7 +167,7 @@ export class LocalFileAttachmentManager extends BaseAttachmentManager {
         createdAt: new Date(metadata.createdAt),
         updatedAt: new Date(metadata.updatedAt),
       };
-    } catch (error) {
+    } catch (_error) {
       // If metadata file doesn't exist, try to reconstruct from file
       try {
         await access(filePath, fs.constants.F_OK);

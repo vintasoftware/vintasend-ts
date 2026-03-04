@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, type Mock, type Mocked, vi } from 'vitest';
 import { VintaSendFactory } from '../../index';
 import type { BaseAttachmentManager } from '../attachment-manager/base-attachment-manager';
 import type { BaseLogger } from '../loggers/base-logger';
@@ -17,10 +18,12 @@ type Config = {
   UserIdType: string;
 };
 
-type MockBackend = vi.Mocked<BaseNotificationBackend<Config>> & {
-  injectLogger: vi.Mock;
-  injectAttachmentManager: vi.Mock;
-  getBackendIdentifier?: () => string;
+type MockBackend = Mocked<BaseNotificationBackend<Config>> & {
+  injectLogger: Mock;
+  injectAttachmentManager: Mock;
+  getBackendIdentifier?: Mock<
+    Exclude<BaseNotificationBackend<Config>['getBackendIdentifier'], undefined>
+  >;
 };
 
 type ServiceInternals = {
@@ -28,18 +31,20 @@ type ServiceInternals = {
   getAdditionalBackends: () => BaseNotificationBackend<Config>[];
 };
 
-const mockTemplateRenderer: vi.Mocked<BaseEmailTemplateRenderer<Config>> = {
+const mockTemplateRenderer: Mocked<BaseEmailTemplateRenderer<Config>> = {
+  logger: null,
   render: vi.fn(),
   renderFromTemplateContent: vi.fn(),
+  injectLogger: vi.fn(),
 };
 
-const mockLogger: vi.Mocked<BaseLogger> = {
+const mockLogger: Mocked<BaseLogger> = {
   info: vi.fn(),
   error: vi.fn(),
   warn: vi.fn(),
 };
 
-const mockAdapter: vi.Mocked<BaseNotificationAdapter<any, Config>> = {
+const mockAdapter: Mocked<BaseNotificationAdapter<any, Config>> = {
   notificationType: 'EMAIL',
   key: 'adapter-1',
   enqueueNotifications: false,
@@ -50,6 +55,7 @@ const mockAdapter: vi.Mocked<BaseNotificationAdapter<any, Config>> = {
   templateRenderer: mockTemplateRenderer,
   logger: mockLogger,
   supportsAttachments: false,
+  getTemplateRenderer: () => mockTemplateRenderer,
 } as any;
 
 const contextGenerators: ContextGenerators = {
@@ -98,7 +104,7 @@ function createMockBackend(identifier?: string): MockBackend {
     injectAttachmentManager: vi.fn(),
     ...(identifier
       ? {
-          getBackendIdentifier: () => identifier,
+          getBackendIdentifier: vi.fn(() => identifier),
         }
       : {}),
   } as unknown as MockBackend;

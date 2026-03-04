@@ -1,5 +1,6 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BaseNotificationAdapter } from '../../../services/notification-adapters/base-notification-adapter';
-import type { BaseNotificationTemplateRenderer } from '../../../services/notification-template-renderers/base-notification-template-renderer';
+import { BaseNotificationTemplateRenderer } from '../../../services/notification-template-renderers/base-notification-template-renderer';
 import type { DatabaseNotification } from '../../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../../types/notification-type-config';
 
@@ -11,7 +12,7 @@ interface MockConfig extends BaseNotificationTypeConfig {
   UserIdType: string;
 }
 
-class MockTemplateRenderer implements BaseNotificationTemplateRenderer<MockConfig> {
+class MockTemplateRenderer extends BaseNotificationTemplateRenderer<MockConfig> {
   render() {
     return Promise.resolve({ subject: 'Test', body: 'Test body' });
   }

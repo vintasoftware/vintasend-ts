@@ -1,3 +1,4 @@
+import { describe, expect, it, vi } from 'vitest';
 import type { BaseNotificationTypeConfig } from '../../../types/notification-type-config';
 import type { BaseNotificationQueueService } from '../base-notification-queue-service';
 import type { BaseNotificationReplicationQueueService } from '../base-notification-replication-queue-service';

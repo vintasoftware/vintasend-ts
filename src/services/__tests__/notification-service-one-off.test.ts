@@ -1,16 +1,17 @@
+import { beforeEach, describe, expect, it, type Mocked, vi } from 'vitest';
 import { VintaSendFactory } from '../../index';
 import type {
   DatabaseOneOffNotification,
   OneOffNotificationInput,
 } from '../../types/one-off-notification';
-import type { BaseLogger } from '../loggers/base-logger';
 import type { BaseGitCommitShaProvider } from '../git-commit-sha/base-git-commit-sha-provider';
+import type { BaseLogger } from '../loggers/base-logger';
 import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
 
 // Mock implementations
-const mockBackend: vi.Mocked<BaseNotificationBackend<any>> = {
+const mockBackend: Mocked<BaseNotificationBackend<any>> = {
   persistNotification: vi.fn(),
   persistNotificationUpdate: vi.fn(),
   getAllFutureNotifications: vi.fn(),
@@ -49,18 +50,20 @@ const mockBackend: vi.Mocked<BaseNotificationBackend<any>> = {
   deleteNotificationAttachment: vi.fn().mockResolvedValue(undefined),
 };
 
-const mockTemplateRenderer: vi.Mocked<BaseEmailTemplateRenderer<any>> = {
+const mockTemplateRenderer: Mocked<BaseEmailTemplateRenderer<any>> = {
+  logger: null,
   render: vi.fn(),
   renderFromTemplateContent: vi.fn(),
+  injectLogger: vi.fn(),
 };
 
-const mockLogger: vi.Mocked<BaseLogger> = {
+const mockLogger: Mocked<BaseLogger> = {
   info: vi.fn(),
   error: vi.fn(),
   warn: vi.fn(),
 };
 
-const mockAdapter: vi.Mocked<BaseNotificationAdapter<any, any>> = {
+const mockAdapter: Mocked<BaseNotificationAdapter<any, any>> = {
   notificationType: 'EMAIL',
   key: 'test-adapter',
   enqueueNotifications: false,
@@ -71,6 +74,7 @@ const mockAdapter: vi.Mocked<BaseNotificationAdapter<any, any>> = {
   templateRenderer: mockTemplateRenderer,
   logger: mockLogger,
   supportsAttachments: false,
+  getTemplateRenderer: () => mockTemplateRenderer,
 } as any;
 
 const notificationContextgenerators = {
@@ -79,7 +83,7 @@ const notificationContextgenerators = {
   },
 };
 
-const mockGitCommitShaProvider: vi.Mocked<BaseGitCommitShaProvider> = {
+const mockGitCommitShaProvider: Mocked<BaseGitCommitShaProvider> = {
   getCurrentGitCommitSha: vi.fn(),
 };
 

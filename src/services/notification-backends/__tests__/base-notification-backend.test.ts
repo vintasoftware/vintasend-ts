@@ -1,18 +1,18 @@
-import type { BaseNotificationBackend } from '../base-notification-backend';
-import {
-  supportsAttachments,
-  isFieldFilter,
-  isStringFilterLookup,
-} from '../base-notification-backend';
-import type {
-  NotificationFilter,
-  NotificationFilterFields,
-  DateRange,
-  StringFieldFilter,
-} from '../base-notification-backend';
+import { describe, expect, it } from 'vitest';
 import type { AttachmentFileRecord, StoredAttachment } from '../../../types/attachment';
 import type { AnyDatabaseNotification, DatabaseNotification } from '../../../types/notification';
 import type { BaseNotificationTypeConfig } from '../../../types/notification-type-config';
+import type {
+  BaseNotificationBackend,
+  DateRange,
+  NotificationFilter,
+  StringFieldFilter,
+} from '../base-notification-backend';
+import {
+  isFieldFilter,
+  isStringFilterLookup,
+  supportsAttachments,
+} from '../base-notification-backend';
 
 interface TestConfig extends BaseNotificationTypeConfig {
   NotificationIdType: string;
@@ -125,27 +125,27 @@ class TestBackendWithAttachments implements BaseNotificationBackend<TestConfig> 
 
   // filterNotifications method
   async filterNotifications(
-    filter: NotificationFilter<TestConfig>,
-    page: number,
-    pageSize: number,
+    _filter: NotificationFilter<TestConfig>,
+    _page: number,
+    _pageSize: number,
   ): Promise<AnyDatabaseNotification<TestConfig>[]> {
     return [];
   }
 
   // New attachment management methods
-  async storeAttachmentFileRecord(record: AttachmentFileRecord): Promise<void> {
+  async storeAttachmentFileRecord(_record: AttachmentFileRecord): Promise<void> {
     // Store record in database
   }
 
-  async getAttachmentFileRecord(fileId: string): Promise<AttachmentFileRecord | null> {
+  async getAttachmentFileRecord(_fileId: string): Promise<AttachmentFileRecord | null> {
     return null;
   }
 
-  async findAttachmentFileByChecksum(checksum: string): Promise<AttachmentFileRecord | null> {
+  async findAttachmentFileByChecksum(_checksum: string): Promise<AttachmentFileRecord | null> {
     return null;
   }
 
-  async deleteAttachmentFile(fileId: string): Promise<void> {
+  async deleteAttachmentFile(_fileId: string): Promise<void> {
     // Implementation
   }
 
@@ -153,11 +153,14 @@ class TestBackendWithAttachments implements BaseNotificationBackend<TestConfig> 
     return [];
   }
 
-  async getAttachments(notificationId: string): Promise<StoredAttachment[]> {
+  async getAttachments(_notificationId: string): Promise<StoredAttachment[]> {
     return [];
   }
 
-  async deleteNotificationAttachment(notificationId: string, attachmentId: string): Promise<void> {
+  async deleteNotificationAttachment(
+    _notificationId: string,
+    _attachmentId: string,
+  ): Promise<void> {
     // Implementation
   }
 }

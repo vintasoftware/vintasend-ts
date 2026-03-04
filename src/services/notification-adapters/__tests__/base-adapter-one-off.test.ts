@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, type Mocked, vi } from 'vitest';
 import type { JsonObject } from '../../../types/json-values';
 import type {
   AnyDatabaseNotification,
@@ -80,11 +81,13 @@ const mockBackend = {
   getOrphanedAttachmentFiles: vi.fn().mockResolvedValue([]),
   getAttachments: vi.fn().mockResolvedValue([]),
   deleteNotificationAttachment: vi.fn().mockResolvedValue(undefined),
-} as vi.Mocked<BaseNotificationBackend<Config>>;
+} as Mocked<BaseNotificationBackend<Config>>;
 
-const mockTemplateRenderer: vi.Mocked<BaseNotificationTemplateRenderer<Config>> = {
+const mockTemplateRenderer: Mocked<BaseNotificationTemplateRenderer<Config>> = {
+  logger: null,
   render: vi.fn(),
   renderFromTemplateContent: vi.fn(),
+  injectLogger: vi.fn(),
 };
 
 describe('BaseNotificationAdapter - One-Off Notifications', () => {

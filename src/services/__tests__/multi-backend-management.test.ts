@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, type Mock, type Mocked, vi } from 'vitest';
 import { VintaSendFactory } from '../../index';
 import type { DatabaseNotification } from '../../types/notification';
 import type { BaseLogger } from '../loggers/base-logger';
@@ -17,24 +18,28 @@ type Config = {
   UserIdType: string;
 };
 
-type MockBackend = vi.Mocked<BaseNotificationBackend<Config>> & {
-  injectLogger: vi.Mock;
-  injectAttachmentManager: vi.Mock;
-  getBackendIdentifier: vi.Mock<string, []>;
+type MockBackend = Mocked<BaseNotificationBackend<Config>> & {
+  injectLogger: Mock;
+  injectAttachmentManager: Mock;
+  getBackendIdentifier: Mock<
+    Exclude<BaseNotificationBackend<Config>['getBackendIdentifier'], undefined>
+  >;
 };
 
-const templateRenderer: vi.Mocked<BaseEmailTemplateRenderer<Config>> = {
+const templateRenderer: Mocked<BaseEmailTemplateRenderer<Config>> = {
+  logger: null,
   render: vi.fn(),
   renderFromTemplateContent: vi.fn(),
+  injectLogger: vi.fn(),
 };
 
-const logger: vi.Mocked<BaseLogger> = {
+const logger: Mocked<BaseLogger> = {
   info: vi.fn(),
   error: vi.fn(),
   warn: vi.fn(),
 };
 
-const adapter: vi.Mocked<BaseNotificationAdapter<any, Config>> = {
+const adapter: Mocked<BaseNotificationAdapter<any, Config>> = {
   notificationType: 'EMAIL',
   key: 'adapter-1',
   enqueueNotifications: false,
@@ -45,6 +50,7 @@ const adapter: vi.Mocked<BaseNotificationAdapter<any, Config>> = {
   templateRenderer,
   logger,
   supportsAttachments: false,
+  getTemplateRenderer: () => templateRenderer,
 } as any;
 
 const contextGenerators: ContextGenerators = {

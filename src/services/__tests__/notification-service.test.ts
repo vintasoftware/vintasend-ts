@@ -1,3 +1,4 @@
+import { beforeEach, describe, expect, it, type Mocked, vi } from 'vitest';
 import { VintaSendFactory } from '../../index';
 import type { DatabaseNotification } from '../../types/notification';
 import type { BaseGitCommitShaProvider } from '../git-commit-sha/base-git-commit-sha-provider';
@@ -9,7 +10,7 @@ import type { BaseNotificationReplicationQueueService } from '../notification-qu
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
 
 // Mock implementations
-const mockBackend: vi.Mocked<BaseNotificationBackend<any>> = {
+const mockBackend: Mocked<BaseNotificationBackend<any>> = {
   persistNotification: vi.fn(),
   persistNotificationUpdate: vi.fn(),
   getAllFutureNotifications: vi.fn(),
@@ -48,18 +49,20 @@ const mockBackend: vi.Mocked<BaseNotificationBackend<any>> = {
   deleteNotificationAttachment: vi.fn().mockResolvedValue(undefined),
 };
 
-const mockTemplateRenderer: vi.Mocked<BaseEmailTemplateRenderer<any>> = {
+const mockTemplateRenderer: Mocked<BaseEmailTemplateRenderer<any>> = {
+  logger: null,
   render: vi.fn(),
   renderFromTemplateContent: vi.fn(),
+  injectLogger: vi.fn(),
 };
 
-const mockLogger: vi.Mocked<BaseLogger> = {
+const mockLogger: Mocked<BaseLogger> = {
   info: vi.fn(),
   error: vi.fn(),
   warn: vi.fn(),
 };
 
-const mockAdapter: vi.Mocked<BaseNotificationAdapter<any, any>> = {
+const mockAdapter: Mocked<BaseNotificationAdapter<any, any>> = {
   notificationType: 'EMAIL',
   key: 'test-adapter',
   enqueueNotifications: false,
@@ -70,17 +73,18 @@ const mockAdapter: vi.Mocked<BaseNotificationAdapter<any, any>> = {
   templateRenderer: mockTemplateRenderer,
   logger: mockLogger,
   supportsAttachments: false,
+  getTemplateRenderer: () => mockTemplateRenderer,
 } as any;
 
-const mockQueueService: vi.Mocked<BaseNotificationQueueService<any>> = {
+const mockQueueService: Mocked<BaseNotificationQueueService<any>> = {
   enqueueNotification: vi.fn(),
 };
 
-const mockReplicationQueueService: vi.Mocked<BaseNotificationReplicationQueueService<any>> = {
+const mockReplicationQueueService: Mocked<BaseNotificationReplicationQueueService<any>> = {
   enqueueReplication: vi.fn(),
 };
 
-const mockGitCommitShaProvider: vi.Mocked<BaseGitCommitShaProvider> = {
+const mockGitCommitShaProvider: Mocked<BaseGitCommitShaProvider> = {
   getCurrentGitCommitSha: vi.fn(),
 };
 
@@ -609,6 +613,7 @@ describe('NotificationService', () => {
         expect.stringContaining('Error sending notification 123'),
       );
       expect(mockBackend.markAsFailed).toHaveBeenCalled();
+      expect(mockBackend.markAsSent).not.toHaveBeenCalled();
     });
 
     it('should handle error when marking as failed in delayedSend', async () => {
@@ -630,6 +635,7 @@ describe('NotificationService', () => {
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.stringContaining('Error marking notification 123 as failed'),
       );
+      expect(mockBackend.markAsSent).not.toHaveBeenCalled();
     });
 
     it('should resolve and persist gitCommitSha in delayedSend execution path', async () => {
@@ -908,7 +914,6 @@ describe('NotificationService', () => {
         ...mockNotification,
         id: '123',
         readAt: new Date(),
-        // biome-ignore lint/suspicious/noExplicitAny:any just for testing
       } as unknown as DatabaseNotification<any>);
       await service.markRead('123');
       expect(mockBackend.markAsRead).toHaveBeenCalledWith('123', true);
@@ -1184,18 +1189,33 @@ describe('NotificationService', () => {
   });
 
   describe('VintaSend constructor wiring', () => {
+    it('throws when there are multiple adapters for the same notification type', () => {
+      const duplicateTypeAdapter = {
+        ...mockAdapter,
+        key: 'duplicate-email-adapter',
+      } as any;
+
+      expect(() => {
+        new VintaSendFactory<Config>().create(
+          [mockAdapter, duplicateTypeAdapter],
+          mockBackend,
+          mockLogger,
+          notificationContextgenerators,
+        );
+      }).toThrow('Duplicate adapter notification types are not allowed');
+    });
+
     it('injects logger into adapter when constructing VintaSend', () => {
       const adapterMock = {
         injectLogger: vi.fn(),
         injectBackend: vi.fn(),
         notificationType: 'EMAIL',
         key: 'test-adapter',
-        // biome-ignore lint/suspicious/noExplicitAny:any just for testing
+        getTemplateRenderer: () => mockTemplateRenderer,
       } as any;
 
       const backendMock = {
         // basic backend stub
-        // biome-ignore lint/suspicious/noExplicitAny:any just for testing
       } as any;
 
       new VintaSendFactory<Config>().create(
@@ -1218,7 +1238,7 @@ describe('NotificationService', () => {
         injectBackend: vi.fn(),
         notificationType: 'EMAIL',
         key: 'test-adapter',
-        // biome-ignore lint/suspicious/noExplicitAny:any just for testing
+        getTemplateRenderer: () => mockTemplateRenderer,
       } as any;
 
       const backendWithoutInjection = {
@@ -1247,7 +1267,6 @@ describe('NotificationService', () => {
       );
 
       // Backend without the injection method should not be called
-      // biome-ignore lint/suspicious/noExplicitAny:any just for testing
       expect((backendWithoutInjection as any).injectAttachmentManager).toBeUndefined();
 
       // Test backend with injection
@@ -1273,6 +1292,7 @@ describe('NotificationService', () => {
         injectBackend: vi.fn(),
         notificationType: 'EMAIL',
         key: 'test-adapter',
+        getTemplateRenderer: () => mockTemplateRenderer,
       } as any;
 
       const backendWithAttachmentInjection = {

@@ -1,6 +1,6 @@
 {
   "name": "vintasend",
-  "version": "0.12.3",
+  "version": "0.13.0",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -29,7 +29,7 @@
     "format:implementations": "node scripts/run-implementations-script.js format",
     "test:implementations:local": "node scripts/test-implementations-local.js",
     "build:implementations:local": "node scripts/test-implementations-local.js --command=build",
-    "release:prepare": "npm run format:implementations && npm run test:implementations:local && npm run build:implementations:local",
+    "release:prepare": "npm run format && npm test && npm run format:implementations && npm run test:implementations:local && npm run build:implementations:local",
     "release:bump": "node scripts/release-bump.js",
     "release:bump:patch": "node scripts/release-bump.js --bump=patch",
     "release:bump:minor": "node scripts/release-bump.js --bump=minor",

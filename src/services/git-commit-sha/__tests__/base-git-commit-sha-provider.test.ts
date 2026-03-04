@@ -1,3 +1,4 @@
+import { describe, expect, it } from 'vitest';
 import type { BaseGitCommitShaProvider } from '../base-git-commit-sha-provider';
 
 describe('BaseGitCommitShaProvider', () => {

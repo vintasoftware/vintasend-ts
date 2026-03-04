@@ -1,14 +1,17 @@
 import type { StoredAttachment } from '../../types/attachment.js';
 import type { JsonObject, JsonValue } from '../../types/json-values.js';
-import type { AnyDatabaseNotification, DatabaseOneOffNotification } from '../../types/notification.js';
+import type {
+  AnyDatabaseNotification,
+  DatabaseOneOffNotification,
+} from '../../types/notification.js';
 import type { NotificationType } from '../../types/notification-type.js';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config.js';
+import type { BaseLogger } from '../loggers/base-logger.js';
+import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend.js';
 import type {
   EmailTemplate,
   EmailTemplateContent,
 } from '../notification-template-renderers/base-email-template-renderer.js';
-import type { BaseLogger } from '../loggers/base-logger.js';
-import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend.js';
 import type { BaseNotificationTemplateRenderer } from '../notification-template-renderers/base-notification-template-renderer.js';
 
 /**
@@ -118,6 +121,10 @@ export abstract class BaseNotificationAdapter<
       firstName: '',
       lastName: '',
     };
+  }
+
+  getTemplateRenderer(): TemplateRenderer {
+    return this.templateRenderer;
   }
 
   injectBackend(backend: BaseNotificationBackend<Config>): void {

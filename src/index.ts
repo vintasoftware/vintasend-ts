@@ -11,21 +11,21 @@ export {
   BaseNotificationAdapter,
   isOneOffNotification,
 } from './services/notification-adapters/base-notification-adapter.js';
-export type { BaseNotificationBackend } from './services/notification-backends/base-notification-backend.js';
-export {
-  supportsAttachments,
-  isFieldFilter,
-} from './services/notification-backends/base-notification-backend.js';
 export type {
-  NotificationFilter,
-  NotificationFilterFields,
+  BaseNotificationBackend,
   DateRange,
+  NotificationFilter,
   NotificationFilterCapabilities,
+  NotificationFilterFields,
   NotificationOrderBy,
   NotificationOrderByField,
   NotificationOrderDirection,
-  StringFilterLookup,
   StringFieldFilter,
+  StringFilterLookup,
+} from './services/notification-backends/base-notification-backend.js';
+export {
+  isFieldFilter,
+  supportsAttachments,
 } from './services/notification-backends/base-notification-backend.js';
 export type { BaseNotificationQueueService } from './services/notification-queue-service/base-notification-queue-service.js';
 export type { BaseNotificationReplicationQueueService } from './services/notification-queue-service/base-notification-replication-queue-service.js';

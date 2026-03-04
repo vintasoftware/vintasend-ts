@@ -1,16 +1,27 @@
 import type { JsonObject } from '../../types/json-values.js';
 import type { AnyNotification } from '../../types/notification.js';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config.js';
+import type { BaseLogger } from '../loggers/base-logger.js';
 
-export interface BaseNotificationTemplateRenderer<
+export abstract class BaseNotificationTemplateRenderer<
   Config extends BaseNotificationTypeConfig,
   T = unknown,
 > {
-  render(notification: AnyNotification<Config>, context: JsonObject): Promise<T>;
+  logger: BaseLogger | null = null;
+
+  render(_notification: AnyNotification<Config>, _context: JsonObject): Promise<T> {
+    throw 'Not implemented';
+  }
 
   renderFromTemplateContent(
-    notification: AnyNotification<Config>,
-    templateContent: unknown,
-    context: JsonObject,
-  ): Promise<T>;
+    _notification: AnyNotification<Config>,
+    _templateContent: unknown,
+    _context: JsonObject,
+  ): Promise<T> {
+    throw 'Not implemented';
+  }
+
+  injectLogger(logger: BaseLogger): void {
+    this.logger = logger;
+  }
 }
