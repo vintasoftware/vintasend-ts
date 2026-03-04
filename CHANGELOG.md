@@ -1,6 +1,15 @@
 # Changelog
 
-# Version 0.13.0
+# Version 0.13.2
+
+* Add `@types/node` as a dev dependency to some packages that were missing it (to fix CI builds). Packages affected:
+  * vintasend-aws-s3-attachments 
+  * vintasend-pug 
+  * vintasend-winston 
+  * vintasend-implementation-template
+
+
+# Version 0.13.1
 
 * Fix wrong vintasend version reference on all implementations
 
