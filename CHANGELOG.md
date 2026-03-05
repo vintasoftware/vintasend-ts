@@ -1,5 +1,9 @@
 # Changelog
 
+# Version 0.13.3
+
+* Refactor compile-pug-templates script to be compatible with Node 20.x
+
 # Version 0.13.2
 
 * Add `@types/node` as a dev dependency to some packages that were missing it (to fix CI builds). Packages affected:
