@@ -112,6 +112,7 @@ describe('VintaSend multi-backend error handling (Phase 4)', () => {
     sendAfter: new Date(Date.now() + 60_000),
     subjectTemplate: 'subject',
     extraParams: null,
+    tenant: null,
   };
 
   const databaseNotification = {

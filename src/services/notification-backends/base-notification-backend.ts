@@ -70,6 +70,7 @@ export type NotificationFilterFields<Config extends BaseNotificationTypeConfig> 
   bodyTemplate?: StringFieldFilter;
   subjectTemplate?: StringFieldFilter;
   contextName?: StringFieldFilter;
+  tenant?: string | string[];
   sendAfterRange?: DateRange;
   createdAtRange?: DateRange;
   sentAtRange?: DateRange;
@@ -101,6 +102,7 @@ export const DEFAULT_BACKEND_FILTER_CAPABILITIES = {
   'fields.bodyTemplate': true,
   'fields.subjectTemplate': true,
   'fields.contextName': true,
+  'fields.tenant': true,
   'fields.sendAfterRange': true,
   'fields.createdAtRange': true,
   'fields.sentAtRange': true,

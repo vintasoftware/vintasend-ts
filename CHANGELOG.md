@@ -1,5 +1,16 @@
 # Changelog
 
+# Version 0.14.0
+
+* Added multi-tenant support via a new optional `tenant` field on notifications. Notifications can now be scoped to a specific tenant (e.g. an organization, clinic, or workspace), and `filterNotifications` accepts a `tenant` filter that returns only notifications belonging to the given tenant(s).
+  * **Core types**: `NotificationInput`, `NotificationResendWithContextInput`, `OneOffNotificationInput`, and `OneOffNotificationResendWithContextInput` accept an optional `tenant?: string | null`. `DatabaseNotification` and `DatabaseOneOffNotification` include a `tenant: string | null` field. `NotificationFilterFields` accepts `tenant?: string | string[]`, and `'fields.tenant'` was added to the default backend filter capabilities.
+  * **Tenant reassignment is forbidden on update.** The service methods `updateNotification` and `updateOneOffNotification` now statically `Omit<'tenant'>` from their partial payloads and throw at runtime if a `tenant` key is present. Backends also enforce this defensively: both `vintasend-prisma` and `vintasend-medplum` read the existing resource and reject any update whose incoming tenant differs from the current tenant. Idempotent updates (same tenant, or no `tenant` field) are still allowed so multi-backend replication continues to work.
+* **`vintasend-prisma`**: `PrismaNotificationModel` now has a `tenant: string | null` column. The Prisma `where` conversion supports `tenant` filters (single value, array, and negation). Consumers must run a migration adding a nullable `tenant` text column (and ideally an index) to their notification table.
+* **`vintasend-medplum`**: Tenant support uses Medplum's native compartment mechanism. On persist, `meta.accounts` is set directly on the `Communication` resource inline (no separate `$set-accounts` call), so Medplum populates `meta.compartment` server-side and your `AccessPolicy` with parameterized compartment variables scopes reads automatically. On query, `tenant` filters are translated to the FHIR `_compartment` search parameter. See: https://www.medplum.com/docs/access/multi-tenant-access-policy
+* **`vintasend-dashboard`**: Added a tenant text filter to the notifications filter bar, a tenant column to the notifications table, a tenant field to the notification detail view, and URL query param sync for the `tenant` filter (bookmarkable/shareable URLs).
+* Updated the notification resend reconstruction in the service layer so `tenant` is carried through, and added `'tenant'` to the multi-backend sync verification field list.
+* Updated the example Prisma schema in `examples/nextjs-prisma-nodemailer-pug-temporal` to document the required column and index.
+
 # Version 0.13.3
 
 * Refactor compile-pug-templates script to be compatible with Node 20.x

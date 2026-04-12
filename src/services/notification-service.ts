@@ -768,8 +768,17 @@ export class VintaSend<
 
   async updateNotification(
     notificationId: Config['NotificationIdType'],
-    notification: Partial<Omit<Notification<Config>, 'id'>>,
+    notification: Partial<Omit<Notification<Config>, 'id' | 'tenant'>>,
   ) {
+    // Defense-in-depth: reject tenant changes even if bypassed via `as any`.
+    // Reassigning a notification to a different tenant would move it across
+    // compartments and could leak data across tenant boundaries.
+    if ('tenant' in (notification as Record<string, unknown>)) {
+      throw new Error(
+        `Cannot update tenant of notification ${String(notificationId)}: ` +
+          'tenant reassignment is not allowed.',
+      );
+    }
     const updatedNotification = this.executeMultiBackendWrite(
       'updateNotification',
       async (backend) => {
@@ -832,8 +841,16 @@ export class VintaSend<
    */
   async updateOneOffNotification(
     notificationId: Config['NotificationIdType'],
-    notification: Partial<Omit<OneOffNotificationInput<Config>, 'id'>>,
+    notification: Partial<Omit<OneOffNotificationInput<Config>, 'id' | 'tenant'>>,
   ): Promise<DatabaseOneOffNotification<Config>> {
+    // Defense-in-depth: reject tenant changes even if bypassed via `as any`.
+    // See updateNotification for rationale.
+    if ('tenant' in (notification as Record<string, unknown>)) {
+      throw new Error(
+        `Cannot update tenant of one-off notification ${String(notificationId)}: ` +
+          'tenant reassignment is not allowed.',
+      );
+    }
     // Validate email or phone format if provided
     if (notification.emailOrPhone !== undefined) {
       this.validateEmailOrPhone(notification.emailOrPhone);
@@ -1120,6 +1137,7 @@ export class VintaSend<
       sendAfter: null,
       subjectTemplate: notification.subjectTemplate,
       extraParams: notification.extraParams,
+      tenant: notification.tenant,
     };
 
     let createdNotification: DatabaseNotification<Config>;
@@ -1398,6 +1416,7 @@ export class VintaSend<
         'contextParameters',
         'contextUsed',
         'extraParams',
+        'tenant',
         'adapterUsed',
         'sendAfter',
         'sentAt',

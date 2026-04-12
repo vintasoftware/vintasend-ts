@@ -30,6 +30,7 @@ export type NotificationInput<Config extends BaseNotificationTypeConfig> = {
   sendAfter: Date | null;
   subjectTemplate: string | null;
   extraParams: InputJsonValue | null;
+  tenant?: string | null;
   gitCommitSha?: never;
   attachments?: NotificationAttachment[];
 };
@@ -54,6 +55,7 @@ export type NotificationResendWithContextInput<Config extends BaseNotificationTy
   sendAfter: Date | null;
   subjectTemplate: string | null;
   extraParams: InputJsonValue | null;
+  tenant?: string | null;
   gitCommitSha?: never;
   attachments?: NotificationAttachment[];
 };
@@ -81,6 +83,7 @@ export type DatabaseNotification<Config extends BaseNotificationTypeConfig> = {
             Config['ContextMap'][DatabaseNotification<Config>['contextName']]['generate']
           >);
   extraParams: JsonValue;
+  tenant: string | null;
   adapterUsed: string | null;
   sentAt: Date | null;
   readAt: Date | null;

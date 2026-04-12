@@ -125,6 +125,7 @@ describe('NotificationService - One-Off Notifications', () => {
       status: 'PENDING_SEND' as const,
       contextUsed: null,
       extraParams: {},
+      tenant: null,
       adapterUsed: null,
       sentAt: null,
       readAt: null,

@@ -118,6 +118,7 @@ function createDatabaseNotification(
     status,
     contextUsed: null,
     extraParams: null,
+    tenant: null,
     adapterUsed: null,
     sentAt: null,
     readAt: null,

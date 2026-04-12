@@ -121,6 +121,7 @@ describe('VintaSend multi-backend writes (Phase 4)', () => {
     sendAfter: new Date(Date.now() + 60_000),
     subjectTemplate: 'subject',
     extraParams: null,
+    tenant: null,
   };
 
   const baseOneOffInput: Omit<OneOffNotificationInput<Config>, 'id'> = {
@@ -135,6 +136,7 @@ describe('VintaSend multi-backend writes (Phase 4)', () => {
     sendAfter: new Date(Date.now() + 60_000),
     subjectTemplate: 'subject',
     extraParams: null,
+    tenant: null,
   };
 
   beforeEach(() => {
