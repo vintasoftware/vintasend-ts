@@ -44,6 +44,18 @@ function updateVintasendDependency(packageJsonPath, newVersion, dryRun = false) 
     updates.push({ field: 'peerDependencies', oldVersion, newVersion: `^${newVersion}` });
   }
 
+  // Update in devDependencies. Packages that expose vintasend via
+  // peerDependencies typically also list it in devDependencies so the types
+  // resolve during local build/test. If we bump the peer but leave the dev
+  // at an older range, `npm install` pulls a stale published vintasend and
+  // overwrites any workspace symlink — breaking builds when newer types are
+  // expected.
+  if (packageJson.devDependencies && packageJson.devDependencies.vintasend) {
+    const oldVersion = packageJson.devDependencies.vintasend;
+    packageJson.devDependencies.vintasend = `^${newVersion}`;
+    updates.push({ field: 'devDependencies', oldVersion, newVersion: `^${newVersion}` });
+  }
+
   if (updates.length > 0 && !dryRun) {
     fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
   }
