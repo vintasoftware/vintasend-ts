@@ -1,5 +1,9 @@
 # Changelog
 
+# Version 0.14.1
+
+* **`vintasend-pug`**: Fixed `compile-pug-templates` bin being a no-op when installed from npm. The direct-execution guard compared `import.meta.url` against `path.resolve(process.argv[1])`, but when invoked via the `node_modules/.bin` symlink `process.argv[1]` is the symlink path while `import.meta.url` points at the real file in `dist/scripts/`, so the two never matched and `runCli` never ran. Switched the comparison to `fs.realpathSync(process.argv[1])` so the symlinked bin resolves to the same path.
+
 # Version 0.14.0
 
 * Added multi-tenant support via a new optional `tenant` field on notifications. Notifications can now be scoped to a specific tenant (e.g. an organization, clinic, or workspace), and `filterNotifications` accepts a `tenant` filter that returns only notifications belonging to the given tenant(s).
