@@ -270,6 +270,26 @@ const replicaCapabilities = await vintasend.getBackendSupportedFilterCapabilitie
 
 `vintasend-medplum` currently does not support `orderBy.readAt`, and reports `orderBy.readAt: false`.
 
+### Filtering by read date
+
+`readAtRange` filters on when a notification was read, alongside
+`sendAfterRange`, `createdAtRange` and `sentAtRange`. It is newer than the other
+range filters, so support is opt-in per backend and both of its capability keys
+default to `false`:
+
+```typescript
+const capabilities = await vintasend.getBackendSupportedFilterCapabilities();
+
+if (capabilities['fields.readAtRange']) {
+  await vintasend.filterNotifications({ readAtRange: { from: lastWeek } }, 0, 25);
+}
+```
+
+All four date ranges share the same NULL semantics: a notification whose date
+field is null does not match a positive range, and because `{ not: ... }` inverts
+the positive result, it *is* returned by a negated one. An unread notification is
+therefore excluded by `readAtRange` and returned by `{ not: { readAtRange } }`.
+
 ### Case sensitivity
 
 `stringLookups.caseSensitive` and `stringLookups.caseInsensitive` are separate

@@ -218,8 +218,10 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
    * - `logical.and`, `logical.or`, `logical.not`, `logical.notNested`
    * - `fields.status`, `fields.notificationType`, `fields.adapterUsed`, `fields.userId`,
    *   `fields.bodyTemplate`, `fields.subjectTemplate`, `fields.contextName`,
-   *   `fields.sendAfterRange`, `fields.createdAtRange`, `fields.sentAtRange`
-   * - `negation.sendAfterRange`, `negation.createdAtRange`, `negation.sentAtRange`
+   *   `fields.sendAfterRange`, `fields.createdAtRange`, `fields.sentAtRange`,
+   *   `fields.readAtRange`
+   * - `negation.sendAfterRange`, `negation.createdAtRange`, `negation.sentAtRange`,
+   *   `negation.readAtRange`
    *
    * If this method is not implemented, all features are assumed to be supported.
    * If this method is implemented, missing keys default to true (supported) for forward compatibility.

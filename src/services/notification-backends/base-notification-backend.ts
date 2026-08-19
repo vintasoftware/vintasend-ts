@@ -72,11 +72,23 @@ export type NotificationOrderBy = {
  * `getOneOffNotifications`, `filterNotifications` and the rest — because a
  * backend follows one pagination convention throughout.
  *
- * It is also the one key whose default is `false` rather than `true`, since the
+ * It is one of the keys whose default is `false` rather than `true`, since the
  * TypeScript convention is 0-indexed. That is safe: `getBackendSupportedFilterCapabilities()`
  * merges these defaults under the backend's own report, so the key is always
  * present in what a caller receives and the "missing keys default to true" rule
  * never applies to it in practice.
+ *
+ * `fields.readAtRange` and `negation.readAtRange` default to `false` for a
+ * different reason. Defaulting to true is safe for a capability that describes
+ * behaviour backends already have — it says "assume support unless a backend
+ * says otherwise". `readAtRange` is new filter vocabulary that no backend
+ * implemented when it was introduced, so a `true` default would have made every
+ * shipped and third-party backend claim a filter it would silently ignore or
+ * throw on, which is the exact failure these capabilities exist to prevent. A
+ * backend flips both keys to `true` when it implements the field; a backend that
+ * cannot search on `readAt` at all (`vintasend-medplum`, which does not expose it
+ * as a searchable field and already reports `orderBy.readAt: false`) leaves them
+ * alone.
  */
 export type NotificationFilterCapabilities = {
   [key: string]: boolean;
@@ -85,6 +97,14 @@ export type NotificationFilterCapabilities = {
 /**
  * Leaf-level filter conditions for notification fields.
  * All specified fields are combined with implicit AND.
+ *
+ * Date-range fields (`sendAfterRange`, `createdAtRange`, `sentAtRange`,
+ * `readAtRange`) all share the same NULL semantics, which backends must
+ * implement consistently: a notification whose date field is null does **not**
+ * match a positive range filter, and because `{ not: ... }` inverts the positive
+ * result, such a notification **is** included by a negated one. A notification
+ * that was never read is therefore excluded by `readAtRange` and returned by
+ * `{ not: { readAtRange } }`.
  */
 export type NotificationFilterFields<Config extends BaseNotificationTypeConfig> = {
   status?: NotificationStatus | NotificationStatus[];
@@ -98,6 +118,7 @@ export type NotificationFilterFields<Config extends BaseNotificationTypeConfig> 
   sendAfterRange?: DateRange;
   createdAtRange?: DateRange;
   sentAtRange?: DateRange;
+  readAtRange?: DateRange;
 };
 
 /**
@@ -133,6 +154,10 @@ export const DEFAULT_BACKEND_FILTER_CAPABILITIES = {
   'negation.sendAfterRange': true,
   'negation.createdAtRange': true,
   'negation.sentAtRange': true,
+  // `readAtRange` is new vocabulary rather than behaviour backends already have,
+  // so it defaults to false — see the note on this constant.
+  'fields.readAtRange': false,
+  'negation.readAtRange': false,
   'stringLookups.exact': true,
   'stringLookups.startsWith': true,
   'stringLookups.endsWith': true,
@@ -278,8 +303,10 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
    * - `logical.and`, `logical.or`, `logical.not`, `logical.notNested`
    * - `fields.status`, `fields.notificationType`, `fields.adapterUsed`, `fields.userId`,
    *   `fields.bodyTemplate`, `fields.subjectTemplate`, `fields.contextName`,
-   *   `fields.sendAfterRange`, `fields.createdAtRange`, `fields.sentAtRange`
-   * - `negation.sendAfterRange`, `negation.createdAtRange`, `negation.sentAtRange`
+   *   `fields.sendAfterRange`, `fields.createdAtRange`, `fields.sentAtRange`,
+   *   `fields.readAtRange`
+   * - `negation.sendAfterRange`, `negation.createdAtRange`, `negation.sentAtRange`,
+   *   `negation.readAtRange`
    * - `stringLookups.exact`, `stringLookups.startsWith`, `stringLookups.endsWith`,
    *   `stringLookups.includes`, `stringLookups.caseSensitive`, `stringLookups.caseInsensitive`
    * - `pagination.oneIndexed`: whether the first page is page `1`, or page `0` (default)

@@ -428,6 +428,29 @@ describe('BaseNotificationBackend Interface', () => {
       expect(result).toEqual([]);
     });
 
+    it('should accept a readAtRange filter', async () => {
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        readAtRange: {
+          from: new Date('2025-06-01'),
+          to: new Date('2025-06-30'),
+        },
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
+    it('should accept a negated readAtRange filter', async () => {
+      // Notifications that were never read have a null readAt, so a positive
+      // range excludes them and its negation returns them.
+      const backend = new TestBackendWithAttachments();
+      const filter: NotificationFilter<TestConfig> = {
+        not: { readAtRange: { from: new Date('2025-06-01') } },
+      };
+      const result = await backend.filterNotifications(filter, 1, 10);
+      expect(result).toEqual([]);
+    });
+
     it('should accept a sendAfterRange filter', async () => {
       const backend = new TestBackendWithAttachments();
       const filter: NotificationFilter<TestConfig> = {
