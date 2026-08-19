@@ -270,6 +270,21 @@ const replicaCapabilities = await vintasend.getBackendSupportedFilterCapabilitie
 
 `vintasend-medplum` currently does not support `orderBy.readAt`, and reports `orderBy.readAt: false`.
 
+### Pagination indexing
+
+`page` arguments are 0-indexed in this package: the first page is page `0`. That
+is a convention of the backend, not of VintaSend as a whole — the Python
+VintaSend backends are 1-indexed. Anything that exposes page numbers of its own
+(an HTTP API, a UI) should ask the backend rather than hardcode an offset:
+
+```typescript
+const capabilities = await vintasend.getBackendSupportedFilterCapabilities();
+const firstPage = capabilities['pagination.zeroIndexed'] === false ? 1 : 0;
+```
+
+Backends that do not implement `getFilterCapabilities()` report
+`pagination.zeroIndexed: true`, which is correct for every TypeScript backend.
+
 ## Attachment Support
 
 VintaSend supports file attachments for notifications with an extensible architecture that allows you to choose your preferred storage backend.

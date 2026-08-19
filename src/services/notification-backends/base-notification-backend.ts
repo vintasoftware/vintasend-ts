@@ -49,10 +49,17 @@ export type NotificationOrderBy = {
  * - `logical.*`: Operator support (and, or, not, notNested)
  * - `fields.*`: Field filtering support
  * - `negation.*`: Negation support for specific fields
+ * - `pagination.*`: Pagination conventions the backend follows
  *
  * When a backend implements getFilterCapabilities(), missing keys default to true (supported),
  * ensuring forward compatibility when new capabilities are added.
  * Backends that don't implement getFilterCapabilities() are treated as supporting all features.
+ *
+ * `pagination.zeroIndexed` describes a convention rather than a feature: `true`
+ * (the default) means the backend's first page is page `0`, `false` means it is
+ * page `1`. Callers that expose their own page numbers should read it instead of
+ * assuming an offset — the assumption does not hold across languages, and the
+ * Python VintaSend backends are 1-indexed.
  */
 export type NotificationFilterCapabilities = {
   [key: string]: boolean;
@@ -118,6 +125,7 @@ export const DEFAULT_BACKEND_FILTER_CAPABILITIES = {
   'orderBy.readAt': true,
   'orderBy.createdAt': true,
   'orderBy.updatedAt': true,
+  'pagination.zeroIndexed': true,
 };
 
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
@@ -251,6 +259,7 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
    *   `fields.bodyTemplate`, `fields.subjectTemplate`, `fields.contextName`,
    *   `fields.sendAfterRange`, `fields.createdAtRange`, `fields.sentAtRange`
    * - `negation.sendAfterRange`, `negation.createdAtRange`, `negation.sentAtRange`
+   * - `pagination.zeroIndexed`: whether the first page is page `0` (default) or page `1`
    *
    * If this method is not implemented, all features are assumed to be supported.
    * If this method is implemented, missing keys default to true (supported) for forward compatibility.

@@ -334,6 +334,40 @@ describe('VintaSend multi-backend reads (Phase 5)', () => {
     expect(capabilities['orderBy.updatedAt']).toBe(false);
   });
 
+  it('reports zero-indexed pagination by default', async () => {
+    const backend = createMockBackend('primary');
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend,
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const capabilities = await service.getBackendSupportedFilterCapabilities();
+
+    expect(capabilities['pagination.zeroIndexed']).toBe(true);
+  });
+
+  it('lets a backend report one-indexed pagination', async () => {
+    const backend = createMockBackend('primary');
+
+    backend.getFilterCapabilities.mockReturnValue({
+      'pagination.zeroIndexed': false,
+    });
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend,
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const capabilities = await service.getBackendSupportedFilterCapabilities();
+
+    expect(capabilities['pagination.zeroIndexed']).toBe(false);
+  });
+
   it('exposes backend identifier management helpers', () => {
     const primaryBackend = createMockBackend('primary');
     const replicaA = createMockBackend('replica-a');
