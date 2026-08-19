@@ -49,10 +49,34 @@ export type NotificationOrderBy = {
  * - `logical.*`: Operator support (and, or, not, notNested)
  * - `fields.*`: Field filtering support
  * - `negation.*`: Negation support for specific fields
+ * - `pagination.*`: Pagination conventions the backend follows
  *
  * When a backend implements getFilterCapabilities(), missing keys default to true (supported),
  * ensuring forward compatibility when new capabilities are added.
  * Backends that don't implement getFilterCapabilities() are treated as supporting all features.
+ *
+ * `stringLookups.caseSensitive` and `stringLookups.caseInsensitive` are two
+ * independent capabilities, not a flag and its negation. A backend on a
+ * case-insensitive collation (MySQL `*_ci`) matches case-insensitively and
+ * cannot do otherwise, so it reports `caseSensitive: false`. A backend with
+ * `LIKE` but no `ILIKE` and no case folding matches case-sensitively only, so it
+ * reports `caseInsensitive: false`. Deriving either from the other inverts the
+ * answer for exactly the backends that had a constraint worth reporting.
+ *
+ * `pagination.oneIndexed` describes a convention rather than a feature: `false`
+ * (the default) means the backend's first page is page `0`, `true` means it is
+ * page `1`. Every TypeScript backend is 0-indexed; the Python VintaSend backends
+ * are 1-indexed, which is why callers that expose page numbers of their own must
+ * read this instead of assuming an offset. It covers **every** paginated backend
+ * method — `getNotifications`, `getPendingNotifications`, `getFutureNotifications`,
+ * `getOneOffNotifications`, `filterNotifications` and the rest — because a
+ * backend follows one pagination convention throughout.
+ *
+ * It is also the one key whose default is `false` rather than `true`, since the
+ * TypeScript convention is 0-indexed. That is safe: `getBackendSupportedFilterCapabilities()`
+ * merges these defaults under the backend's own report, so the key is always
+ * present in what a caller receives and the "missing keys default to true" rule
+ * never applies to it in practice.
  */
 export type NotificationFilterCapabilities = {
   [key: string]: boolean;
@@ -109,15 +133,20 @@ export const DEFAULT_BACKEND_FILTER_CAPABILITIES = {
   'negation.sendAfterRange': true,
   'negation.createdAtRange': true,
   'negation.sentAtRange': true,
+  'stringLookups.exact': true,
   'stringLookups.startsWith': true,
   'stringLookups.endsWith': true,
   'stringLookups.includes': true,
   'stringLookups.caseInsensitive': true,
+  'stringLookups.caseSensitive': true,
   'orderBy.sendAfter': true,
   'orderBy.sentAt': true,
   'orderBy.readAt': true,
   'orderBy.createdAt': true,
   'orderBy.updatedAt': true,
+  // Unlike the keys above, this reports a convention rather than a feature:
+  // every TypeScript backend numbers its first page 0.
+  'pagination.oneIndexed': false,
 };
 
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
@@ -230,7 +259,7 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
    * Filters can be combined with logical operators (and, or, not).
    *
    * @param filter - Composable filter expression
-   * @param page - Page number (1-indexed) for pagination
+   * @param page - Page number (0-indexed) for pagination
    * @param pageSize - Number of results per page
    * @returns Matching notifications
    */
@@ -251,6 +280,9 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
    *   `fields.bodyTemplate`, `fields.subjectTemplate`, `fields.contextName`,
    *   `fields.sendAfterRange`, `fields.createdAtRange`, `fields.sentAtRange`
    * - `negation.sendAfterRange`, `negation.createdAtRange`, `negation.sentAtRange`
+   * - `stringLookups.exact`, `stringLookups.startsWith`, `stringLookups.endsWith`,
+   *   `stringLookups.includes`, `stringLookups.caseSensitive`, `stringLookups.caseInsensitive`
+   * - `pagination.oneIndexed`: whether the first page is page `1`, or page `0` (default)
    *
    * If this method is not implemented, all features are assumed to be supported.
    * If this method is implemented, missing keys default to true (supported) for forward compatibility.

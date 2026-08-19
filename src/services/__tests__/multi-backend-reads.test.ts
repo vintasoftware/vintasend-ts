@@ -334,6 +334,99 @@ describe('VintaSend multi-backend reads (Phase 5)', () => {
     expect(capabilities['orderBy.updatedAt']).toBe(false);
   });
 
+  it('reports both case-sensitivity capabilities by default', async () => {
+    const backend = createMockBackend('primary');
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend,
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const capabilities = await service.getBackendSupportedFilterCapabilities();
+
+    expect(capabilities['stringLookups.caseSensitive']).toBe(true);
+    expect(capabilities['stringLookups.caseInsensitive']).toBe(true);
+    expect(capabilities['stringLookups.exact']).toBe(true);
+  });
+
+  it('lets a backend decline case-sensitive matching without declining case-insensitive', async () => {
+    // A backend on a case-insensitive collation: it can only fold case.
+    const backend = createMockBackend('primary');
+
+    backend.getFilterCapabilities.mockReturnValue({
+      'stringLookups.caseSensitive': false,
+    });
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend,
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const capabilities = await service.getBackendSupportedFilterCapabilities();
+
+    expect(capabilities['stringLookups.caseSensitive']).toBe(false);
+    expect(capabilities['stringLookups.caseInsensitive']).toBe(true);
+  });
+
+  it('lets a backend decline case-insensitive matching without declining case-sensitive', async () => {
+    // A backend with LIKE but no ILIKE: it can only match case-sensitively.
+    const backend = createMockBackend('primary');
+
+    backend.getFilterCapabilities.mockReturnValue({
+      'stringLookups.caseInsensitive': false,
+    });
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend,
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const capabilities = await service.getBackendSupportedFilterCapabilities();
+
+    expect(capabilities['stringLookups.caseInsensitive']).toBe(false);
+    expect(capabilities['stringLookups.caseSensitive']).toBe(true);
+  });
+
+  it('reports zero-indexed pagination by default', async () => {
+    const backend = createMockBackend('primary');
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend,
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const capabilities = await service.getBackendSupportedFilterCapabilities();
+
+    expect(capabilities['pagination.oneIndexed']).toBe(false);
+  });
+
+  it('lets a backend report one-indexed pagination', async () => {
+    const backend = createMockBackend('primary');
+
+    backend.getFilterCapabilities.mockReturnValue({
+      'pagination.oneIndexed': true,
+    });
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend,
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const capabilities = await service.getBackendSupportedFilterCapabilities();
+
+    expect(capabilities['pagination.oneIndexed']).toBe(true);
+  });
+
   it('exposes backend identifier management helpers', () => {
     const primaryBackend = createMockBackend('primary');
     const replicaA = createMockBackend('replica-a');

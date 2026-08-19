@@ -270,6 +270,47 @@ const replicaCapabilities = await vintasend.getBackendSupportedFilterCapabilitie
 
 `vintasend-medplum` currently does not support `orderBy.readAt`, and reports `orderBy.readAt: false`.
 
+### Case sensitivity
+
+`stringLookups.caseSensitive` and `stringLookups.caseInsensitive` are separate
+capabilities, not a flag and its negation, because a backend can be unable to do
+either one:
+
+| Backend | Reports | Meaning |
+| --- | --- | --- |
+| Case-insensitive collation (MySQL `*_ci`) | `caseSensitive: false` | Always matches case-insensitively; cannot be asked for a case-sensitive match. |
+| `LIKE` without `ILIKE` or case folding | `caseInsensitive: false` | Always matches case-sensitively. |
+| Most backends | both `true` | Either lookup can be requested. |
+
+Deriving one from the other inverts the answer for exactly the backends that had
+a constraint worth reporting, and then declines the one lookup they do support.
+
+### Pagination indexing
+
+`page` arguments are 0-indexed in this package: the first page is page `0`.
+`vintasend-prisma` and `vintasend-medplum` both translate it as
+`page * pageSize`, and the interface documents it as 0-indexed.
+
+That is a convention of the backend, not of VintaSend as a whole — the Python
+VintaSend backends are 1-indexed. Anything that exposes page numbers of its own
+(an HTTP API, a UI) should ask the backend rather than hardcode an offset:
+
+```typescript
+const capabilities = await vintasend.getBackendSupportedFilterCapabilities();
+const firstPage = capabilities['pagination.oneIndexed'] === true ? 1 : 0;
+```
+
+`pagination.oneIndexed` defaults to `false`, so every TypeScript backend —
+including any that does not implement `getFilterCapabilities()` — reports the
+0-indexed convention it already follows. It is the one capability whose default
+is `false` rather than `true`; because the defaults are merged under the
+backend's own report, the key is always present in what you receive, so the
+"missing keys mean supported" rule never applies to it in practice.
+
+The convention covers every paginated backend method — `getNotifications`,
+`getPendingNotifications`, `getFutureNotifications`, `getOneOffNotifications`,
+`filterNotifications` — since a backend pages the same way throughout.
+
 ## Attachment Support
 
 VintaSend supports file attachments for notifications with an extensible architecture that allows you to choose your preferred storage backend.
