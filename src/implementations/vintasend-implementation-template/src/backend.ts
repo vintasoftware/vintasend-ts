@@ -197,7 +197,7 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
    * Filters can be combined with logical operators (and, or, not).
    *
    * @param filter - Composable filter expression
-   * @param page - Page number (1-indexed) for pagination
+   * @param page - Page number (0-indexed) for pagination
    * @param pageSize - Number of results per page
    * @returns Matching notifications
    */
