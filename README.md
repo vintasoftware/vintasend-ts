@@ -611,6 +611,15 @@ VintaSend has many backend, adapter, and template renderer implementations. If y
 * **[vintasend-winston](https://github.com/vintasoftware/vintasend-winston/)**: Uses Winston to allow `NotificationService` to create log entries.
 * **[vintasend-medplum](https://github.com/vintasoftware/vintasend-medplum/)**: Simple console-based logger for Medplum applications.
 
+## Tools
+
+A dashboard for inspecting, previewing, resending and cancelling notifications,
+split into an API and a UI so the UI can be reused with any implementation of
+the API's contract — including one built on the Python `vintasend` package.
+
+* **[vintasend-api](https://github.com/vintasoftware/vintasend-ts-api/)** (`src/tools/vintasend-api`): REST API that exposes a configured VintaSend service over HTTP. Its `openapi.yaml` is the normative contract.
+* **[vintasend-dashboard](https://github.com/vintasoftware/vintasend-ts-dashboard/)** (`src/tools/vintasend-dashboard`): Next.js UI that consumes that contract. It holds no backend credentials of its own.
+
 ## Examples
 
 Examples of how to use VintaSend in different context are available on the [vintasend-ts-examples repository](https://github.com/vintasoftware/vintasend-ts-examples).
