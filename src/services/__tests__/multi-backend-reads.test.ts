@@ -393,6 +393,71 @@ describe('VintaSend multi-backend reads (Phase 5)', () => {
     expect(capabilities['stringLookups.caseSensitive']).toBe(true);
   });
 
+  it('reports readAt range filtering as unsupported by default', async () => {
+    // New filter vocabulary: no backend implemented it when it was introduced,
+    // so the defaults must not claim it works.
+    const backend = createMockBackend('primary');
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend,
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const capabilities = await service.getBackendSupportedFilterCapabilities();
+
+    expect(capabilities['fields.readAtRange']).toBe(false);
+    expect(capabilities['negation.readAtRange']).toBe(false);
+    expect(capabilities['fields.sentAtRange']).toBe(true);
+  });
+
+  it('lets a backend claim readAt range filtering once it implements it', async () => {
+    const backend = createMockBackend('primary');
+
+    backend.getFilterCapabilities.mockReturnValue({
+      'fields.readAtRange': true,
+      'negation.readAtRange': true,
+    });
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend,
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const capabilities = await service.getBackendSupportedFilterCapabilities();
+
+    expect(capabilities['fields.readAtRange']).toBe(true);
+    expect(capabilities['negation.readAtRange']).toBe(true);
+  });
+
+  it('reports readAt and sentAt range support independently', async () => {
+    // A backend can search one date column and not the other; neither key is
+    // derived from the other.
+    const backend = createMockBackend('primary');
+
+    backend.getFilterCapabilities.mockReturnValue({
+      'fields.readAtRange': true,
+      'fields.sentAtRange': false,
+    });
+
+    const service = new VintaSendFactory<Config>().create({
+      adapters: [adapter],
+      backend,
+      logger,
+      contextGeneratorsMap: contextGenerators,
+    });
+
+    const capabilities = await service.getBackendSupportedFilterCapabilities();
+
+    expect(capabilities['fields.readAtRange']).toBe(true);
+    expect(capabilities['fields.sentAtRange']).toBe(false);
+    // Negation is a separate claim: implementing the field does not grant it.
+    expect(capabilities['negation.readAtRange']).toBe(false);
+  });
+
   it('reports zero-indexed pagination by default', async () => {
     const backend = createMockBackend('primary');
 

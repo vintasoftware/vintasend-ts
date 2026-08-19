@@ -1,5 +1,15 @@
 # Changelog
 
+# Unreleased
+
+* Added `readAtRange` to `NotificationFilterFields`, closing the last gap between the TypeScript and Python capability maps. Notifications can now be filtered by when they were read, not just ordered by it.
+  * **Backend authors must opt in.** Unlike most capabilities, `'fields.readAtRange'` and `'negation.readAtRange'` default to **`false`**. This is new filter vocabulary rather than behaviour backends already have, so a `true` default would make every existing backend claim a filter it would silently ignore or throw on. To support it: implement `readAtRange` in your `filterNotifications` conversion — matching the NULL semantics of the other date ranges, where a row with a null `readAt` does not match a positive range and *is* returned by a negated one — then report `'fields.readAtRange': true` from `getFilterCapabilities()`, and `'negation.readAtRange': true` if you can negate it. Backends that cannot search on `readAt` need no change.
+  * No shipped backend implements it yet, so `vintasend-prisma` and `vintasend-medplum` continue to report both keys as `false`.
+* Added `'stringLookups.caseSensitive'` (default `true`) as a capability independent of `'stringLookups.caseInsensitive'`. `StringFilterLookup` has always accepted `caseSensitive`, so a backend could be asked for case-sensitive matching with no way to decline. The two are not a flag and its negation: a case-insensitive collation can only fold case, a backend with `LIKE` but no `ILIKE` can only match case-sensitively, and deriving either from the other declines the one lookup such a backend supports.
+* Added `'stringLookups.exact'` (default `true`) for parity with the Python capability report, since `exact` is the default lookup.
+* Added `'pagination.oneIndexed'` (default `false`) so callers that expose page numbers of their own can read the backend's convention instead of assuming an offset. It covers every paginated backend method. The TypeScript backends are 0-indexed; the Python ones are 1-indexed.
+* **Documentation fix:** `filterNotifications` documented `@param page` as 1-indexed, and `vintasend-implementation-template` repeated it, but every backend translates it as `page * pageSize` — `vintasend-prisma` and `vintasend-medplum` at seven call sites each. The interface now documents pages as 0-indexed, which is what backends implement. No behaviour changed, but a backend written from the old docs would have been one page off, silently.
+
 # Version 0.14.1
 
 * **`vintasend-pug`**: Fixed `compile-pug-templates` bin being a no-op when installed from npm. The direct-execution guard compared `import.meta.url` against `path.resolve(process.argv[1])`, but when invoked via the `node_modules/.bin` symlink `process.argv[1]` is the symlink path while `import.meta.url` points at the real file in `dist/scripts/`, so the two never matched and `runCli` never ran. Switched the comparison to `fs.realpathSync(process.argv[1])` so the symlinked bin resolves to the same path.
