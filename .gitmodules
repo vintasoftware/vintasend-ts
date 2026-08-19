@@ -37,3 +37,7 @@
 [submodule "src/implementations/vintasend-react-email"]
 	path = src/implementations/vintasend-react-email
 	url = git@github.com:vintasoftware/vintasend-react-email.git
+[submodule "src/tools/vintasend-api"]
+	path = src/tools/vintasend-api
+	url = git@github.com:vintasoftware/vintasend-ts-api.git
+	branch = main
