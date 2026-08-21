@@ -13,7 +13,8 @@
       "!node_modules",
       "!src/implementations",
       "!src/examples",
-      "!src/tools"
+      "!src/tools",
+      "!src/managed-templates"
     ]
   },
   "formatter": {

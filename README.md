@@ -636,6 +636,54 @@ If you're adding one-off notification support to an existing installation:
 * **Regular Notification**: A notification associated with a user account (via userId). Used for registered users in your system.
 * **AttachmentManager**: A class that handles file storage operations (upload, download, delete) for notification attachments. Supports S3, Azure, GCS, and custom storage backends.
 * **Attachment**: A file attached to a notification, either uploaded inline or referenced from previously uploaded files. Supports automatic deduplication and reuse across multiple notifications.  
+* **Managed Template**: A notification template stored in a database rather than in a file, so it can be edited without a deploy. Versioned, never edited in place, and published deliberately through a `draft → active → inactive → archived` lifecycle. See [Managed Templates](#managed-templates).
+* **Template Manager Backend**: A class that implements the methods necessary for storing, versioning, tagging and querying managed templates. The template equivalent of a Notification Backend.
+
+
+## Managed Templates
+
+A template renderer reads templates from wherever its engine looks, which is usually files on
+disk — so every copy change is a deploy.
+[vintasend-managed-templates](https://github.com/vintasoftware/vintasend-ts-managed-templates)
+(`src/managed-templates`) moves templates into a data store instead: someone who is not a
+developer edits them, every edit is a new version, and a version is published deliberately rather
+than the moment it is saved.
+
+It is storage-agnostic — it defines the seam, not the database — and it adds four things on top:
+
+* **Versioning.** A write creates the next version and leaves the previous one exactly as it was,
+  so a notification that already went out against v1 renders v1 forever.
+* **A lifecycle with an audit trail.** `draft → active → inactive → archived`, with every move
+  recorded and `allowedTransitions` on every payload so a UI never has to discover the rules by
+  catching errors.
+* **Composition.** Stored templates reach the engine as source, so `extends`/`include` have
+  nothing to load. The package resolves its own `{% managed_extends %}` /
+  `{% managed_block %}` / `{% managed_include %}` tags against the store *before* the engine runs,
+  and hands it one flat string.
+* **Tags and filtering**, spelled the same way VintaSend spells its notification filters.
+
+To send through it, wrap your existing renderer and set the notification's `bodyTemplate` to a
+template **key** instead of a path. Nothing else about creating or sending notifications changes.
+
+```typescript
+import { ManagedTemplateEmailRenderer, ManagedTemplateService } from 'vintasend-managed-templates';
+import { MedplumTemplateManagerBackend } from 'vintasend-medplum-template-manager';
+
+const managerBackend = new MedplumTemplateManagerBackend(medplum);
+const renderer = new ManagedTemplateEmailRenderer<Config>(managerBackend, pugRenderer);
+const templates = new ManagedTemplateService<Config>(managerBackend, renderer);
+
+await notificationService.createNotification({
+  // ...
+  bodyTemplate: 'welcome', // a managed template key, not a file path
+});
+```
+
+The package's README documents the tag language, the lifecycle, the filter vocabulary and what a
+template manager backend has to implement. There is a Python sibling,
+[vintasend-managed-templates](https://github.com/vintasoftware/vintasend-managed-templates), and
+the two agree on the tag language, the slug rules and the filter vocabulary — so a store written
+by one is readable by the other.
 
 
 ## Implementations
@@ -664,6 +712,12 @@ VintaSend has many backend, adapter, and template renderer implementations. If y
 * **[vintasend-aws-s3-attachments](https://github.com/vintasoftware/vintasend-aws-s3-attachments/)**: AWS S3 storage backend with presigned URLs and streaming support. Also works with S3-compatible services (MinIO, DigitalOcean Spaces, Cloudflare R2, etc.).
 * **[vintasend-medplum](https://github.com/vintasoftware/vintasend-medplum/)**: FHIR-compliant file storage using Binary and Media resources for healthcare applications.
 
+##### Template Managers
+
+Storage for [managed templates](#managed-templates) — where the versions, tags and status history live.
+
+* **[vintasend-medplum-template-manager](https://github.com/vintasoftware/vintasend-medplum-template-manager/)**: Stores managed templates as FHIR `MessageDefinition` resources, alongside the notifications that reference them.
+
 ##### Template Renderers
 * **[vintasend-pug](https://github.com/vintasoftware/vintasend-pug/)**: Renders emails using Pug.
 * **[vintasend-react-email](https://github.com/vintasoftware/vintasend-react-email/)**: Renders emails using React Email, including uncompiled TS/TSX template support.
@@ -680,6 +734,11 @@ the API's contract — including one built on the Python `vintasend` package.
 
 * **[vintasend-api](https://github.com/vintasoftware/vintasend-ts-api/)** (`src/tools/vintasend-api`): REST API that exposes a configured VintaSend service over HTTP. Its `openapi.yaml` is the normative contract.
 * **[vintasend-dashboard](https://github.com/vintasoftware/vintasend-dashboard/)** (`src/tools/vintasend-dashboard`): Next.js UI that consumes that contract. It holds no backend credentials of its own.
+
+And an API for editing the templates themselves, sharing its `openapi.yaml` byte-for-byte with the
+Python implementation so one generated client works against either server.
+
+* **[vintasend-templates-management-api](https://github.com/vintasoftware/vintasend-ts-templates-management-api/)** (`src/tools/vintasend-templates-management-api`): REST API over a configured `ManagedTemplateService` — versions, the status lifecycle, tags, composition and previews.
 
 ## Examples
 

@@ -41,3 +41,15 @@
 	path = src/tools/vintasend-api
 	url = git@github.com:vintasoftware/vintasend-ts-api.git
 	branch = main
+[submodule "src/managed-templates"]
+	path = src/managed-templates
+	url = git@github.com:vintasoftware/vintasend-ts-managed-templates.git
+	branch = main
+[submodule "src/implementations/vintasend-medplum-template-manager"]
+	path = src/implementations/vintasend-medplum-template-manager
+	url = git@github.com:vintasoftware/vintasend-medplum-template-manager.git
+	branch = main
+[submodule "src/tools/vintasend-templates-management-api"]
+	path = src/tools/vintasend-templates-management-api
+	url = git@github.com:vintasoftware/vintasend-ts-templates-management-api.git
+	branch = main
