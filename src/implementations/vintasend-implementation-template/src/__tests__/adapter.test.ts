@@ -98,7 +98,10 @@ describe('NotificationAdapter', () => {
       mockTemplateRenderer.render.mockResolvedValue(renderedTemplate);
       mockBackend.getUserEmailFromNotification.mockResolvedValue('user@example.com');
 
-      await expect(adapter.send(mockNotification, context)).resolves.toBeUndefined();
+      // `send` hands the render back so the service can record which template version went out.
+      // Returning nothing is still valid for an adapter that has nothing to report; this one
+      // reports, so the assertion is on the payload rather than on `undefined`.
+      await expect(adapter.send(mockNotification, context)).resolves.toEqual(renderedTemplate);
       expect(mockTemplateRenderer.render).toHaveBeenCalledWith(mockNotification, context);
       expect(mockBackend.getUserEmailFromNotification).toHaveBeenCalledWith('123');
     });
