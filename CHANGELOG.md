@@ -1,14 +1,143 @@
 # Changelog
 
-# Unreleased
+# Version 1.0.0-alpha1
 
+First alpha of the 1.0.0 line, published to npm under the `alpha` dist-tag. The version number
+reflects the size of what landed — template version pinning, managed templates, and the API/UI
+split — not a rewrite of the VintaSend API: every seam it touches was added as optional, so an
+adapter, renderer, or backend that ignores all of it keeps working. The one change that requires
+action is a Prisma column migration, noted below.
+
+* **Template version pinning added across core, backends, and adapters**: a notification can now
+  name which version of its template it renders, and record which version actually went out. This
+  only means anything with a renderer whose templates are versioned — a store-backed one such as
+  `vintasend-managed-templates`. With a file-based renderer, which is every other one, both fields
+  stay absent and nothing about sending changes.
+  * **Core types**: `requestedTemplateVersion?: number | null` was added to `NotificationInput`,
+    `NotificationResendWithContextInput`, `OneOffNotificationInput`, and
+    `OneOffNotificationResendWithContextInput`, which also declare `usedTemplateVersion?: never`.
+    `DatabaseNotification` and `DatabaseOneOffNotification` carry both fields as optional, so a
+    backend with nowhere to store them stays valid.
+  * **Service options**: `pinTemplateVersions` on `VintaSendOptions` decides whether a create — or
+    an update that repoints `bodyTemplate` — is pinned to whatever version is current at that
+    moment. It defaults to **off**, because turning it on changes what an existing deployment
+    sends: unpinned, a notification scheduled for next week renders whatever the template says next
+    week. The flag is never stored; it only decides what `requestedTemplateVersion` is set to.
+  * **Per-call override**: `createNotification`, `updateNotification`, `createOneOffNotification`,
+    and `updateOneOffNotification` each take a new optional `TemplateVersionPinningOptions`
+    argument, whose `pinTemplateVersions` overrides the service's setting in both directions. An
+    explicit `requestedTemplateVersion` always wins over both.
+  * **Updates re-pin only when the template changes.** An update carrying a new `bodyTemplate` is
+    re-pinned to that template's current version; an update to anything else leaves an existing pin
+    exactly as it was, since silently moving a pin forward is what pinning exists to prevent.
+  * **`usedTemplateVersion` is system-managed.** `updateNotification` and `updateOneOffNotification`
+    throw if it is present in the payload, the same defence `tenant` and `gitCommitSha` already had.
+  * **Renderer contract**: added `NotificationSendInput` (`templateVersion?: number | null`), which
+    `EmailTemplate` and `TextNotificationTemplate` now extend, and the optional
+    `BaseNotificationTemplateRenderer.getLatestTemplateVersion(templateKey)`. The default
+    implementation returns `null`, so a renderer over a file tree needs no changes. Resolution is
+    best-effort: a renderer that throws is logged and the notification is created unpinned rather
+    than the write failing.
+  * **Adapter contract**: `BaseNotificationAdapter.send()` may now return the render —
+    `Promise<NotificationSendInput | void>` — which is the channel the service reads the version
+    through. `void` is kept in the union deliberately so every adapter written before this, which
+    returns `Promise<void>`, still typechecks.
+  * **Backend contract**: added the optional `storeTemplateVersion(notificationId, templateVersion)`
+    and the exported `supportsTemplateVersions()` guard the service asks with. It is called after
+    delivery and only when the reported version differs from what is stored, and any failure is
+    logged rather than thrown — the notification has already been sent by then, and losing a line
+    of audit metadata is not worth reporting a successful send as failed.
+  * **Filtering**: `requestedTemplateVersion` and `usedTemplateVersion` were added to
+    `NotificationFilterFields`, as a single version or a list. Their four capability keys default to
+    **`false`** for the same reason `fields.readAtRange` does — vocabulary no backend implemented
+    when it was introduced, where a `true` default would have every shipped and third-party backend
+    claim a filter it would silently ignore.
+  * **Multi-backend**: both fields joined the `verifyNotificationSync` comparison list. Neither is
+    per-backend detail — `requestedTemplateVersion` travels with the create/update that fans out to
+    every backend, and `usedTemplateVersion` is written to all of them together at send time — so a
+    backend disagreeing on either really is replication drift.
+  * **New exports**: `supportsTemplateVersions`, `TemplateVersionPinningOptions`,
+    `NotificationSendInput`, `TextNotificationTemplate`, `TextNotificationTemplateContent`.
+* **`vintasend-prisma`**: stores, filters, and records both versions, and now implements
+  `getFilterCapabilities()` declaring the new keys (plus `readAtRange`, whose clause was added while
+  the translation was open). `requestedTemplateVersion` travels with ordinary create and update
+  writes; `usedTemplateVersion` is written only by `storeTemplateVersion`, so a caller cannot
+  rewrite which version actually went out.
+  * ⚠️ **Migration required.** Consumers must add two nullable integer columns to their
+    `Notification` model — `requestedTemplateVersion Int?` and `usedTemplateVersion Int?`. This is
+    the one part of the feature that is not opt-in for this backend: without the columns, Prisma
+    rejects the write.
+* **`vintasend-medplum`**: stores both versions as `Communication.identifier` entries —
+  `http://vintasend.com/fhir/requested-template-version` and
+  `http://vintasend.com/fhir/used-template-version` — so a token search finds them the same way it
+  already does for `bodyTemplate` and `adapterUsed`, which is what makes them filterable. FHIR
+  identifier values are strings, so a version round-trips through `String()`/`parseInt` and a value
+  that does not parse reads back as `null` rather than `NaN`. `storeTemplateVersion` replaces the
+  existing identifier instead of accumulating them, and the adapter returns its render from `send()`.
+* **Adapters returning the render from `send()`**: `vintasend-nodemailer`, `vintasend-ts-mailgun`,
+  `vintasend-ts-sendgrid`, and `vintasend-ts-twilio`.
+* **Managed templates: a new family of packages.** A template renderer reads templates from wherever
+  its engine looks, which is usually files on disk, so every copy change is a deploy. These move
+  templates into a data store instead.
+  * **[`vintasend-managed-templates`](https://github.com/vintasoftware/vintasend-ts-managed-templates)**
+    (`src/implementations/vintasend-managed-templates`): storage-agnostic managed templates —
+    versioning (a write creates the next version and leaves the previous one untouched), a
+    `draft → active → inactive → archived` lifecycle with an audit trail and `allowedTransitions` on
+    every payload, tags and filtering spelled the way VintaSend spells its notification filters, and
+    composition through its own `{% managed_extends %}` / `{% managed_block %}` /
+    `{% managed_include %}` tags, resolved against the store before the engine runs. Ships
+    `BaseTemplateManagerBackend`, `ManagedTemplateService`, `ManagedTemplateEmailRenderer` /
+    `ManagedTemplateTextRenderer`, `TemplateComposer`, the shared `slugifyTag` /
+    `nextAvailableSlug` rules, and a complete `InMemoryTemplateManagerBackend`. It agrees with the
+    Python `vintasend-managed-templates` on the tag language, slug rules, lifecycle, and filter
+    vocabulary, so a store written by one is readable by the other.
+  * **[`vintasend-medplum-template-manager`](https://github.com/vintasoftware/vintasend-medplum-template-manager)**
+    (`src/implementations/vintasend-medplum-template-manager`): the storage seam over Medplum,
+    keeping template versions, tags, and the status audit trail as FHIR `MessageDefinition`
+    resources — same project, same access policies, same infrastructure as the `Communication`
+    resources the notifications live in. Every read is answered by a query, version ordering works
+    by zero-padding the string FHIR stores the version in, `mostRecentActiveVersion` comes from a
+    flag maintained on write, and the package declares what FHIR cannot do rather than pretending.
+  * To send through a managed template, wrap your existing renderer and set the notification's
+    `bodyTemplate` to a template **key** instead of a path. Note that a pin covers the template
+    named, not what that template builds on: a base reached through `managed_extends` without a
+    `version=` still resolves to whatever that base is today.
+* **Tools: the dashboard split into an API and a UI.**
+  * **[`vintasend-api`](https://github.com/vintasoftware/vintasend-ts-api)**
+    (`src/tools/vintasend-api`): new REST API exposing a configured VintaSend service over HTTP,
+    with `openapi.yaml` as the normative contract. It owns everything needing backend credentials —
+    database access, template rendering, template lookups.
+  * **`vintasend-dashboard`**: now a pure client of that contract, holding no backend credentials of
+    its own, so any implementation of the contract can serve it — including a future one built on
+    the Python `vintasend` package. It also displays the template version a notification asked for
+    and the one it rendered.
+  * **[`vintasend-templates-management-api`](https://github.com/vintasoftware/vintasend-ts-templates-management-api)**
+    (`src/tools/vintasend-templates-management-api`): new REST API over a configured
+    `ManagedTemplateService` — versions, the status lifecycle, tags, composition, and previewing
+    what a version renders to before anyone publishes it. Its `openapi.yaml` is shared verbatim with
+    the Python implementation, so one generated client works against either server, and a contract
+    test walks every path and method the file declares. Listing supports ordering, negotiated
+    through `/capabilities`.
 * Added `readAtRange` to `NotificationFilterFields`, closing the last gap between the TypeScript and Python capability maps. Notifications can now be filtered by when they were read, not just ordered by it.
   * **Backend authors must opt in.** Unlike most capabilities, `'fields.readAtRange'` and `'negation.readAtRange'` default to **`false`**. This is new filter vocabulary rather than behaviour backends already have, so a `true` default would make every existing backend claim a filter it would silently ignore or throw on. To support it: implement `readAtRange` in your `filterNotifications` conversion — matching the NULL semantics of the other date ranges, where a row with a null `readAt` does not match a positive range and *is* returned by a negated one — then report `'fields.readAtRange': true` from `getFilterCapabilities()`, and `'negation.readAtRange': true` if you can negate it. Backends that cannot search on `readAt` need no change.
-  * No shipped backend implements it yet, so `vintasend-prisma` and `vintasend-medplum` continue to report both keys as `false`.
+  * `vintasend-prisma` implements it and reports both keys as `true`. `vintasend-medplum` does not expose `readAt` as a searchable field — it already reports `orderBy.readAt: false` — and continues to report both keys as `false`.
 * Added `'stringLookups.caseSensitive'` (default `true`) as a capability independent of `'stringLookups.caseInsensitive'`. `StringFilterLookup` has always accepted `caseSensitive`, so a backend could be asked for case-sensitive matching with no way to decline. The two are not a flag and its negation: a case-insensitive collation can only fold case, a backend with `LIKE` but no `ILIKE` can only match case-sensitively, and deriving either from the other declines the one lookup such a backend supports.
 * Added `'stringLookups.exact'` (default `true`) for parity with the Python capability report, since `exact` is the default lookup.
 * Added `'pagination.oneIndexed'` (default `false`) so callers that expose page numbers of their own can read the backend's convention instead of assuming an offset. It covers every paginated backend method. The TypeScript backends are 0-indexed; the Python ones are 1-indexed.
 * **Documentation fix:** `filterNotifications` documented `@param page` as 1-indexed, and `vintasend-implementation-template` repeated it, but every backend translates it as `page * pageSize` — `vintasend-prisma` and `vintasend-medplum` at seven call sites each. The interface now documents pages as 0-indexed, which is what backends implement. No behaviour changed, but a backend written from the old docs would have been one page off, silently.
+* **Repository and packaging**:
+  * Submodules renamed to match their repositories: `vintasend-aws-s3-attachments` →
+    `vintasend-ts-aws-s3-attachments` and `vintasend-aws-sqs` → `vintasend-ts-aws-sqs`, both under
+    `src/implementations`; the dashboard's remote is now `vintasoftware/vintasend-dashboard`.
+  * Added a `publish.yml` GitHub Actions workflow — to this repository and to
+    `vintasend-implementation-template` — that publishes to npm with OIDC trusted publishing and no
+    `NPM_TOKEN`. It runs on a `v*` tag or manual dispatch, verifies the tag matches
+    `package.json`, resolves the dist-tag from the version's prerelease id (so `1.0.0-alpha1`
+    publishes under `alpha`), and supports a dry run.
+  * Release tooling: added a `major` bump and an `--alpha-base=patch|minor|major` flag, with
+    `npm run release:bump:major` and `npm run release:bump:alpha:major` as shortcuts.
+  * Upgraded Biome to 2.5.10 across the root package and the implementation template, migrating the
+    config to `"preset": "recommended"`.
 
 # Version 0.14.1
 
