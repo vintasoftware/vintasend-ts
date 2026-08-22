@@ -290,6 +290,23 @@ field is null does not match a positive range, and because `{ not: ... }` invert
 the positive result, it *is* returned by a negated one. An unread notification is
 therefore excluded by `readAtRange` and returned by `{ not: { readAtRange } }`.
 
+### Filtering by template version
+
+`requestedTemplateVersion` and `usedTemplateVersion` filter on the two integer fields a
+notification records when its template renderer versions templates — what it was pinned to, and
+what it actually rendered. Scalar or array, like the other membership fields:
+
+```typescript
+// still pinned to v3
+await vintasend.filterNotifications({ requestedTemplateVersion: 3 }, 0, 25);
+
+// went out on v1 or v2
+await vintasend.filterNotifications({ usedTemplateVersion: [1, 2] }, 0, 25);
+```
+
+Both are opt-in per backend for the same reason `readAtRange` is, and their capability keys
+default to `false`. See [Template Version Pinning](#template-version-pinning).
+
 ### Case sensitivity
 
 `stringLookups.caseSensitive` and `stringLookups.caseInsensitive` are separate
@@ -621,11 +638,175 @@ If you're adding one-off notification support to an existing installation:
 
 3. **Existing notifications are preserved** - they have `userId` set and `emailOrPhone` as null.
 
+## Template Version Pinning
+
+Some template renderers version their templates. A file on disk has no version — editing it changes
+what every notification renders, past and future. A store-backed renderer such as
+[vintasend-managed-templates](https://github.com/vintasoftware/vintasend-ts-managed-templates) keeps
+every edit as a new version, and that makes two questions answerable that were not before: *which
+version should this notification render*, and *which version did it actually go out with*.
+
+Two fields on the notification hold the answers:
+
+| Field | Set by | Means |
+|---|---|---|
+| `requestedTemplateVersion` | the caller, or the service at create time | Render this exact version. Absent means "whatever is current at send time". |
+| `usedTemplateVersion` | the service, at send time | The version the renderer reported it actually used. Read-only to callers. |
+
+With a renderer whose templates are not versioned — which is most of them — both stay absent and
+nothing about this changes.
+
+### Pinning a single notification
+
+Pass the version and it is used, whatever the service is configured with:
+
+```typescript
+await notificationService.createNotification({
+  userId: user.id,
+  notificationType: 'EMAIL',
+  title: 'Welcome',
+  bodyTemplate: 'welcome',          // a template key, not a path
+  contextName: 'welcomeContext',
+  contextParameters: { userId: user.id },
+  sendAfter: null,
+  subjectTemplate: null,
+  extraParams: null,
+  requestedTemplateVersion: 3,      // render v3, now and forever
+});
+```
+
+Repointing an existing notification works the same way:
+
+```typescript
+await notificationService.updateNotification(notificationId, { requestedTemplateVersion: 4 });
+```
+
+### Pinning without naming a version
+
+`pinTemplateVersions: true` resolves whatever version is current *now* and records it, so a later
+edit to the template cannot change what an already-recorded notification renders. Ask for it per
+call, in the options argument that every create and update takes:
+
+```typescript
+await notificationService.createNotification(
+  { /* ... */ bodyTemplate: 'welcome' },
+  { pinTemplateVersions: true },      // pin to whatever "welcome" is right now
+);
+
+await notificationService.updateNotification(
+  notificationId,
+  { bodyTemplate: 'farewell' },       // re-pinned to farewell's current version
+  { pinTemplateVersions: true },
+);
+```
+
+...or set the default for every call on the service, and override it where it does not apply:
+
+```typescript
+const notificationService = new VintaSendFactory<Config>().create({
+  adapters,
+  backend,
+  logger,
+  contextGeneratorsMap,
+  options: {
+    raiseErrorOnFailedSend: false,
+    pinTemplateVersions: true,        // the default for every create and update
+  },
+});
+
+// not this one
+await notificationService.createNotification(input, { pinTemplateVersions: false });
+```
+
+The default is **off**, because turning it on changes what an existing deployment sends: unpinned, a
+notification scheduled for next week renders whatever the template says next week, which is
+sometimes exactly what a team wants. The flag is never stored — it decides what
+`requestedTemplateVersion` is set to at that moment, and nothing afterwards consults it.
+
+Key semantics:
+
+* **The call wins over the service.** `pinTemplateVersions` on a create or update overrides the
+  constructor's setting in both directions; leave it out to defer to the service.
+* **An explicit version always wins over both.** `pinTemplateVersions` only decides what happens
+  when the caller does not name a version, on create and on update alike.
+* **Resolved through the renderer.** The service asks the renderer for the notification type it is
+  creating, via `BaseNotificationTemplateRenderer.getLatestTemplateVersion()`. The default
+  implementation returns `null` — so with a file-based renderer this flag has nothing to pin and
+  quietly does nothing.
+* **Best-effort.** A renderer that throws while resolving is logged and the notification is created
+  unpinned, rather than failing the write. An unpinned notification still sends.
+* **Updates re-pin only when the template changes.** An update carrying a new `bodyTemplate` is
+  re-pinned to that template's current version; an update to the title leaves an existing pin
+  exactly as it was. Silently moving a pin forward is the one thing pinning exists to prevent.
+
+### Recording what actually rendered
+
+At send time the renderer reports the version it used on the payload it returns, the adapter hands
+that back from `send()`, and the service stores it:
+
+```typescript
+const notification = await notificationService.getNotification(notificationId);
+notification.requestedTemplateVersion;   // 3  — what it asked for (or absent)
+notification.usedTemplateVersion;        // 3  — what rendered
+```
+
+On an unpinned notification `usedTemplateVersion` is the *only* record of which version went out,
+since the template has moved on by the time anyone asks.
+
+* **System-managed.** Passing `usedTemplateVersion` to `updateNotification` throws. Set
+  `requestedTemplateVersion` instead.
+* **Never blocks a send.** It is written after delivery, so a failure to record it is logged and the
+  notification stays sent.
+* **A pin covers the template named, not what that template builds on.** With a renderer that
+  composes templates from other templates, pinning a notification to v3 of `welcome` renders v3 of
+  `welcome` — but a base it extends without naming a version still resolves to whatever that base is
+  today. Pin the reference too (with `version=2` on the `managed_extends` tag) when a template must
+  keep composing against an exact parent. See [Managed Templates](#managed-templates).
+
+### Filtering
+
+Both fields are filterable, by a single version or a list:
+
+```typescript
+// still pinned to v3
+await notificationService.filterNotifications({ requestedTemplateVersion: 3 }, 0, 20);
+
+// went out on v1 or v2 — the query after finding a bug in an old version
+await notificationService.filterNotifications({ usedTemplateVersion: [1, 2] }, 0, 20);
+```
+
+Both capability keys default to **false**, for the same reason `fields.readAtRange` does: they are
+vocabulary no backend implemented when they were introduced, so a `true` default would have every
+shipped and third-party backend claim a filter it would silently ignore. `vintasend-prisma` and
+`vintasend-medplum` both declare them supported. Check before you rely on them:
+
+```typescript
+const capabilities = await notificationService.getBackendSupportedFilterCapabilities();
+capabilities['fields.usedTemplateVersion'];
+```
+
+### What an implementation package has to do
+
+Everything below is optional. A renderer, adapter, or backend that ignores all of it keeps working
+exactly as it did.
+
+* **A renderer whose templates are versioned** overrides `getLatestTemplateVersion(templateKey)`,
+  honours the notification's `requestedTemplateVersion` in `render()`, and sets `templateVersion` on
+  the payload it returns.
+* **An adapter** returns the render from `send()` instead of discarding it. Returning nothing is
+  still valid — the service then records nothing.
+* **A backend** stores `requestedTemplateVersion` (an ordinary field on the notification it is
+  handed) and implements `storeTemplateVersion()`. That method is optional on the interface, so a
+  backend with nowhere to put it needs no changes at all; the cost is only that
+  `usedTemplateVersion` stays absent on the records it holds.
+
 ## Glossary
 
 * **Notification Backend**: It is a class that implements the methods necessary for VintaSend services to create, update, and retrieve Notifications from the database.
 * **Notification Adapter**: It is a class that implements the methods necessary for VintaSend services to send Notifications through email, SMS or even push/in-app notifications.
 * **Template Renderer**: It is a class that implements the methods necessary for VintaSend adapter to render the notification body.
+* **Requested template version**: Which version of its template a notification should render, when its renderer versions templates. Set by the caller or resolved at create time; absent means "whatever is current at send time". See [Template Version Pinning](#template-version-pinning).
+* **Used template version**: Which version actually rendered a notification, recorded by the service at send time from what the renderer reported. System-managed — a caller sets `requestedTemplateVersion` instead.
 * **Notification Context**: It's the data passed to the templates to render the notification correctly. It's generated when the notification is sent, not on creation time
 * **Context generator**: It's a class defined by the user context generator map with a context name. That class has a `generate` method that, when called, generates the data necessary to render its respective notification.
 * **Context name**: The registered name of a context generator. It's stored in the notification so the context generator is called at the moment the notification will be sent.

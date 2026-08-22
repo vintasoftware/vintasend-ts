@@ -119,6 +119,16 @@ export type NotificationFilterFields<Config extends BaseNotificationTypeConfig> 
   createdAtRange?: DateRange;
   sentAtRange?: DateRange;
   readAtRange?: DateRange;
+  /**
+   * Which template version a notification asked for, and which one it actually rendered.
+   *
+   * Scalar or array, like the other membership fields. Both are `null` on a notification whose
+   * renderer does not version templates, and `usedTemplateVersion` is `null` until it has been
+   * sent; under the NULL semantics above such a notification never matches a positive filter on
+   * either field and is included by a negated one.
+   */
+  requestedTemplateVersion?: number | number[];
+  usedTemplateVersion?: number | number[];
 };
 
 /**
@@ -158,6 +168,13 @@ export const DEFAULT_BACKEND_FILTER_CAPABILITIES = {
   // so it defaults to false — see the note on this constant.
   'fields.readAtRange': false,
   'negation.readAtRange': false,
+  // The template-version fields default to false for the same reason: they are vocabulary no
+  // backend implemented when they were introduced, so a `true` default would have every shipped
+  // and third-party backend claim a filter it would silently ignore.
+  'fields.requestedTemplateVersion': false,
+  'fields.usedTemplateVersion': false,
+  'negation.requestedTemplateVersion': false,
+  'negation.usedTemplateVersion': false,
   'stringLookups.exact': true,
   'stringLookups.startsWith': true,
   'stringLookups.endsWith': true,
@@ -255,6 +272,22 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     notificationId: Config['NotificationIdType'],
     adapterKey: string,
     context: InputJsonValue,
+  ): Promise<void>;
+
+  /**
+   * Persist which version of the template actually rendered this notification.
+   *
+   * Called by the service at send time, only when the renderer reported a version and it differs
+   * from what is already stored — so an implementation need not deduplicate writes itself.
+   *
+   * Optional on purpose: a backend with no column for it simply omits the method and keeps
+   * working, which is what lets the field be added without a major version. The cost of not
+   * implementing it is only that `usedTemplateVersion` stays absent on the records that backend
+   * holds.
+   */
+  storeTemplateVersion?(
+    notificationId: Config['NotificationIdType'],
+    templateVersion: number,
   ): Promise<void>;
 
   // One-off notification methods
@@ -415,4 +448,21 @@ export function supportsAttachments<Config extends BaseNotificationTypeConfig>(
     typeof backend.getAttachments === 'function' &&
     typeof backend.deleteNotificationAttachment === 'function'
   );
+}
+
+/**
+ * Whether a backend can record which template version rendered a notification.
+ *
+ * `storeTemplateVersion` is optional on the interface, so this is how the service asks before
+ * calling it — a backend that predates template versioning is skipped rather than erroring.
+ */
+export function supportsTemplateVersions<Config extends BaseNotificationTypeConfig>(
+  backend: BaseNotificationBackend<Config>,
+): backend is BaseNotificationBackend<Config> & {
+  storeTemplateVersion(
+    notificationId: Config['NotificationIdType'],
+    templateVersion: number,
+  ): Promise<void>;
+} {
+  return typeof backend.storeTemplateVersion === 'function';
 }

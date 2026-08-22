@@ -25,6 +25,23 @@ export type OneOffNotificationInput<Config extends BaseNotificationTypeConfig> =
   extraParams: InputJsonValue | null;
   tenant?: string | null;
   gitCommitSha?: never;
+  /**
+   * Which version of `bodyTemplate` to render, for a renderer whose templates are versioned.
+   *
+   * Absent (or `null`) means "whatever is current at send time", which is how every notification
+   * behaved before pinning existed and how they still behave unless a version is passed here or
+   * the service was built with `pinTemplateVersions: true`. Pinned, an edit to the template
+   * cannot change what this notification renders -- which is the point.
+   *
+   * An explicit value always wins over `pinTemplateVersions`, on create and on update alike.
+   */
+  requestedTemplateVersion?: number | null;
+  /**
+   * System-managed. Written by the service at send time from the version the renderer reported,
+   * never by a caller -- `updateNotification` throws if it is passed. Set
+   * `requestedTemplateVersion` instead to change which version renders.
+   */
+  usedTemplateVersion?: never;
   attachments?: NotificationAttachment[];
 };
 
@@ -56,6 +73,23 @@ export type OneOffNotificationResendWithContextInput<Config extends BaseNotifica
   extraParams: InputJsonValue | null;
   tenant?: string | null;
   gitCommitSha?: never;
+  /**
+   * Which version of `bodyTemplate` to render, for a renderer whose templates are versioned.
+   *
+   * Absent (or `null`) means "whatever is current at send time", which is how every notification
+   * behaved before pinning existed and how they still behave unless a version is passed here or
+   * the service was built with `pinTemplateVersions: true`. Pinned, an edit to the template
+   * cannot change what this notification renders -- which is the point.
+   *
+   * An explicit value always wins over `pinTemplateVersions`, on create and on update alike.
+   */
+  requestedTemplateVersion?: number | null;
+  /**
+   * System-managed. Written by the service at send time from the version the renderer reported,
+   * never by a caller -- `updateNotification` throws if it is passed. Set
+   * `requestedTemplateVersion` instead to change which version renders.
+   */
+  usedTemplateVersion?: never;
   attachments?: NotificationAttachment[];
 };
 
@@ -95,6 +129,21 @@ export type DatabaseOneOffNotification<Config extends BaseNotificationTypeConfig
   createdAt?: Date;
   updatedAt?: Date;
   gitCommitSha: string | null;
+  /**
+   * Which version of `bodyTemplate` this notification renders, when its renderer versions
+   * templates at all. `null` (or absent, on a backend that does not store it) means "whatever is
+   * current at send time".
+   */
+  requestedTemplateVersion?: number | null;
+  /**
+   * What the renderer reported it actually used, written by the service at send time.
+   *
+   * Reads the same as `requestedTemplateVersion` on a pinned notification, and tells you which
+   * version went out on an unpinned one -- the only record of that, since the template has moved
+   * on by the time anyone asks. Optional rather than required so a backend with nowhere to put it
+   * keeps working; it simply stays absent on the records that backend holds.
+   */
+  usedTemplateVersion?: number | null;
   attachments?: StoredAttachment[];
 };
 

@@ -12,7 +12,10 @@ import type {
   EmailTemplate,
   EmailTemplateContent,
 } from '../notification-template-renderers/base-email-template-renderer.js';
-import type { BaseNotificationTemplateRenderer } from '../notification-template-renderers/base-notification-template-renderer.js';
+import type {
+  BaseNotificationTemplateRenderer,
+  NotificationSendInput,
+} from '../notification-template-renderers/base-notification-template-renderer.js';
 
 /**
  * Type guard to check if a notification is a one-off notification
@@ -39,7 +42,25 @@ export abstract class BaseNotificationAdapter<
     public readonly enqueueNotifications: boolean,
   ) {}
 
-  send(_notification: AnyDatabaseNotification<Config>, _context: JsonValue): Promise<void> {
+  /**
+   * Deliver a notification.
+   *
+   * Return whatever the renderer produced — an `EmailTemplate`, a `TextNotificationTemplate`, any
+   * `NotificationSendInput` — and the service reads `templateVersion` off it to record which
+   * version of the template actually went out. Returning nothing stays valid: an adapter that
+   * discards the render, or one written before template versioning existed, simply gives the
+   * service nothing to record, which is what every file-based renderer would have reported anyway.
+   *
+   * The return union ends in `void` rather than `undefined` deliberately. Every adapter written
+   * before this returns `Promise<void>`, which is assignable to `Promise<X | void>` but not to
+   * `Promise<X | undefined>` — so the tidier-looking spelling would break every existing adapter
+   * at compile time for no behavioural gain.
+   */
+  send(
+    _notification: AnyDatabaseNotification<Config>,
+    _context: JsonValue,
+    // biome-ignore lint/suspicious/noConfusingVoidType: keeps `Promise<void>` adapters assignable
+  ): Promise<NotificationSendInput | void> {
     if (this.backend === null) {
       return Promise.reject(new Error('Backend not injected'));
     }

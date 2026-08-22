@@ -6,6 +6,7 @@ import type {
   DatabaseOneOffNotification,
   Notification,
 } from '../types/notification.js';
+import type { NotificationType } from '../types/notification-type.js';
 import type { BaseNotificationTypeConfig } from '../types/notification-type-config.js';
 import type { OneOffNotificationInput } from '../types/one-off-notification.js';
 import type { BaseAttachmentManager } from './attachment-manager/base-attachment-manager.js';
@@ -20,6 +21,7 @@ import {
   DEFAULT_BACKEND_FILTER_CAPABILITIES,
   type NotificationFilterFields,
   type NotificationOrderBy,
+  supportsTemplateVersions,
 } from './notification-backends/base-notification-backend.js';
 import { NotificationContextGeneratorsMap } from './notification-context-generators-map.js';
 import type { BaseNotificationQueueService } from './notification-queue-service/base-notification-queue-service.js';
@@ -28,11 +30,40 @@ import type {
   EmailTemplate,
   EmailTemplateContent,
 } from './notification-template-renderers/base-email-template-renderer.js';
-import type { BaseNotificationTemplateRenderer } from './notification-template-renderers/base-notification-template-renderer.js';
+import type {
+  BaseNotificationTemplateRenderer,
+  NotificationSendInput,
+} from './notification-template-renderers/base-notification-template-renderer.js';
 
 type VintaSendOptions = {
   raiseErrorOnFailedSend: boolean;
   replicationMode?: 'inline' | 'queued';
+  /**
+   * The default answer to "should a notification created or repointed without an explicit
+   * `requestedTemplateVersion` be pinned to whatever version is current right now?".
+   *
+   * Off by default, because turning it on changes what an existing deployment sends: unpinned, a
+   * notification scheduled for next week renders whatever the template says next week, which is
+   * sometimes exactly what a team wants. Every create and update takes a `pinTemplateVersions` of
+   * its own that overrides this in both directions.
+   *
+   * Never stored. It decides what `requestedTemplateVersion` is set to at that moment, and nothing
+   * afterwards consults it. Resolved through
+   * `BaseNotificationTemplateRenderer.getLatestTemplateVersion`, so with a file-based renderer it
+   * has nothing to pin and quietly does nothing.
+   */
+  pinTemplateVersions?: boolean;
+};
+
+/**
+ * Per-call control over template-version pinning.
+ *
+ * `pinTemplateVersions` left out means "whatever the service was built with". A caller with one
+ * notification that must not move, in a deployment that pins nothing — or the reverse — says so
+ * here rather than building a second service.
+ */
+export type TemplateVersionPinningOptions = {
+  pinTemplateVersions?: boolean;
 };
 
 type RenderEmailTemplateContextInput<Config extends BaseNotificationTypeConfig> =
@@ -590,6 +621,212 @@ export class VintaSend<
     return this.persistGitCommitShaForExecution(notification, gitCommitSha);
   }
 
+  /**
+   * Whether this call pins, given what it asked for and what the service defaults to.
+   *
+   * `undefined` from a call site means it did not ask, so the service's own setting decides.
+   * Anything else is the call's decision and overrides it in both directions.
+   */
+  private shouldPinTemplateVersions(pinTemplateVersions?: boolean): boolean {
+    if (pinTemplateVersions === undefined) {
+      return this.options.pinTemplateVersions ?? false;
+    }
+    return pinTemplateVersions;
+  }
+
+  /**
+   * Which template version to record on a notification being created or repointed.
+   *
+   * An explicit request always wins — pinning is a default, not an override, so a caller who names
+   * a version gets that version whatever the service was configured with. With no request and no
+   * pinning asked for, the answer is `null`: the notification goes on resolving its template at
+   * send time, exactly as notifications did before any of this existed.
+   *
+   * Otherwise the renderer for this notification type is asked what the current version is.
+   * Best-effort by design: a renderer that does not version templates says `null`, and one that
+   * throws is logged and treated the same way. Neither is worth failing a creation over — an
+   * unpinned notification still sends, against whatever is current.
+   */
+  private async resolveTemplateVersionToPin(
+    notificationType: NotificationType,
+    bodyTemplate: string,
+    requestedTemplateVersion: number | null | undefined,
+    pinTemplateVersions: boolean | undefined,
+  ): Promise<number | null> {
+    if (requestedTemplateVersion !== null && requestedTemplateVersion !== undefined) {
+      return requestedTemplateVersion;
+    }
+    if (!this.shouldPinTemplateVersions(pinTemplateVersions)) {
+      return null;
+    }
+
+    for (const adapter of this.adapters) {
+      if (adapter.notificationType !== notificationType) {
+        continue;
+      }
+      try {
+        // Optional-chained: a renderer that never grew the method — anything written before
+        // template versioning, or against the `implements` form of the seam — simply has no
+        // version to offer, which is the same answer the default implementation gives.
+        const version = await adapter.getTemplateRenderer().getLatestTemplateVersion?.(bodyTemplate);
+        if (version !== null && version !== undefined) {
+          return version;
+        }
+      } catch (resolveError) {
+        this.logger.error(
+          `Template renderer for adapter ${adapter.key ?? 'unknown'} threw while resolving the ` +
+            `current version of template "${bodyTemplate}"; leaving the notification unpinned: ` +
+            `${resolveError}`,
+        );
+      }
+    }
+    return null;
+  }
+
+  /**
+   * The notification to persist, with a pin resolved onto it when one applies.
+   *
+   * Returns the very object it was given when there is nothing to pin, so a backend that predates
+   * template versioning never sees a key it does not know — the same courtesy `attachments` gets.
+   */
+  private async withResolvedTemplateVersion<
+    NotificationInputType extends {
+      notificationType: NotificationType;
+      bodyTemplate: string;
+      requestedTemplateVersion?: number | null;
+    },
+  >(
+    notification: NotificationInputType,
+    pinTemplateVersions: boolean | undefined,
+  ): Promise<NotificationInputType> {
+    const resolved = await this.resolveTemplateVersionToPin(
+      notification.notificationType,
+      notification.bodyTemplate,
+      notification.requestedTemplateVersion,
+      pinTemplateVersions,
+    );
+
+    if (resolved === null) {
+      return notification;
+    }
+    return { ...notification, requestedTemplateVersion: resolved };
+  }
+
+  /**
+   * Pin an update that repoints a notification at a different template.
+   *
+   * Only when `bodyTemplate` is being changed: that is the update where the version that was
+   * pinned no longer describes what the notification renders. An update to the title — or to
+   * anything else — leaves an existing pin exactly as it is, because silently re-pinning a
+   * notification to a newer version is the very thing pinning exists to prevent.
+   *
+   * Does nothing when the caller named a version themselves; theirs wins, as it does on create.
+   */
+  private async withRepinnedTemplateVersion<
+    UpdateType extends { bodyTemplate?: string; requestedTemplateVersion?: number | null },
+  >(
+    notificationId: Config['NotificationIdType'],
+    update: UpdateType,
+    pinTemplateVersions: boolean | undefined,
+  ): Promise<UpdateType> {
+    if (!this.shouldPinTemplateVersions(pinTemplateVersions)) {
+      return update;
+    }
+    if (update.bodyTemplate === undefined || update.requestedTemplateVersion != null) {
+      return update;
+    }
+
+    const notification = await this.getNotification(notificationId, false);
+    if (!notification) {
+      return update;
+    }
+
+    const version = await this.resolveTemplateVersionToPin(
+      notification.notificationType,
+      update.bodyTemplate,
+      null,
+      pinTemplateVersions,
+    );
+
+    if (version === null) {
+      return update;
+    }
+    return { ...update, requestedTemplateVersion: version };
+  }
+
+  /**
+   * Reject an attempt to set `usedTemplateVersion` through an update.
+   *
+   * System-managed, the same as `gitCommitSha`: only the service writes it, at send time, from the
+   * version the renderer reported. Checked on the raw object because the parameter type says
+   * `never` and a caller casting past that is exactly who this is for.
+   */
+  private assertUsedTemplateVersionNotSet(
+    notificationId: Config['NotificationIdType'],
+    update: Record<string, unknown>,
+  ): void {
+    if ('usedTemplateVersion' in update) {
+      throw new Error(
+        `Cannot update usedTemplateVersion of notification ${String(notificationId)}: ` +
+          'it is system-managed and written at send time. ' +
+          'Set requestedTemplateVersion instead to change which version renders.',
+      );
+    }
+  }
+
+  /**
+   * Store the template version an adapter's renderer reported it used.
+   *
+   * A no-op unless the adapter returned its send input and the renderer filled the version in,
+   * which is every adapter that predates this and every renderer whose templates are not
+   * versioned. Backends that cannot store it are skipped rather than erroring.
+   *
+   * Failures are logged, never thrown: the notification has already been delivered by the time
+   * this runs, and losing a line of audit metadata is not worth reporting a successful send as
+   * failed.
+   */
+  private async recordUsedTemplateVersion(
+    notification: AnyDatabaseNotification<Config>,
+    // biome-ignore lint/suspicious/noConfusingVoidType: mirrors `BaseNotificationAdapter.send`
+    sendInput: NotificationSendInput | void,
+  ): Promise<void> {
+    const version = sendInput?.templateVersion;
+    if (version === null || version === undefined) {
+      return;
+    }
+    if (version === notification.usedTemplateVersion) {
+      return;
+    }
+
+    try {
+      await this.executeMultiBackendWrite(
+        'storeTemplateVersion',
+        async (backend) => {
+          if (supportsTemplateVersions(backend)) {
+            await backend.storeTemplateVersion(notification.id, version);
+          }
+        },
+        async (backend) => {
+          if (supportsTemplateVersions(backend)) {
+            await backend.storeTemplateVersion(notification.id, version);
+          }
+        },
+        notification.id,
+      );
+    } catch (storeError) {
+      // Every failure, not just a write error: by the time this runs the notification has been
+      // delivered and marked sent, so anything thrown here would report a successful send as a
+      // failure. A missing line of audit metadata is the smaller loss, and the log says which
+      // notification lost it.
+      this.logger.error(
+        `Error storing the template version used for notification ${String(notification.id)}: ${storeError}`,
+      );
+      return;
+    }
+
+    notification.usedTemplateVersion = version;
+  }
+
   async send(notification: AnyDatabaseNotification<Config>): Promise<void> {
     const notificationWithExecutionGitCommitSha =
       await this.resolveAndPersistGitCommitShaForExecution(notification);
@@ -660,11 +897,13 @@ export class VintaSend<
         }
       }
 
+      // biome-ignore lint/suspicious/noConfusingVoidType: mirrors `BaseNotificationAdapter.send`
+      let sendInput: NotificationSendInput | void;
       try {
         this.logger.info(
           `Sending notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key}`,
         );
-        await adapter.send(notificationWithExecutionGitCommitSha, context);
+        sendInput = await adapter.send(notificationWithExecutionGitCommitSha, context);
         this.logger.info(
           `Sent notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key} successfully`,
         );
@@ -732,20 +971,37 @@ export class VintaSend<
           `Error storing adapter and context for notification ${notificationWithExecutionGitCommitSha.id}: ${storeContextError}`,
         );
       }
+
+      // Outside every try above on purpose: those handle real delivery outcomes, while recording
+      // which template version rendered the notification is audit metadata, and it keeps its own
+      // failure handling inside the helper.
+      await this.recordUsedTemplateVersion(notificationWithExecutionGitCommitSha, sendInput);
     }
   }
 
+  /**
+   * @param notification the notification to create. Pass `requestedTemplateVersion` to render one
+   *   exact version of `bodyTemplate` forever, whatever the service is configured with.
+   * @param options `pinTemplateVersions` overrides the service's own setting for this call, in
+   *   both directions. An explicit `requestedTemplateVersion` still wins over it.
+   */
   async createNotification(
     notification: Omit<Notification<Config>, 'id'>,
+    options: TemplateVersionPinningOptions = {},
   ): Promise<DatabaseNotification<Config>> {
+    const notificationToPersist = await this.withResolvedTemplateVersion(
+      notification,
+      options.pinTemplateVersions,
+    );
+
     const createdNotification = await this.executeMultiBackendWrite(
       'createNotification',
       async (backend) => {
-        return backend.persistNotification(notification);
+        return backend.persistNotification(notificationToPersist);
       },
       async (backend, primaryResult) => {
         await backend.persistNotification({
-          ...notification,
+          ...notificationToPersist,
           id: primaryResult.id,
         });
       },
@@ -766,9 +1022,17 @@ export class VintaSend<
     return createdNotification;
   }
 
+  /**
+   * @param notification the fields to change. `requestedTemplateVersion` repoints the
+   *   notification at a different version of its template, or pins one that was floating.
+   * @param options `pinTemplateVersions` decides whether an update that changes `bodyTemplate`
+   *   re-pins to the new template's current version. An update that leaves `bodyTemplate` alone
+   *   never moves an existing pin.
+   */
   async updateNotification(
     notificationId: Config['NotificationIdType'],
     notification: Partial<Omit<Notification<Config>, 'id' | 'tenant'>>,
+    options: TemplateVersionPinningOptions = {},
   ) {
     // Defense-in-depth: reject tenant changes even if bypassed via `as any`.
     // Reassigning a notification to a different tenant would move it across
@@ -779,13 +1043,21 @@ export class VintaSend<
           'tenant reassignment is not allowed.',
       );
     }
+    this.assertUsedTemplateVersionNotSet(notificationId, notification as Record<string, unknown>);
+
+    const notificationUpdate = await this.withRepinnedTemplateVersion(
+      notificationId,
+      notification,
+      options.pinTemplateVersions,
+    );
+
     const updatedNotification = this.executeMultiBackendWrite(
       'updateNotification',
       async (backend) => {
-        return backend.persistNotificationUpdate(notificationId, notification);
+        return backend.persistNotificationUpdate(notificationId, notificationUpdate);
       },
       async (backend) => {
-        await backend.persistNotificationUpdate(notificationId, notification);
+        await backend.persistNotificationUpdate(notificationId, notificationUpdate);
       },
       notificationId,
     );
@@ -802,18 +1074,24 @@ export class VintaSend<
    */
   async createOneOffNotification(
     notification: Omit<OneOffNotificationInput<Config>, 'id'>,
+    options: TemplateVersionPinningOptions = {},
   ): Promise<DatabaseOneOffNotification<Config>> {
     // Validate email or phone format
     this.validateEmailOrPhone(notification.emailOrPhone);
 
+    const notificationToPersist = await this.withResolvedTemplateVersion(
+      notification,
+      options.pinTemplateVersions,
+    );
+
     const createdNotification = await this.executeMultiBackendWrite(
       'createOneOffNotification',
       async (backend) => {
-        return backend.persistOneOffNotification(notification);
+        return backend.persistOneOffNotification(notificationToPersist);
       },
       async (backend, primaryResult) => {
         await backend.persistOneOffNotification({
-          ...notification,
+          ...notificationToPersist,
           id: primaryResult.id,
         });
       },
@@ -842,6 +1120,7 @@ export class VintaSend<
   async updateOneOffNotification(
     notificationId: Config['NotificationIdType'],
     notification: Partial<Omit<OneOffNotificationInput<Config>, 'id' | 'tenant'>>,
+    options: TemplateVersionPinningOptions = {},
   ): Promise<DatabaseOneOffNotification<Config>> {
     // Defense-in-depth: reject tenant changes even if bypassed via `as any`.
     // See updateNotification for rationale.
@@ -851,18 +1130,25 @@ export class VintaSend<
           'tenant reassignment is not allowed.',
       );
     }
+    this.assertUsedTemplateVersionNotSet(notificationId, notification as Record<string, unknown>);
     // Validate email or phone format if provided
     if (notification.emailOrPhone !== undefined) {
       this.validateEmailOrPhone(notification.emailOrPhone);
     }
 
+    const notificationUpdate = await this.withRepinnedTemplateVersion(
+      notificationId,
+      notification,
+      options.pinTemplateVersions,
+    );
+
     const updatedNotification = await this.executeMultiBackendWrite(
       'updateOneOffNotification',
       async (backend) => {
-        return backend.persistOneOffNotificationUpdate(notificationId, notification);
+        return backend.persistOneOffNotificationUpdate(notificationId, notificationUpdate);
       },
       async (backend) => {
-        await backend.persistOneOffNotificationUpdate(notificationId, notification);
+        await backend.persistOneOffNotificationUpdate(notificationId, notificationUpdate);
       },
       notificationId,
     );
@@ -1200,7 +1486,8 @@ export class VintaSend<
     for (const adapter of enqueueNotificationsAdapters) {
       lastAdapterKey = adapter.key ?? 'unknown';
       try {
-        await adapter.send(notificationWithExecutionGitCommitSha, context);
+        const sendInput = await adapter.send(notificationWithExecutionGitCommitSha, context);
+        await this.recordUsedTemplateVersion(notificationWithExecutionGitCommitSha, sendInput);
         try {
           await this.executeMultiBackendWrite(
             'markAsSent',
@@ -1424,6 +1711,12 @@ export class VintaSend<
         'createdAt',
         'updatedAt',
         'gitCommitSha',
+        // Both hold comparable content rather than per-backend detail:
+        // requestedTemplateVersion is written by the same create/update that fans out to every
+        // backend, and usedTemplateVersion is written to all of them together at send time. A
+        // backend disagreeing on either really is replication drift.
+        'requestedTemplateVersion',
+        'usedTemplateVersion',
       ] as const;
 
       for (const fieldName of fieldsToCompare) {

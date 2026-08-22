@@ -26,17 +26,28 @@ export type {
 export {
   isFieldFilter,
   supportsAttachments,
+  supportsTemplateVersions,
 } from './services/notification-backends/base-notification-backend.js';
 export type { BaseNotificationQueueService } from './services/notification-queue-service/base-notification-queue-service.js';
 export type { BaseNotificationReplicationQueueService } from './services/notification-queue-service/base-notification-replication-queue-service.js';
-export type { VintaSend } from './services/notification-service.js';
+export type {
+  TemplateVersionPinningOptions,
+  VintaSend,
+} from './services/notification-service.js';
 export { VintaSendFactory } from './services/notification-service.js';
 export type {
   BaseEmailTemplateRenderer,
   EmailTemplate,
   EmailTemplateContent,
 } from './services/notification-template-renderers/base-email-template-renderer.js';
-export type { BaseNotificationTemplateRenderer } from './services/notification-template-renderers/base-notification-template-renderer.js';
+export type {
+  BaseNotificationTemplateRenderer,
+  NotificationSendInput,
+} from './services/notification-template-renderers/base-notification-template-renderer.js';
+export type {
+  TextNotificationTemplate,
+  TextNotificationTemplateContent,
+} from './services/notification-template-renderers/base-text-notification-template-renderer.js';
 // Attachment Types
 export type {
   AttachmentFile,

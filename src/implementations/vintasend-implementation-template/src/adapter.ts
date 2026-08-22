@@ -3,6 +3,7 @@ import type {
   BaseNotificationTypeConfig,
   DatabaseNotification,
   JsonObject,
+  EmailTemplate,
 } from 'vintasend';
 import { BaseNotificationAdapter } from 'vintasend';
 
@@ -17,7 +18,11 @@ export class NotificationAdapter<
     super(templateRenderer, notificationType, enqueueNotifications);
   }
 
-  async send(notification: DatabaseNotification<Config>, context: JsonObject): Promise<void> {
+  /**
+   * Returns what the renderer produced so the service can record which template version rendered
+   * this notification. Nothing else reads it — the message is already sent by then.
+   */
+  async send(notification: DatabaseNotification<Config>, context: JsonObject): Promise<EmailTemplate> {
     if (!this.backend) {
       throw new Error('Backend not injected');
     }
@@ -35,6 +40,8 @@ export class NotificationAdapter<
     }
 
     // TODO: Implement the logic to send the notification
+
+    return template;
   }
 }
 
