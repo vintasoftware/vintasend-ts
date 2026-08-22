@@ -826,9 +826,9 @@ exactly as it did.
 A template renderer reads templates from wherever its engine looks, which is usually files on
 disk — so every copy change is a deploy.
 [vintasend-managed-templates](https://github.com/vintasoftware/vintasend-ts-managed-templates)
-(`src/managed-templates`) moves templates into a data store instead: someone who is not a
-developer edits them, every edit is a new version, and a version is published deliberately rather
-than the moment it is saved.
+(`src/implementations/vintasend-managed-templates`) moves templates into a data store instead:
+someone who is not a developer edits them, every edit is a new version, and a version is published
+deliberately rather than the moment it is saved.
 
 It is storage-agnostic — it defines the seam, not the database — and it adds four things on top:
 

@@ -668,7 +668,9 @@ export class VintaSend<
         // Optional-chained: a renderer that never grew the method — anything written before
         // template versioning, or against the `implements` form of the seam — simply has no
         // version to offer, which is the same answer the default implementation gives.
-        const version = await adapter.getTemplateRenderer().getLatestTemplateVersion?.(bodyTemplate);
+        const version = await adapter
+          .getTemplateRenderer()
+          .getLatestTemplateVersion?.(bodyTemplate);
         if (version !== null && version !== undefined) {
           return version;
         }

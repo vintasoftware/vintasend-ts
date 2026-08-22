@@ -11,7 +11,6 @@ export default defineConfig({
 			'**/src/examples/**',
 			'**/src/implementations/**',
 			'**/src/tools/**',
-			'**/src/managed-templates/**',
 		],
 		coverage: {
 			provider: 'v8',
@@ -23,7 +22,6 @@ export default defineConfig({
 				'src/examples/**/*',
 				'src/implementations/**/*',
 				'src/tools/**/*',
-				'src/managed-templates/**/*',
 			],
 		},
 	},
