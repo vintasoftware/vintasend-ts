@@ -1,0 +1,129 @@
+name: Publish
+
+# Publishes this package to npm using OIDC trusted publishing.
+#
+# There is no NPM_TOKEN secret: GitHub mints a short-lived OIDC token for this
+# workflow run, and npm exchanges it for publish rights because this repository
+# is registered as a trusted publisher for the package on npmjs.com.
+#
+# Registering the trusted publisher on npm requires four values that must match
+# this file exactly:
+#   Repository:     vintasoftware/<TODO: this repo> <- set once the repo exists
+#   Workflow file:  publish.yml
+#   Environment:    npm
+#   Publisher:      GitHub Actions
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      dist-tag:
+        description: 'npm dist-tag. Leave blank to auto-detect: "latest" for a stable version, the prerelease id (e.g. "alpha") otherwise.'
+        required: false
+        default: ''
+      dry-run:
+        description: 'Resolve and pack everything but stop short of publishing (npm publish --dry-run).'
+        type: boolean
+        required: false
+        default: false
+
+# Least privilege. id-token: write is what lets npm verify this run via OIDC;
+# without it the publish falls back to token auth and fails.
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    # This environment is the one named in the npm trusted publisher config.
+    # Create it under Settings -> Environments if it does not exist yet; adding
+    # required reviewers there turns every publish into an approval gate.
+    environment: npm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          registry-url: 'https://registry.npmjs.org'
+
+      # Trusted publishing needs npm >= 11.5.1, which is newer than the npm
+      # bundled with most runner Node versions.
+      - name: Install latest npm
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Check the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if [ "$TAG_NAME" != "v$VERSION" ]; then
+            echo "::error::Tag $TAG_NAME does not match package.json version $VERSION (expected tag v$VERSION)."
+            exit 1
+          fi
+          echo "Tag $TAG_NAME matches package.json version $VERSION."
+
+      - name: Resolve dist-tag
+        id: dist
+        env:
+          INPUT_DIST_TAG: ${{ inputs.dist-tag }}
+        run: |
+          DIST_TAG="$(node -e '
+            const version = require("./package.json").version;
+            const requested = (process.env.INPUT_DIST_TAG || "").trim();
+            if (requested) { console.log(requested); process.exit(0); }
+            const prerelease = version.includes("-") ? version.split("-")[1] : "";
+            if (!prerelease) { console.log("latest"); process.exit(0); }
+            // 1.0.0-alpha1 -> alpha, 1.0.0-rc.2 -> rc
+            console.log(prerelease.replace(/[^a-zA-Z].*$/, "") || "alpha");
+          ')"
+          echo "tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
+          echo "Publishing under dist-tag: $DIST_TAG"
+
+      - name: Publish
+        env:
+          DIST_TAG: ${{ steps.dist.outputs.tag }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            npm publish --tag "$DIST_TAG" --dry-run
+          else
+            npm publish --tag "$DIST_TAG"
+          fi
+
+      - name: Summary
+        if: always()
+        env:
+          DIST_TAG: ${{ steps.dist.outputs.tag }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          NAME="$(node -p "require('./package.json').name")"
+          VERSION="$(node -p "require('./package.json').version")"
+          {
+            echo "### ${NAME}@${VERSION}"
+            echo ""
+            echo "- dist-tag: \`${DIST_TAG:-unresolved}\`"
+            echo "- dry run: \`${DRY_RUN:-false}\`"
+            echo "- auth: OIDC trusted publishing (no NPM_TOKEN)"
+          } >> "$GITHUB_STEP_SUMMARY"

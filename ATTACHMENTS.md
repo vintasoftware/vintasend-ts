@@ -403,7 +403,7 @@ Production-ready storage using AWS S3 with presigned URLs and streaming support.
 
 - **Use Case**: Production applications, scalable cloud storage
 - **Features**: Presigned URLs, streaming, S3-compatible services
-- **Documentation**: See [vintasend-aws-s3-attachments README](src/implementations/vintasend-aws-s3-attachments/README.md)
+- **Documentation**: See [vintasend-aws-s3-attachments README](src/implementations/vintasend-ts-aws-s3-attachments/README.md)
 
 **Installation:**
 ```bash
@@ -921,7 +921,7 @@ export class MyAdapter extends BaseNotificationAdapter {
 - [VintaSend Core Documentation](README.md)
 - [VintaSend Examples](src/examples/)
 - [Implementation Template](src/implementations/vintasend-implementation-template/)
-- [S3 AttachmentManager Documentation](src/implementations/vintasend-aws-s3-attachments/README.md)
+- [S3 AttachmentManager Documentation](src/implementations/vintasend-ts-aws-s3-attachments/README.md)
 
 ---
 

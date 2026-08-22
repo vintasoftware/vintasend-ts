@@ -890,7 +890,7 @@ VintaSend has many backend, adapter, and template renderer implementations. If y
 
 ##### Attachment Managers
 
-* **[vintasend-aws-s3-attachments](https://github.com/vintasoftware/vintasend-aws-s3-attachments/)**: AWS S3 storage backend with presigned URLs and streaming support. Also works with S3-compatible services (MinIO, DigitalOcean Spaces, Cloudflare R2, etc.).
+* **[vintasend-aws-s3-attachments](https://github.com/vintasoftware/vintasend-ts-aws-s3-attachments/)**: AWS S3 storage backend with presigned URLs and streaming support. Also works with S3-compatible services (MinIO, DigitalOcean Spaces, Cloudflare R2, etc.).
 * **[vintasend-medplum](https://github.com/vintasoftware/vintasend-medplum/)**: FHIR-compliant file storage using Binary and Media resources for healthcare applications.
 
 ##### Template Managers

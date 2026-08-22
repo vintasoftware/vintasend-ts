@@ -165,7 +165,7 @@ The template renderer component transforms templates + context into provider-rea
 The `TemplateAttachmentManager` provides a structure for implementing file attachment storage for notifications.
 
 **Supported Storage Backends:**
-- AWS S3 (see [`vintasend-aws-s3-attachments`](../vintasend-aws-s3-attachments))
+- AWS S3 (see [`vintasend-aws-s3-attachments`](../vintasend-ts-aws-s3-attachments))
 - Azure Blob Storage
 - Google Cloud Storage
 - Local Filesystem (development only)
@@ -242,7 +242,7 @@ The `TemplateAttachmentManager` provides a structure for implementing file attac
 
 **Example Implementation:**
 
-See [`vintasend-aws-s3-attachments`](../vintasend-aws-s3-attachments) for a complete AWS S3 implementation that follows this pattern.
+See [`vintasend-aws-s3-attachments`](../vintasend-ts-aws-s3-attachments) for a complete AWS S3 implementation that follows this pattern.
 
 **Key Design Patterns:**
 

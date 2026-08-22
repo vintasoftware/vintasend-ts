@@ -13,9 +13,9 @@
 [submodule "src/examples"]
 	path = src/examples
 	url = git@github.com:vintasoftware/vintasend-ts-examples.git
-[submodule "src/implementations/vintasend-aws-s3-attachments"]
-	path = src/implementations/vintasend-aws-s3-attachments
-	url = git@github.com:vintasoftware/vintasend-aws-s3-attachments.git
+[submodule "src/implementations/vintasend-ts-aws-s3-attachments"]
+	path = src/implementations/vintasend-ts-aws-s3-attachments
+	url = git@github.com:vintasoftware/vintasend-ts-aws-s3-attachments.git
 [submodule "src/implementations/vintasend-medplum"]
 	path = src/implementations/vintasend-medplum
 	url = git@github.com:vintasoftware/vintasend-medplum.git
@@ -31,9 +31,9 @@
 [submodule "src/implementations/vintasend-ts-twilio"]
 	path = src/implementations/vintasend-ts-twilio
 	url = git@github.com:vintasoftware/vintasend-ts-twilio.git
-[submodule "src/implementations/vintasend-aws-sqs"]
-	path = src/implementations/vintasend-aws-sqs
-	url = git@github.com:vintasoftware/vintasend-aws-sqs.git
+[submodule "src/implementations/vintasend-ts-aws-sqs"]
+	path = src/implementations/vintasend-ts-aws-sqs
+	url = git@github.com:vintasoftware/vintasend-ts-aws-sqs.git
 [submodule "src/implementations/vintasend-react-email"]
 	path = src/implementations/vintasend-react-email
 	url = git@github.com:vintasoftware/vintasend-react-email.git

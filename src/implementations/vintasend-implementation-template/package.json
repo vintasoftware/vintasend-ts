@@ -21,7 +21,7 @@
     "vintasend": "^0.14.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.5",
+    "@biomejs/biome": "^2.5.10",
     "@types/node": "25.3.3",
     "@vitest/coverage-v8": "4.0.18",
     "husky": "^9.1.7",
