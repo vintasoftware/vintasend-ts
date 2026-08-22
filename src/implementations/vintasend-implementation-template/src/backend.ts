@@ -157,6 +157,26 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
     throw new Error('Method not implemented.');
   }
 
+  /**
+   * Record which version of the template actually rendered this notification.
+   *
+   * Optional on the interface: delete this method entirely if your store has nowhere to put it,
+   * and `usedTemplateVersion` simply stays absent on the records you hold. Everything else keeps
+   * working.
+   *
+   * The service only calls this when the renderer reported a version that differs from what is
+   * stored, so there is nothing to deduplicate here. To store the *requested* version too, read
+   * `notification.requestedTemplateVersion` in `persistNotification` /
+   * `persistOneOffNotification` and their update twins — it arrives as an ordinary field, not
+   * through a dedicated method.
+   */
+  storeTemplateVersion(
+    notificationId: Config['NotificationIdType'],
+    templateVersion: number,
+  ): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
+
   persistOneOffNotification(
     notification: Omit<OneOffNotificationInput<Config>, 'id'> & {
       id?: Config['NotificationIdType'];

@@ -290,6 +290,23 @@ field is null does not match a positive range, and because `{ not: ... }` invert
 the positive result, it *is* returned by a negated one. An unread notification is
 therefore excluded by `readAtRange` and returned by `{ not: { readAtRange } }`.
 
+### Filtering by template version
+
+`requestedTemplateVersion` and `usedTemplateVersion` filter on the two integer fields a
+notification records when its template renderer versions templates — what it was pinned to, and
+what it actually rendered. Scalar or array, like the other membership fields:
+
+```typescript
+// still pinned to v3
+await vintasend.filterNotifications({ requestedTemplateVersion: 3 }, 0, 25);
+
+// went out on v1 or v2
+await vintasend.filterNotifications({ usedTemplateVersion: [1, 2] }, 0, 25);
+```
+
+Both are opt-in per backend for the same reason `readAtRange` is, and their capability keys
+default to `false`. See [Template Version Pinning](#template-version-pinning).
+
 ### Case sensitivity
 
 `stringLookups.caseSensitive` and `stringLookups.caseInsensitive` are separate
@@ -621,11 +638,175 @@ If you're adding one-off notification support to an existing installation:
 
 3. **Existing notifications are preserved** - they have `userId` set and `emailOrPhone` as null.
 
+## Template Version Pinning
+
+Some template renderers version their templates. A file on disk has no version — editing it changes
+what every notification renders, past and future. A store-backed renderer such as
+[vintasend-managed-templates](https://github.com/vintasoftware/vintasend-ts-managed-templates) keeps
+every edit as a new version, and that makes two questions answerable that were not before: *which
+version should this notification render*, and *which version did it actually go out with*.
+
+Two fields on the notification hold the answers:
+
+| Field | Set by | Means |
+|---|---|---|
+| `requestedTemplateVersion` | the caller, or the service at create time | Render this exact version. Absent means "whatever is current at send time". |
+| `usedTemplateVersion` | the service, at send time | The version the renderer reported it actually used. Read-only to callers. |
+
+With a renderer whose templates are not versioned — which is most of them — both stay absent and
+nothing about this changes.
+
+### Pinning a single notification
+
+Pass the version and it is used, whatever the service is configured with:
+
+```typescript
+await notificationService.createNotification({
+  userId: user.id,
+  notificationType: 'EMAIL',
+  title: 'Welcome',
+  bodyTemplate: 'welcome',          // a template key, not a path
+  contextName: 'welcomeContext',
+  contextParameters: { userId: user.id },
+  sendAfter: null,
+  subjectTemplate: null,
+  extraParams: null,
+  requestedTemplateVersion: 3,      // render v3, now and forever
+});
+```
+
+Repointing an existing notification works the same way:
+
+```typescript
+await notificationService.updateNotification(notificationId, { requestedTemplateVersion: 4 });
+```
+
+### Pinning without naming a version
+
+`pinTemplateVersions: true` resolves whatever version is current *now* and records it, so a later
+edit to the template cannot change what an already-recorded notification renders. Ask for it per
+call, in the options argument that every create and update takes:
+
+```typescript
+await notificationService.createNotification(
+  { /* ... */ bodyTemplate: 'welcome' },
+  { pinTemplateVersions: true },      // pin to whatever "welcome" is right now
+);
+
+await notificationService.updateNotification(
+  notificationId,
+  { bodyTemplate: 'farewell' },       // re-pinned to farewell's current version
+  { pinTemplateVersions: true },
+);
+```
+
+...or set the default for every call on the service, and override it where it does not apply:
+
+```typescript
+const notificationService = new VintaSendFactory<Config>().create({
+  adapters,
+  backend,
+  logger,
+  contextGeneratorsMap,
+  options: {
+    raiseErrorOnFailedSend: false,
+    pinTemplateVersions: true,        // the default for every create and update
+  },
+});
+
+// not this one
+await notificationService.createNotification(input, { pinTemplateVersions: false });
+```
+
+The default is **off**, because turning it on changes what an existing deployment sends: unpinned, a
+notification scheduled for next week renders whatever the template says next week, which is
+sometimes exactly what a team wants. The flag is never stored — it decides what
+`requestedTemplateVersion` is set to at that moment, and nothing afterwards consults it.
+
+Key semantics:
+
+* **The call wins over the service.** `pinTemplateVersions` on a create or update overrides the
+  constructor's setting in both directions; leave it out to defer to the service.
+* **An explicit version always wins over both.** `pinTemplateVersions` only decides what happens
+  when the caller does not name a version, on create and on update alike.
+* **Resolved through the renderer.** The service asks the renderer for the notification type it is
+  creating, via `BaseNotificationTemplateRenderer.getLatestTemplateVersion()`. The default
+  implementation returns `null` — so with a file-based renderer this flag has nothing to pin and
+  quietly does nothing.
+* **Best-effort.** A renderer that throws while resolving is logged and the notification is created
+  unpinned, rather than failing the write. An unpinned notification still sends.
+* **Updates re-pin only when the template changes.** An update carrying a new `bodyTemplate` is
+  re-pinned to that template's current version; an update to the title leaves an existing pin
+  exactly as it was. Silently moving a pin forward is the one thing pinning exists to prevent.
+
+### Recording what actually rendered
+
+At send time the renderer reports the version it used on the payload it returns, the adapter hands
+that back from `send()`, and the service stores it:
+
+```typescript
+const notification = await notificationService.getNotification(notificationId);
+notification.requestedTemplateVersion;   // 3  — what it asked for (or absent)
+notification.usedTemplateVersion;        // 3  — what rendered
+```
+
+On an unpinned notification `usedTemplateVersion` is the *only* record of which version went out,
+since the template has moved on by the time anyone asks.
+
+* **System-managed.** Passing `usedTemplateVersion` to `updateNotification` throws. Set
+  `requestedTemplateVersion` instead.
+* **Never blocks a send.** It is written after delivery, so a failure to record it is logged and the
+  notification stays sent.
+* **A pin covers the template named, not what that template builds on.** With a renderer that
+  composes templates from other templates, pinning a notification to v3 of `welcome` renders v3 of
+  `welcome` — but a base it extends without naming a version still resolves to whatever that base is
+  today. Pin the reference too (with `version=2` on the `managed_extends` tag) when a template must
+  keep composing against an exact parent. See [Managed Templates](#managed-templates).
+
+### Filtering
+
+Both fields are filterable, by a single version or a list:
+
+```typescript
+// still pinned to v3
+await notificationService.filterNotifications({ requestedTemplateVersion: 3 }, 0, 20);
+
+// went out on v1 or v2 — the query after finding a bug in an old version
+await notificationService.filterNotifications({ usedTemplateVersion: [1, 2] }, 0, 20);
+```
+
+Both capability keys default to **false**, for the same reason `fields.readAtRange` does: they are
+vocabulary no backend implemented when they were introduced, so a `true` default would have every
+shipped and third-party backend claim a filter it would silently ignore. `vintasend-prisma` and
+`vintasend-medplum` both declare them supported. Check before you rely on them:
+
+```typescript
+const capabilities = await notificationService.getBackendSupportedFilterCapabilities();
+capabilities['fields.usedTemplateVersion'];
+```
+
+### What an implementation package has to do
+
+Everything below is optional. A renderer, adapter, or backend that ignores all of it keeps working
+exactly as it did.
+
+* **A renderer whose templates are versioned** overrides `getLatestTemplateVersion(templateKey)`,
+  honours the notification's `requestedTemplateVersion` in `render()`, and sets `templateVersion` on
+  the payload it returns.
+* **An adapter** returns the render from `send()` instead of discarding it. Returning nothing is
+  still valid — the service then records nothing.
+* **A backend** stores `requestedTemplateVersion` (an ordinary field on the notification it is
+  handed) and implements `storeTemplateVersion()`. That method is optional on the interface, so a
+  backend with nowhere to put it needs no changes at all; the cost is only that
+  `usedTemplateVersion` stays absent on the records it holds.
+
 ## Glossary
 
 * **Notification Backend**: It is a class that implements the methods necessary for VintaSend services to create, update, and retrieve Notifications from the database.
 * **Notification Adapter**: It is a class that implements the methods necessary for VintaSend services to send Notifications through email, SMS or even push/in-app notifications.
 * **Template Renderer**: It is a class that implements the methods necessary for VintaSend adapter to render the notification body.
+* **Requested template version**: Which version of its template a notification should render, when its renderer versions templates. Set by the caller or resolved at create time; absent means "whatever is current at send time". See [Template Version Pinning](#template-version-pinning).
+* **Used template version**: Which version actually rendered a notification, recorded by the service at send time from what the renderer reported. System-managed — a caller sets `requestedTemplateVersion` instead.
 * **Notification Context**: It's the data passed to the templates to render the notification correctly. It's generated when the notification is sent, not on creation time
 * **Context generator**: It's a class defined by the user context generator map with a context name. That class has a `generate` method that, when called, generates the data necessary to render its respective notification.
 * **Context name**: The registered name of a context generator. It's stored in the notification so the context generator is called at the moment the notification will be sent.
@@ -636,6 +817,54 @@ If you're adding one-off notification support to an existing installation:
 * **Regular Notification**: A notification associated with a user account (via userId). Used for registered users in your system.
 * **AttachmentManager**: A class that handles file storage operations (upload, download, delete) for notification attachments. Supports S3, Azure, GCS, and custom storage backends.
 * **Attachment**: A file attached to a notification, either uploaded inline or referenced from previously uploaded files. Supports automatic deduplication and reuse across multiple notifications.  
+* **Managed Template**: A notification template stored in a database rather than in a file, so it can be edited without a deploy. Versioned, never edited in place, and published deliberately through a `draft → active → inactive → archived` lifecycle. See [Managed Templates](#managed-templates).
+* **Template Manager Backend**: A class that implements the methods necessary for storing, versioning, tagging and querying managed templates. The template equivalent of a Notification Backend.
+
+
+## Managed Templates
+
+A template renderer reads templates from wherever its engine looks, which is usually files on
+disk — so every copy change is a deploy.
+[vintasend-managed-templates](https://github.com/vintasoftware/vintasend-ts-managed-templates)
+(`src/managed-templates`) moves templates into a data store instead: someone who is not a
+developer edits them, every edit is a new version, and a version is published deliberately rather
+than the moment it is saved.
+
+It is storage-agnostic — it defines the seam, not the database — and it adds four things on top:
+
+* **Versioning.** A write creates the next version and leaves the previous one exactly as it was,
+  so a notification that already went out against v1 renders v1 forever.
+* **A lifecycle with an audit trail.** `draft → active → inactive → archived`, with every move
+  recorded and `allowedTransitions` on every payload so a UI never has to discover the rules by
+  catching errors.
+* **Composition.** Stored templates reach the engine as source, so `extends`/`include` have
+  nothing to load. The package resolves its own `{% managed_extends %}` /
+  `{% managed_block %}` / `{% managed_include %}` tags against the store *before* the engine runs,
+  and hands it one flat string.
+* **Tags and filtering**, spelled the same way VintaSend spells its notification filters.
+
+To send through it, wrap your existing renderer and set the notification's `bodyTemplate` to a
+template **key** instead of a path. Nothing else about creating or sending notifications changes.
+
+```typescript
+import { ManagedTemplateEmailRenderer, ManagedTemplateService } from 'vintasend-managed-templates';
+import { MedplumTemplateManagerBackend } from 'vintasend-medplum-template-manager';
+
+const managerBackend = new MedplumTemplateManagerBackend(medplum);
+const renderer = new ManagedTemplateEmailRenderer<Config>(managerBackend, pugRenderer);
+const templates = new ManagedTemplateService<Config>(managerBackend, renderer);
+
+await notificationService.createNotification({
+  // ...
+  bodyTemplate: 'welcome', // a managed template key, not a file path
+});
+```
+
+The package's README documents the tag language, the lifecycle, the filter vocabulary and what a
+template manager backend has to implement. There is a Python sibling,
+[vintasend-managed-templates](https://github.com/vintasoftware/vintasend-managed-templates), and
+the two agree on the tag language, the slug rules and the filter vocabulary — so a store written
+by one is readable by the other.
 
 
 ## Implementations
@@ -664,6 +893,12 @@ VintaSend has many backend, adapter, and template renderer implementations. If y
 * **[vintasend-aws-s3-attachments](https://github.com/vintasoftware/vintasend-aws-s3-attachments/)**: AWS S3 storage backend with presigned URLs and streaming support. Also works with S3-compatible services (MinIO, DigitalOcean Spaces, Cloudflare R2, etc.).
 * **[vintasend-medplum](https://github.com/vintasoftware/vintasend-medplum/)**: FHIR-compliant file storage using Binary and Media resources for healthcare applications.
 
+##### Template Managers
+
+Storage for [managed templates](#managed-templates) — where the versions, tags and status history live.
+
+* **[vintasend-medplum-template-manager](https://github.com/vintasoftware/vintasend-medplum-template-manager/)**: Stores managed templates as FHIR `MessageDefinition` resources, alongside the notifications that reference them.
+
 ##### Template Renderers
 * **[vintasend-pug](https://github.com/vintasoftware/vintasend-pug/)**: Renders emails using Pug.
 * **[vintasend-react-email](https://github.com/vintasoftware/vintasend-react-email/)**: Renders emails using React Email, including uncompiled TS/TSX template support.
@@ -680,6 +915,11 @@ the API's contract — including one built on the Python `vintasend` package.
 
 * **[vintasend-api](https://github.com/vintasoftware/vintasend-ts-api/)** (`src/tools/vintasend-api`): REST API that exposes a configured VintaSend service over HTTP. Its `openapi.yaml` is the normative contract.
 * **[vintasend-dashboard](https://github.com/vintasoftware/vintasend-dashboard/)** (`src/tools/vintasend-dashboard`): Next.js UI that consumes that contract. It holds no backend credentials of its own.
+
+And an API for editing the templates themselves, sharing its `openapi.yaml` byte-for-byte with the
+Python implementation so one generated client works against either server.
+
+* **[vintasend-templates-management-api](https://github.com/vintasoftware/vintasend-ts-templates-management-api/)** (`src/tools/vintasend-templates-management-api`): REST API over a configured `ManagedTemplateService` — versions, the status lifecycle, tags, composition and previews.
 
 ## Examples
 
