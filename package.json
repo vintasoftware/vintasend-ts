@@ -33,7 +33,9 @@
     "release:bump": "node scripts/release-bump.js",
     "release:bump:patch": "node scripts/release-bump.js --bump=patch",
     "release:bump:minor": "node scripts/release-bump.js --bump=minor",
+    "release:bump:major": "node scripts/release-bump.js --bump=major",
     "release:bump:alpha": "node scripts/release-bump.js --bump=alpha",
+    "release:bump:alpha:major": "node scripts/release-bump.js --bump=alpha --alpha-base=major",
     "release:bump:promote": "node scripts/release-bump.js --bump=promote",
     "release:publish": "node scripts/release-publish.js",
     "prepare": "husky"

@@ -48,7 +48,7 @@ npm run release
 This will:
 1. Check git status (must be clean)
 2. Find the highest version among implementations
-3. Prompt for version bump type (patch or minor)
+3. Prompt for version bump type (patch, minor, major or alpha — alpha also asks for its base bump: patch, minor or major)
 4. Prompt for commit messages (separate for main and implementations)
 5. Show summary and ask for confirmation
 6. Update and publish main package (opens browser for 2FA)
@@ -71,6 +71,30 @@ npm run release:patch
 # Minor release (e.g., 0.4.14 → 0.5.0)
 npm run release:minor
 ```
+
+### Version Bump with Preset Type (`release:bump`)
+```bash
+# Patch bump (e.g., 0.4.14 → 0.4.15)
+npm run release:bump:patch
+
+# Minor bump (e.g., 0.4.14 → 0.5.0)
+npm run release:bump:minor
+
+# Major bump (e.g., 0.4.14 → 1.0.0)
+npm run release:bump:major
+
+# Alpha bump — prompts for the base bump type (e.g., 0.4.14 → 0.4.15-alpha1)
+npm run release:bump:alpha
+
+# Alpha of a major bump (e.g., 0.4.14 → 1.0.0-alpha1)
+npm run release:bump:alpha:major
+
+# Promote the current alpha to stable (e.g., 1.0.0-alpha2 → 1.0.0)
+npm run release:bump:promote
+```
+
+The alpha base bump type can also be preset on any alpha bump with
+`--alpha-base=patch|minor|major`, which skips that prompt.
 
 ## Release Process
 

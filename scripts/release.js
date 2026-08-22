@@ -112,11 +112,14 @@ async function main() {
       console.log('\nSelect version bump type:');
       console.log('  1) patch (e.g., 0.4.14 → 0.4.15)');
       console.log('  2) minor (e.g., 0.4.14 → 0.5.0)');
-      console.log('  3) alpha (e.g., 0.4.14 → 0.4.15-alpha1)');
-      const choice = await question('\nEnter choice (1, 2, or 3): ');
+      console.log('  3) major (e.g., 0.4.14 → 1.0.0)');
+      console.log('  4) alpha (e.g., 0.4.14 → 0.4.15-alpha1)');
+      const choice = await question('\nEnter choice (1, 2, 3, or 4): ');
       if (choice === '2') {
         selectedBumpType = 'minor';
       } else if (choice === '3') {
+        selectedBumpType = 'major';
+      } else if (choice === '4') {
         selectedBumpType = 'alpha';
       } else {
         selectedBumpType = 'patch';
@@ -128,8 +131,9 @@ async function main() {
       console.log('\nSelect alpha base bump type:');
       console.log('  1) patch (e.g., 0.4.14 → 0.4.15-alpha1)');
       console.log('  2) minor (e.g., 0.4.14 → 0.5.0-alpha1)');
-      const baseBumpChoice = await question('\nEnter choice (1 or 2): ');
-      alphaBaseBumpType = baseBumpChoice === '2' ? 'minor' : 'patch';
+      console.log('  3) major (e.g., 0.4.14 → 1.0.0-alpha1)');
+      const baseBumpChoice = await question('\nEnter choice (1, 2, or 3): ');
+      alphaBaseBumpType = baseBumpChoice === '3' ? 'major' : baseBumpChoice === '2' ? 'minor' : 'patch';
       logInfo(`Alpha base bump type: ${alphaBaseBumpType}`);
 
       const iterInput = await question('\nEnter alpha iteration number (default 1): ');

@@ -3,7 +3,7 @@
  * @param {string} version - Current version (e.g., "0.4.14" or "0.4.14-alpha1")
  * @param {'patch' | 'minor' | 'major' | 'alpha' | 'alpha-iteration' | 'promote'} bumpType - Type of version bump
  * @param {number} alphaIteration - Alpha iteration number (used when bumpType is 'alpha' or 'alpha-iteration')
- * @param {'patch' | 'minor'} alphaBaseBumpType - Base bump type for alpha (patch or minor, defaults to patch)
+ * @param {'patch' | 'minor' | 'major'} alphaBaseBumpType - Base bump type for alpha (patch, minor or major, defaults to patch)
  * @returns {string} - New version
  */
 function bumpVersion(version, bumpType, alphaIteration = 1, alphaBaseBumpType = 'patch') {

@@ -19,6 +19,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Parse command line arguments
 const args = process.argv.slice(2);
 const bumpType = args.find(arg => arg.startsWith('--bump='))?.split('=')[1];
+const alphaBaseArg = args.find(arg => arg.startsWith('--alpha-base='))?.split('=')[1];
 
 // Paths
 const rootDir = path.join(__dirname, '..');
@@ -134,24 +135,26 @@ async function main() {
       console.log('\nSelect version bump type:');
       console.log('  1) patch (e.g., 0.4.14 → 0.4.15)');
       console.log('  2) minor (e.g., 0.4.14 → 0.5.0)');
-      console.log('  3) alpha (e.g., 0.4.14 → 0.4.15-alpha1)');
+      console.log('  3) major (e.g., 0.4.14 → 1.0.0)');
+      console.log('  4) alpha (e.g., 0.4.14 → 0.4.15-alpha1)');
 
       if (isCurrentAlpha) {
-        console.log(`  4) increment alpha (e.g., ${highestVersion} → ${currentAlphaMatch[1]}-alpha${parseInt(currentAlphaMatch[2]) + 1})`);
-        console.log(`  5) promote alpha to stable (e.g., ${highestVersion} → ${currentAlphaMatch[1]})`);
+        console.log(`  5) increment alpha (e.g., ${highestVersion} → ${currentAlphaMatch[1]}-alpha${parseInt(currentAlphaMatch[2]) + 1})`);
+        console.log(`  6) promote alpha to stable (e.g., ${highestVersion} → ${currentAlphaMatch[1]})`);
       }
 
-      const maxChoice = isCurrentAlpha ? 5 : 3;
-      const choice = await question(`\nEnter choice (1, 2, ${isCurrentAlpha ? '3, 4, or 5' : 'or 3'}): `);
+      const choice = await question(`\nEnter choice (1, 2, 3, ${isCurrentAlpha ? '4, 5, or 6' : 'or 4'}): `);
 
       if (choice === '2') {
         selectedBumpType = 'minor';
       } else if (choice === '3') {
+        selectedBumpType = 'major';
+      } else if (choice === '4') {
         selectedBumpType = 'alpha';
-      } else if (choice === '4' && isCurrentAlpha) {
+      } else if (choice === '5' && isCurrentAlpha) {
         selectedBumpType = 'alpha-iteration';
         alphaIteration = parseInt(currentAlphaMatch[2]) + 1;
-      } else if (choice === '5' && isCurrentAlpha) {
+      } else if (choice === '6' && isCurrentAlpha) {
         selectedBumpType = 'promote';
       } else {
         selectedBumpType = 'patch';
@@ -160,11 +163,20 @@ async function main() {
 
     // If alpha was selected, ask for base bump type and iteration
     if (selectedBumpType === 'alpha') {
-      console.log('\nSelect alpha base bump type:');
-      console.log('  1) patch (e.g., 0.4.14 → 0.4.15-alpha1)');
-      console.log('  2) minor (e.g., 0.4.14 → 0.5.0-alpha1)');
-      const baseBumpChoice = await question('\nEnter choice (1 or 2): ');
-      alphaBaseBumpType = baseBumpChoice === '2' ? 'minor' : 'patch';
+      if (alphaBaseArg) {
+        if (!['patch', 'minor', 'major'].includes(alphaBaseArg)) {
+          logError(`Invalid --alpha-base value: ${alphaBaseArg} (expected patch, minor or major)`);
+          process.exit(1);
+        }
+        alphaBaseBumpType = alphaBaseArg;
+      } else {
+        console.log('\nSelect alpha base bump type:');
+        console.log('  1) patch (e.g., 0.4.14 → 0.4.15-alpha1)');
+        console.log('  2) minor (e.g., 0.4.14 → 0.5.0-alpha1)');
+        console.log('  3) major (e.g., 0.4.14 → 1.0.0-alpha1)');
+        const baseBumpChoice = await question('\nEnter choice (1, 2, or 3): ');
+        alphaBaseBumpType = baseBumpChoice === '3' ? 'major' : baseBumpChoice === '2' ? 'minor' : 'patch';
+      }
       logInfo(`Alpha base bump type: ${alphaBaseBumpType}`);
 
       const iterInput = await question('\nEnter alpha iteration number (default 1): ');
