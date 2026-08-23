@@ -1,6 +1,10 @@
 {
   "name": "vintasend",
   "version": "1.0.0-alpha1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vintasoftware/vintasend-ts.git"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

@@ -1,6 +1,11 @@
 {
   "name": "vintasend-implementation-template",
   "version": "1.0.0-alpha1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vintasoftware/vintasend-ts.git",
+    "directory": "src/implementations/vintasend-implementation-template"
+  },
   "description": "",
   "type": "module",
   "main": "dist/index.js",
