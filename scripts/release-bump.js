@@ -1,18 +1,38 @@
 #!/usr/bin/env node
 
+/**
+ * Release step 1: bump every workspace package to a single new version.
+ *
+ * "Every workspace package" means the root `vintasend` package, everything
+ * under `src/implementations` and everything under `src/tools` — including the
+ * repositories that are not published (the APIs and dashboards), which still
+ * have to carry the release version and the new dependency ranges.
+ *
+ * Two things get rewritten in each package.json:
+ *   1. its own `version`
+ *   2. every dependency, peerDependency, devDependency and optionalDependency
+ *      that points at another workspace package
+ *
+ * The second one used to cover only `vintasend`, which is why sibling
+ * dependencies such as `vintasend-managed-templates` inside
+ * `vintasend-medplum-template-manager` kept pointing at the previous release.
+ */
+
 import readline from 'node:readline';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { findHighestVersion, getImplementationPackages, compareVersions } from './utils/version-finder.js';
-import { bumpVersion, isValidVersion } from './utils/version-bumper.js';
+import { compareVersions } from './utils/version-finder.js';
+import { bumpVersion } from './utils/version-bumper.js';
 import {
   updatePackageVersion,
-  updateVintasendDependency,
-  getPackageName,
-  readPackageJson
+  updateInternalDependencies
 } from './utils/package-updater.js';
+import {
+  discoverWorkspacePackages,
+  internalPackageNames
+} from './utils/workspace-packages.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -20,11 +40,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const bumpType = args.find(arg => arg.startsWith('--bump='))?.split('=')[1];
 const alphaBaseArg = args.find(arg => arg.startsWith('--alpha-base='))?.split('=')[1];
+const dryRun = args.includes('--dry-run');
+const assumeYes = args.includes('--yes') || args.includes('-y');
 
 // Paths
 const rootDir = path.join(__dirname, '..');
-const implementationsDir = path.join(rootDir, 'src', 'implementations');
-const rootPackageJsonPath = path.join(rootDir, 'package.json');
 const stateFilePath = path.join(rootDir, '.release-state.json');
 
 // Colors for console output
@@ -35,7 +55,8 @@ const colors = {
   yellow: '\x1b[33m',
   blue: '\x1b[34m',
   red: '\x1b[31m',
-  cyan: '\x1b[36m'
+  cyan: '\x1b[36m',
+  gray: '\x1b[90m'
 };
 
 function log(message, color = 'reset') {
@@ -62,6 +83,10 @@ function logInfo(message) {
   log(`ℹ ${message}`, 'cyan');
 }
 
+function logDetail(message) {
+  log(`  ${message}`, 'gray');
+}
+
 // Create readline interface
 const rl = readline.createInterface({
   input: process.stdin,
@@ -72,38 +97,73 @@ function question(query) {
   return new Promise(resolve => rl.question(query, resolve));
 }
 
+/**
+ * The highest version currently in the workspace, and who carries it.
+ *
+ * The template is skipped: it is scaffolding, it is never released, and it is
+ * routinely left on an old version — letting it win here would drag the whole
+ * workspace backwards.
+ */
+function findHighestWorkspaceVersion(packages) {
+  let highest = '0.0.0';
+  let owner = '';
+
+  for (const pkg of packages) {
+    if (pkg.isTemplate) continue;
+    if (!pkg.version) continue;
+    if (compareVersions(pkg.version, highest) > 0) {
+      highest = pkg.version;
+      owner = pkg.name;
+    }
+  }
+
+  return { version: highest, packageName: owner };
+}
+
 async function main() {
   try {
     log('\n========================================', 'bright');
     log('  VintaSend Release - Step 1: Bump Versions', 'bright');
     log('========================================\n', 'bright');
-
-    // Step 1: Find highest version (including main package)
-    logStep('1', 'Finding highest version...');
-
-    // Get main package version
-    const mainPackage = readPackageJson(rootPackageJsonPath);
-    const mainVersion = mainPackage.version;
-    logInfo(`Main package (vintasend) version: ${mainVersion}`);
-
-    // Get highest implementation version
-    const { version: highestImplVersion, packageName: highestImplPackage } = findHighestVersion(implementationsDir);
-    logInfo(`Highest implementation version: ${highestImplVersion} (${highestImplPackage})`);
-
-    // Compare and find the true highest
-    let highestVersion = mainVersion;
-    let highestPackage = 'vintasend';
-
-    if (compareVersions(highestImplVersion, mainVersion) > 0) {
-      highestVersion = highestImplVersion;
-      highestPackage = highestImplPackage;
+    if (dryRun) {
+      logWarning('Dry run: no package.json will be written');
     }
 
-    log('');
+    // Step 1: discover every package in the workspace
+    logStep('1', 'Discovering workspace packages...');
+    const packages = discoverWorkspacePackages(rootDir);
+    if (packages.length === 0) {
+      logError('No packages found');
+      process.exit(1);
+    }
+
+    const internalNames = internalPackageNames(packages);
+    const published = packages.filter(pkg => pkg.publishable);
+    const companions = packages.filter(pkg => !pkg.publishable && !pkg.isTemplate);
+    const template = packages.find(pkg => pkg.isTemplate);
+
+    for (const pkg of packages) {
+      const role = pkg.isTemplate ? 'template' : pkg.publishable ? 'published' : 'not published';
+      logDetail(`${pkg.name}@${pkg.version} (${pkg.relPath}) — ${role}`);
+    }
+    logSuccess(
+      `Found ${packages.length} packages: ${published.length} published, ` +
+        `${companions.length} not published${template ? ', 1 template' : ''}`
+    );
+
+    // Step 2: find the version to bump from
+    logStep('2', 'Finding highest version...');
+    const { version: highestVersion, packageName: highestPackage } = findHighestWorkspaceVersion(packages);
     logInfo(`Starting from highest version: ${highestVersion} (${highestPackage})`);
 
-    // Step 2: Determine bump type
-    logStep('2', 'Determining version bump type...');
+    const behind = packages.filter(pkg => !pkg.isTemplate && pkg.version !== highestVersion);
+    if (behind.length > 0) {
+      logWarning(`${behind.length} package(s) are not on ${highestVersion} — they will be brought up with the bump:`);
+      for (const pkg of behind) logDetail(`${pkg.name}@${pkg.version}`);
+    }
+
+    // Step 3: determine bump type
+    logStep('3', 'Determining version bump type...');
     let selectedBumpType = bumpType;
     let alphaIteration = 1;
     let alphaBaseBumpType = 'patch';
@@ -190,52 +250,70 @@ async function main() {
     const newVersion = bumpVersion(highestVersion, selectedBumpType, alphaIteration, alphaBaseBumpType);
     logInfo(`New version will be: ${newVersion} (${selectedBumpType} bump)`);
 
-    // Step 3: Confirm before proceeding
+    // Step 4: preview and confirm
+    logStep('4', 'Previewing changes...');
+    const plan = [];
+    for (const pkg of packages) {
+      const { updates, skipped } = updateInternalDependencies(pkg.packageJsonPath, newVersion, internalNames, true);
+      plan.push({ pkg, updates, skipped, versionChanges: pkg.version !== newVersion });
+    }
+
+    for (const { pkg, updates, skipped, versionChanges } of plan) {
+      if (!versionChanges && updates.length === 0 && skipped.length === 0) continue;
+      log(`  ${pkg.name}`, 'blue');
+      if (versionChanges) logDetail(`version ${pkg.version} → ${newVersion}`);
+      for (const update of updates) {
+        logDetail(`${update.field}.${update.name}: ${update.oldRange} → ${update.newRange}`);
+      }
+      for (const skip of skipped) {
+        logWarning(`  ${pkg.name}: leaving ${skip.field}.${skip.name} at "${skip.range}" (not a plain version range)`);
+      }
+    }
+
+    const totalDependencyUpdates = plan.reduce((sum, entry) => sum + entry.updates.length, 0);
+
     console.log('\n' + '='.repeat(50));
     log('VERSION BUMP SUMMARY', 'bright');
     console.log('='.repeat(50));
-    console.log(`New version:      ${newVersion}`);
-    console.log(`Bump type:        ${selectedBumpType}`);
+    console.log(`New version:        ${newVersion}`);
+    console.log(`Bump type:          ${selectedBumpType}`);
+    console.log(`Packages:           ${packages.length}`);
+    console.log(`Dependency updates: ${totalDependencyUpdates}`);
     console.log('='.repeat(50) + '\n');
 
-    const confirm = await question('Proceed with version bump? (yes/no): ');
-    if (confirm.toLowerCase() !== 'yes' && confirm.toLowerCase() !== 'y') {
-      logWarning('Version bump cancelled by user');
-      process.exit(0);
+    if (!assumeYes && !dryRun) {
+      const confirm = await question('Proceed with version bump? (yes/no): ');
+      if (confirm.toLowerCase() !== 'yes' && confirm.toLowerCase() !== 'y') {
+        logWarning('Version bump cancelled by user');
+        process.exit(0);
+      }
     }
 
-    // Step 4: Update main package version
-    logStep('4', 'Updating main package version...');
-    updatePackageVersion(rootPackageJsonPath, newVersion, false);
-    logSuccess(`Updated vintasend package.json to ${newVersion}`);
-
-    // Step 5: Update implementation dependencies and versions
-    logStep('5', 'Updating implementation packages...');
-    const implementationPackages = getImplementationPackages(implementationsDir);
+    // Step 5: write the new versions and dependency ranges
+    logStep('5', 'Updating package.json files...');
     const updatedPackages = [];
 
-    for (const pkgPath of implementationPackages) {
-      const packageName = getPackageName(pkgPath);
-      logInfo(`Processing ${packageName}...`);
-
-      // Update vintasend dependency
-      const depUpdate = updateVintasendDependency(pkgPath, newVersion, false);
-      if (depUpdate.updates.length > 0) {
-        logSuccess(`  Updated vintasend dependency to ^${newVersion}`);
+    for (const pkg of packages) {
+      if (dryRun) {
+        updatedPackages.push({ name: pkg.name, path: pkg.packageJsonPath, dir: pkg.dir, publishable: pkg.publishable });
+        continue;
       }
 
-      // Update package version
-      updatePackageVersion(pkgPath, newVersion, false);
-      logSuccess(`  Updated package version to ${newVersion}`);
+      updatePackageVersion(pkg.packageJsonPath, newVersion, false);
+      const { updates } = updateInternalDependencies(pkg.packageJsonPath, newVersion, internalNames, false);
+
+      const suffix = updates.length > 0 ? ` (+${updates.length} dependency range${updates.length === 1 ? '' : 's'})` : '';
+      logSuccess(`${pkg.name} → ${newVersion}${suffix}`);
 
       updatedPackages.push({
-        name: packageName,
-        path: pkgPath,
-        dir: path.dirname(pkgPath)
+        name: pkg.name,
+        path: pkg.packageJsonPath,
+        dir: pkg.dir,
+        publishable: pkg.publishable
       });
     }
 
-    // Step 6: Save state for next step
+    // Step 6: save state for the next step
     logStep('6', 'Saving release state...');
     const releaseState = {
       version: newVersion,
@@ -243,19 +321,24 @@ async function main() {
       timestamp: new Date().toISOString(),
       packages: updatedPackages
     };
-    fs.writeFileSync(stateFilePath, JSON.stringify(releaseState, null, 2));
-    logSuccess('Release state saved');
+    if (!dryRun) {
+      fs.writeFileSync(stateFilePath, JSON.stringify(releaseState, null, 2));
+      logSuccess('Release state saved');
+    } else {
+      logInfo('[dry-run] release state not written');
+    }
 
     // Final summary
     log('\n' + '='.repeat(50), 'green');
-    log('✓ VERSION BUMP COMPLETED!', 'green');
+    log(dryRun ? '✓ DRY RUN COMPLETED' : '✓ VERSION BUMP COMPLETED!', 'green');
     log('='.repeat(50), 'green');
     console.log(`\nAll packages bumped to version: ${newVersion}`);
-    console.log(`Packages updated: ${updatedPackages.length + 1}`);
+    console.log(`Packages updated: ${updatedPackages.length}`);
     console.log('\nNext steps:');
-    console.log('  1. Review the version changes: git diff');
+    console.log('  1. Review the version changes: git diff && git submodule foreach git diff');
     console.log('  2. Update CHANGELOG.md with release notes');
-    console.log('  3. Run: npm run release:publish');
+    console.log('  3. Run: npm run release:tag -- --commit');
+    console.log('     (it commits, pushes, tags and waits for npm one dependency wave at a time)');
     console.log('');
 
   } catch (error) {

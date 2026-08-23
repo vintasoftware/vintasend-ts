@@ -28,12 +28,35 @@ Interactive mode:
 - If `--dir`, `--package`, or `--components` are not passed, the script prompts for missing values.
 - If the target directory already exists and `--force` is not passed, it prompts for overwrite confirmation.
 
-### `release.js`
-Main orchestration script that handles the entire release process.
+### `release-bump.js`
+Release step 1: puts every package in the workspace on one new version.
+
+What it does:
+- Discovers **every** package — the root `vintasend`, everything under
+  `src/implementations`, everything under `src/tools` (including the APIs and
+  dashboards that carry the version but publish nothing), and
+  `vintasend-implementation-template`
+- Starts from the highest version found anywhere and applies the chosen bump
+- Writes that version into every `package.json`
+- Rewrites **every** dependency on another workspace package — in
+  `dependencies`, `peerDependencies`, `devDependencies` and
+  `optionalDependencies`, not just `vintasend` — preserving the operator, so
+  `^1.0.0-alpha2` becomes `^1.0.1` and a pinned `1.0.0-alpha2` becomes `1.0.1`
+- Leaves ranges it cannot rewrite (git URLs, `file:`, `workspace:*`) alone and
+  warns about them
+- Saves `.release-state.json`
+
+```bash
+npm run release:bump        # interactive
+npm run release:bump:patch  # and :minor / :major / :alpha / :alpha:major / :promote
+```
+
+Useful flags: `--dry-run`, `--yes`, `--bump=<type>`,
+`--alpha-base=patch|minor|major`.
 
 ### `release-tag.js`
-Publishes through GitHub Actions instead of from your machine. Pushes the git
-tags that trigger each repository's `publish.yml`, in dependency order.
+Release step 3: publishes through GitHub Actions instead of from your machine,
+by pushing the tags that trigger each repository's `publish.yml`.
 
 What it does:
 - Finds every package that has its own `.github/workflows/publish.yml` **and** is
@@ -43,23 +66,48 @@ What it does:
   `vintasend`, then packages depending on those, and so on
 - Preflights each repo — clean tree, HEAD merged into the remote default branch,
   committed `package.json` version matching the tag, no conflicting existing tag
-- Pushes `v<version>` for each package in a wave, then waits for npm to serve
-  that version before starting the next wave
+- For each wave in turn: commits and pushes the repositories (with `--commit`),
+  pushes `v<version>`, then waits for npm to serve that version before starting
+  the next wave
 - Uses the `gh` CLI, when available, to fail fast if a publish workflow fails
   rather than waiting out the timeout
 
-It never commits, branches or pushes anything except tags: the release commits
-are expected to be merged already. It is safe to re-run — packages already
-published at the release version are skipped, so an interrupted release resumes.
+The wave ordering is the point. Both `ci.yml` (branch push) and `publish.yml`
+(tag push) run `npm install`, so a repository pushed before its dependencies are
+on npm resolves a version that does not exist yet and fails every time.
+
+With `--commit` it also makes the release commits, and handles the two
+repositories that don't fit the simple pattern:
+
+- The **root repository** is both the `vintasend` package and the superproject.
+  Its release commit excludes the submodule pointers — at that moment the
+  submodules have not been committed yet — and a final
+  `chore: update submodule pointers for v<version>` commit records them once
+  every submodule is done. Moved pointers never block the release either: the
+  working-tree check runs with `--ignore-submodules=all`.
+- The **APIs and dashboards** under `src/tools` have no `publish.yml`. They are
+  committed and pushed after every published package is live, and never tagged.
+
+Without `--commit` it behaves as before: it pushes nothing but tags, and expects
+the release commits to be merged already. Either way it is safe to re-run —
+published packages, pushed tags and clean repositories are all skipped, so an
+interrupted release resumes where it stopped.
 
 ```bash
-npm run release:tag:dry    # preflight everything, print the plan, push nothing
-npm run release:tag        # push tags and wait, wave by wave
+npm run release:tag -- --commit --dry-run   # print the whole plan, change nothing
+npm run release:tag -- --commit             # commit, push, tag and wait
+npm run release:tag                         # tags only
 ```
 
-Useful flags: `--only=`, `--skip=`, `--timeout=<sec>`, `--poll=<sec>`,
-`--no-watch`, `--allow-dirty`, `--allow-unpushed`, `--yes`. Run with `--help`
-for the full list.
+Useful flags: `--commit`, `--commit-message=`, `--no-verify`, `--only=`,
+`--skip=`, `--timeout=<sec>`, `--poll=<sec>`, `--settle=<sec>`, `--no-watch`,
+`--no-companions`, `--no-submodule-sync`, `--allow-dirty`, `--allow-unpushed`,
+`--yes`. Run with `--help` for the full list.
+
+### `release.js` / `release-publish.js`
+The older flow that published from a developer machine with npm 2FA. Kept for
+emergencies; the GitHub Actions flow above is the supported path. See
+[RELEASE_GUIDE.md](../RELEASE_GUIDE.md).
 
 ### `check-all-local.js`
 Runs the whole check suite across every package with all cross-package
@@ -98,181 +146,53 @@ against a locally linked `vintasend`, this covers the whole dependency graph and
 every check in one pass.
 
 ### Utilities (`utils/`)
-- **version-finder.js**: Finds the highest version among implementation packages
+- **workspace-packages.js**: Discovers every package in the workspace and builds
+  the dependency graph and release waves. Shared by the bump and tag steps so
+  the two can't disagree about what the workspace contains — which is how
+  `src/tools/*` used to get released without ever being version-bumped.
+- **version-finder.js**: Version comparison (`compareVersions`)
 - **version-bumper.js**: Handles version bumping logic
-- **package-updater.js**: Updates package.json files
-- **publisher.js**: Handles npm publishing and testing
-- **git-handler.js**: Manages git operations (staging, committing)
+- **package-updater.js**: Updates package.json versions and dependency ranges
+- **publisher.js**: npm publishing and testing (legacy flow)
+- **git-handler.js**: git operations (legacy flow)
 
-## Usage
+## Releasing
 
-### Interactive Release (Recommended)
+The full walkthrough lives in [RELEASE_GUIDE.md](../RELEASE_GUIDE.md); the short
+version is three steps:
+
 ```bash
-npm run release
-```
+# 1. Bump every package.json in the workspace
+npm run release:bump              # interactive
+npm run release:bump:patch        # 1.0.0 → 1.0.1
+npm run release:bump:minor        # 1.0.0 → 1.1.0
+npm run release:bump:major        # 1.0.0 → 2.0.0
+npm run release:bump:alpha        # 1.0.0 → 1.0.1-alpha1 (prompts for the base bump)
+npm run release:bump:alpha:major  # 1.0.0 → 2.0.0-alpha1
+npm run release:bump:promote      # 1.0.0-alpha2 → 1.0.0
 
-This will:
-1. Check git status (must be clean)
-2. Find the highest version among implementations
-3. Prompt for version bump type (patch, minor, major or alpha — alpha also asks for its base bump: patch, minor or major)
-4. Prompt for commit messages (separate for main and implementations)
-5. Show summary and ask for confirmation
-6. Update and publish main package (opens browser for 2FA)
-7. Wait for 2FA authorization (valid for 5 minutes)
-8. Update and publish all implementation packages
-9. Commit changes (implementations first, then main package)
+# 2. Write the release notes in CHANGELOG.md, then review
+git diff && git submodule foreach git diff
 
-### Dry Run (Test Without Changes)
-```bash
-npm run release:dry-run
-```
-
-Shows exactly what would happen without making any actual changes. Great for testing the process.
-
-### Direct Release with Preset Bump Type
-```bash
-# Patch release (e.g., 0.4.14 → 0.4.15)
-npm run release:patch
-
-# Minor release (e.g., 0.4.14 → 0.5.0)
-npm run release:minor
-```
-
-### Version Bump with Preset Type (`release:bump`)
-```bash
-# Patch bump (e.g., 0.4.14 → 0.4.15)
-npm run release:bump:patch
-
-# Minor bump (e.g., 0.4.14 → 0.5.0)
-npm run release:bump:minor
-
-# Major bump (e.g., 0.4.14 → 1.0.0)
-npm run release:bump:major
-
-# Alpha bump — prompts for the base bump type (e.g., 0.4.14 → 0.4.15-alpha1)
-npm run release:bump:alpha
-
-# Alpha of a major bump (e.g., 0.4.14 → 1.0.0-alpha1)
-npm run release:bump:alpha:major
-
-# Promote the current alpha to stable (e.g., 1.0.0-alpha2 → 1.0.0)
-npm run release:bump:promote
+# 3. Commit, push, tag and wait — one dependency wave at a time
+npm run release:tag -- --commit --dry-run
+npm run release:tag -- --commit
 ```
 
 The alpha base bump type can also be preset on any alpha bump with
 `--alpha-base=patch|minor|major`, which skips that prompt.
 
-## Release Process
+Nothing is published locally. Pushing `v<version>` to a repository triggers its
+`publish.yml`, which installs, tests, builds and publishes to npm with OIDC
+trusted publishing — no `NPM_TOKEN`, no 2FA prompt on your machine.
 
-The script follows this sequence:
+### Notes
 
-1. **Git Status Check**: Ensures working directory is clean
-2. **Version Detection**: Finds highest version among implementations
-3. **Version Calculation**: Bumps version based on user selection
-4. **User Confirmation**: Shows summary and asks for confirmation
-5. **Main Package**:
-   - Updates version in package.json
-   - Runs tests
-   - Builds package
-   - Publishes to npm (opens browser for 2FA)
-   - Waits for user to confirm authorization
-6. **Implementation Packages**:
-   - Updates vintasend dependency version
-   - Updates package version to match main package
-7. **Build & Publish Implementations**:
-   - Tests each package
-   - Builds each package
-   - Publishes to npm (within 5-minute 2FA window)
-8. **Git Commits**:
-   - First: Commits all implementation package.json changes (custom message)
-   - Second: Commits main package.json changes (custom message)
-
-## Safety Features
-
-- ✅ **Dry run mode**: Test without making changes
-- ✅ **Git status check**: Prevents releases with uncommitted changes
-- ✅ **2FA support**: Pauses for browser authorization, then uses 5-minute window
-- ✅ **Separate commit messages**: Different messages for main and implementations
-- ✅ **User confirmation**: Shows summary before proceeding
-- ✅ **Test before publish**: Runs tests for each package
-- ✅ **Error handling**: Catches and reports errors
-- ✅ **Colored output**: Clear visual feedback
-
-## Post-Release Steps
-
-After the automation completes:
-
-1. **Update CHANGELOG.md** (manual step)
-2. **Review commits**: Check the two commits created
-3. **Push to remote**:
-   ```bash
-   git push
-   ```
-
-## Troubleshooting
-
-### "Working directory is not clean"
-Commit or stash your changes before running the release script.
-
-### "Tests failed"
-The script will skip publishing packages that fail tests. Fix the tests and run the release again.
-
-### "Failed to publish"
-- Check you're logged in to npm: `npm whoami`
-- Check you have publish rights to the packages
-- Verify the version doesn't already exist on npm
-
-### Publishing Issues
-If the script fails mid-publish:
-- Main package might be published but not implementations (or vice versa)
-- Check npm to see which packages were published
-- You may need to manually publish remaining packages
-- The git commits are only made after all publishing succeeds
-
-## Examples
-
-### Example: Patch Release
-
-```bash
-$ npm run release:patch
-
-========================================
-  VintaSend Release Automation
-========================================
-
-[1] Checking git status...
-✓ Working directory is clean
-
-[2] Finding highest implementation version...
-ℹ Highest version: 0.4.14 (vintasend-medplum)
-
-[3] Determining version bump type...
-ℹ New version will be: 0.4.15 (patch bump)
-
-[4] Getting commit message...
-Commit message (press Enter for "Bump versions"):
-
-ℹ Commit message: "Bump versions"
-
-==================================================
-RELEASE SUMMARY
-==================================================
-New version:      0.4.15
-Bump type:        patch
-Commit message:   "Bump versions"
-==================================================
-
-Proceed with release? (yes/no): yes
-
-[6] Updating main package version...
-✓ Updated vintasend package.json to 0.4.15
-
-...
-```
-
-## Notes
-
-- The script excludes `vintasend-implementation-template` from releases
-- All implementations will be bumped to match the main package version
-- Both `dependencies` and `peerDependencies` are updated for vintasend
-- Each implementation is published independently
+- `vintasend-implementation-template` is never released: it lives inside this
+  repository, so GitHub never runs the `publish.yml` it carries for scaffolding.
+  It is still version-bumped, so packages generated from it start current.
+- The APIs and dashboards under `src/tools` have no `publish.yml`. They are
+  bumped, committed and pushed, but never tagged or published.
+- Lockfiles are not touched by the release scripts. If a publish workflow fails
+  on `npm ci` being out of sync, regenerate the lockfile from a clean install
+  and commit it before releasing.

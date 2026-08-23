@@ -1,91 +1,84 @@
 # VintaSend Release - Quick Reference
 
-## Two-Step Process
+Full details: [RELEASE_GUIDE.md](RELEASE_GUIDE.md)
 
-### Step 1: Bump Versions
+## The three steps
+
 ```bash
-npm run release:bump          # Interactive
-npm run release:bump:patch    # Direct patch
-npm run release:bump:minor    # Direct minor
+# 1. Bump every package.json in the workspace
+npm run release:bump:alpha        # or :patch / :minor / :major / :promote
+
+# 2. Write the release notes
+$EDITOR CHANGELOG.md
+
+# 3. Commit, push, tag and wait — one dependency wave at a time
+npm run release:tag -- --commit --dry-run   # preview first
+npm run release:tag -- --commit
 ```
 
-### Step 2: Update CHANGELOG.md
-Edit the file manually with release notes.
+Nothing is published from your machine: pushing `v<version>` triggers each
+repository's `publish.yml`, which publishes to npm through GitHub Actions.
 
-### Step 3: Publish
-```bash
-npm run release:publish
+## What happens
 
-# Skip specific implementation packages
-npm run release:publish -- --skip=vintasend-medplum,vintasend-ts-twilio
+**Step 1 — `release-bump.js`**
+1. ✓ Finds the highest version anywhere in the workspace
+2. ✓ Writes the new version into **every** package: root, `src/implementations/*`, `src/tools/*`, the template
+3. ✓ Rewrites **every** internal dependency range (not just `vintasend`), keeping `^` / `~` / pinned as it found it
+4. ✓ Saves `.release-state.json`
 
-# Skip root package
-npm run release:publish -- --skip-root
-```
+**Step 3 — `release-tag.js --commit`**, per dependency wave:
+1. ✓ Commits every repository in the wave
+2. ✓ Pushes the branch — only now, because everything it depends on is already on npm
+3. ✓ Re-runs preflight against the new commit
+4. ✓ Pushes `v<version>` and waits for npm (watching the run via `gh`)
 
-## What Happens
+Then, once every wave is live:
 
-**Step 1:**
-1. ✓ Finds highest version among implementations
-2. ✓ Bumps version (you choose patch or minor)
-3. ✓ Updates all package.json files
-4. ✓ Saves state for step 2
+5. ✓ Commits and pushes the repos that carry the version but publish nothing (APIs, dashboards)
+6. ✓ Commits and pushes the submodule pointers in the root repo
 
-**Step 2:**
-1. ✓ Tests and builds main package
-2. ✓ Commits main package (custom message, includes CHANGELOG.md)
-3. ✓ Publishes main package (2FA in browser)
-4. ✓ For each implementation:
-   - Prompts for custom commit message
-   - Tests and builds
-   - Commits (individual commit per package)
-   - Publishes (within 5-min 2FA window)
+## Why the order matters
 
-## What You Do After
+`ci.yml` and `publish.yml` both run `npm install`. Push a repository before its
+dependencies are on npm and the build fails every time — so nothing is pushed
+early.
 
-**After Step 1:**
-1. Review changes: `git diff`
-2. Update `CHANGELOG.md`
+## Two commits in the root repo
 
-**After Step 2:**
-1. Review commits: `git log`
-2. Push: `git push`
+The root repo is both the `vintasend` package and the superproject. Its release
+commit (wave 1) excludes the submodule pointers, because the submodules have not
+been committed yet; a final `chore: update submodule pointers…` commit records
+them. The tag stays on the release commit.
 
-## Current Versions
+## Handy flags
 
-- **Highest**: `vintasend-medplum@0.4.14`
-- **Next**: Will be `0.4.15` (patch) or `0.5.0` (minor)
+| Flag | Effect |
+| --- | --- |
+| `--dry-run` | Print the plan, change nothing |
+| `--yes` | No confirmation prompt |
+| `--only=a,b` / `--skip=a,b` | Pick packages (`root` = the root package) |
+| `--no-verify` | Skip husky hooks on the release commits |
+| `--settle=<sec>` | Pause after a wave goes live (default 20) |
+| `--timeout=<sec>` / `--poll=<sec>` | npm wait tuning |
 
 ## Safety
 
-- Git must be clean before starting
-- Dry-run mode available for testing
-- Confirmation prompt before publishing
-- Tests run before each publish
+- Re-running is safe: published packages, pushed tags and clean repos are skipped
+- Preflight blocks on a mismatched or already-used tag before anything is written
+- A failed publish workflow stops the run before the next wave
 
 ## Troubleshooting
 
-| Error | Solution |
-|-------|----------|
-| Working directory not clean | Commit changes first |
-| Tests failed | Fix tests before releasing |
-| Not logged in to npm | Run `npm login` |
-| Failed to publish | Check npm permissions |
-
-## Files Created
-
-- `scripts/release.js` - Main automation
-- `scripts/utils/*.js` - Helper utilities
-- `RELEASE_GUIDE.md` - Full documentation
-- `scripts/README.md` - (between step 1 and 2)
-- ✋ Provide commit message for each package
-- ✋ Review commits and changes
-- ✋ Push to remote
+| Problem | Fix |
+| --- | --- |
+| `HEAD is not an ancestor of origin/main` | Merge the release branch, or use `--allow-unpushed` knowingly |
+| `remote tag v… points at …, not HEAD` | That version is taken — bump again |
+| `workflow is waiting for approval` | Approve the `npm` environment run in GitHub |
+| `gh CLI not found` | Only disables fail-fast; polling still works |
+| Dependency range warning | Re-run `release:bump`, or fix the range by hand |
 
 ---
 
-**First time?** Run `npm run release:bump:patch` to see step 1 in action
-
----
-
-**First time?** Run `npm run release:dry-run` to see what happens!
+**First time?** Run `npm run release:tag -- --commit --dry-run` to see the whole
+plan without changing anything.
