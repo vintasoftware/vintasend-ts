@@ -13,9 +13,12 @@
  * `npm install` against the public registry — a dependent tagged too early
  * resolves a stale version (or fails outright).
  *
- * This script never commits, branches or pushes anything but tags. Release
- * commits are expected to be merged into each repository's default branch
- * already; preflight refuses to tag anything that isn't.
+ * By default this script never commits, branches or pushes anything but tags:
+ * release commits are expected to be merged into each repository's default
+ * branch already, and preflight refuses to tag anything that isn't. Pass
+ * `--commit` to have it stage and commit each working tree first (leaf packages
+ * before the root repository, so the root records their new submodule pointers)
+ * and push those commits, which is what the preflight checks then look for.
  *
  * It is safe to re-run: packages already published at the release version are
  * skipped, so an interrupted release resumes where it stopped.
@@ -98,6 +101,10 @@ Options:
   --no-watch          Don't use the gh CLI to fail fast on failed workflow runs
   --allow-dirty       Tag even if a repository has uncommitted changes
   --allow-unpushed    Tag even if HEAD is not merged into the remote default branch
+  --commit            Commit each repository's working tree before tagging
+  --commit-message=<msg>
+                      Message for those commits (default "Release <name>@<version>")
+  --no-push-commit    Create the --commit commits but don't push them
   --registry=<url>    npm registry to poll (default https://registry.npmjs.org/)
   --help, -h          Show this message
 `.trim();
@@ -113,6 +120,9 @@ function parseArgs(argv) {
     watch: true,
     allowDirty: false,
     allowUnpushed: false,
+    commit: false,
+    commitMessage: null,
+    pushCommit: true,
     registry: 'https://registry.npmjs.org/',
     help: false
   };
@@ -158,6 +168,21 @@ function parseArgs(argv) {
     }
     if (arg === '--allow-unpushed') {
       options.allowUnpushed = true;
+      continue;
+    }
+    if (arg === '--commit') {
+      options.commit = true;
+      continue;
+    }
+    if (arg === '--no-push-commit') {
+      options.pushCommit = false;
+      continue;
+    }
+
+    const commitMessage = takeValue('--commit-message');
+    if (commitMessage !== null) {
+      options.commitMessage = commitMessage;
+      options.commit = true;
       continue;
     }
 
@@ -244,6 +269,11 @@ function sleep(ms) {
 
 function commandExists(command) {
   return tryRun(`command -v ${command}`).success;
+}
+
+/** Quote a value for use as a single shell argument. */
+function shellQuote(value) {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 // ---------------------------------------------------------------------------
@@ -573,6 +603,65 @@ function checkDependencyRanges(packages) {
 }
 
 // ---------------------------------------------------------------------------
+// Commit
+// ---------------------------------------------------------------------------
+
+/**
+ * Stage and commit everything in a repository's working tree, then push it.
+ *
+ * Preflight wants a clean tree whose HEAD carries the release version and is an
+ * ancestor of the remote default branch, so a commit that stays local would only
+ * trade one blocking error for another — hence the push, unless the caller
+ * explicitly opted out with --no-push-commit.
+ *
+ * @returns {boolean} true when a new commit was created
+ */
+function commitWorkingTree(pkg, options) {
+  const status = tryRun('git status --porcelain', pkg.dir);
+  if (!status.success) {
+    throw new Error(`${pkg.name}: git status failed: ${status.stderr}`);
+  }
+  if (!status.output) {
+    logDetail(`${pkg.name}: working tree is clean`);
+    return false;
+  }
+
+  const entries = status.output.split('\n');
+
+  if (options.dryRun) {
+    logInfo(`[dry-run] would commit ${entries.length} change(s) in ${pkg.name}`);
+    entries.slice(0, 10).forEach(entry => logDetail(entry));
+    if (entries.length > 10) logDetail(`… and ${entries.length - 10} more`);
+    return false;
+  }
+
+  const branch = tryRun('git rev-parse --abbrev-ref HEAD', pkg.dir);
+  if (!branch.success || !branch.output || branch.output === 'HEAD') {
+    throw new Error(`${pkg.name}: cannot commit from a detached HEAD`);
+  }
+
+  run('git add -A', pkg.dir);
+  // `git add -A` can still stage nothing — everything dirty was ignored.
+  if (tryRun('git diff --cached --quiet', pkg.dir).success) {
+    logDetail(`${pkg.name}: nothing to stage`);
+    return false;
+  }
+
+  const message = options.commitMessage || `Release ${pkg.name}@${pkg.version}`;
+  run(`git commit -m ${shellQuote(message)}`, pkg.dir);
+  logSuccess(`${pkg.name}: committed ${entries.length} change(s) on ${branch.output}`);
+
+  if (options.pushCommit) {
+    run(`git push origin HEAD:refs/heads/${branch.output}`, pkg.dir);
+    logSuccess(`${pkg.name}: pushed ${branch.output} to origin`);
+  } else {
+    logWarning(`${pkg.name}: commit was not pushed — preflight will need --allow-unpushed`);
+  }
+
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // Tag and wait
 // ---------------------------------------------------------------------------
 
@@ -668,7 +757,7 @@ async function main() {
     log('  VintaSend Release - Tag & Watch', 'bright');
     log('========================================\n', 'bright');
     if (options.dryRun) {
-      logWarning('Dry run: no tags will be created or pushed');
+      logWarning('Dry run: nothing will be committed, tagged or pushed');
     }
 
     // Step 1: discover packages that publish through GitHub Actions
@@ -744,8 +833,49 @@ async function main() {
       }
     });
 
-    // Step 4: preflight every repository before touching any of them
-    logStep('4', 'Running preflight checks...');
+    // Step 4: optionally commit the working trees so preflight sees clean repos
+    if (options.commit) {
+      logStep('4', 'Committing working tree changes...');
+
+      // Leaves first, root last: committing a submodule moves the pointer the
+      // root repository records, and that change has to land in the root commit.
+      const commitOrder = [...waves].reverse().flat();
+      const dirty = commitOrder.filter(pkg => {
+        const status = tryRun('git status --porcelain', pkg.dir);
+        return status.success && status.output.length > 0;
+      });
+
+      if (dirty.length === 0) {
+        logSuccess('Every working tree is already clean — nothing to commit');
+      } else {
+        for (const pkg of dirty) {
+          const status = tryRun('git status --porcelain', pkg.dir);
+          logDetail(`${pkg.name}: ${status.output.split('\n').length} uncommitted change(s)`);
+        }
+
+        if (!options.yes && !options.dryRun) {
+          const verb = options.pushCommit ? 'Commit and push' : 'Commit';
+          const answer = await question(`\n${verb} these changes? (yes/no): `);
+          if (!['y', 'yes'].includes(answer.trim().toLowerCase())) {
+            logWarning('Aborted — nothing was committed');
+            return;
+          }
+        }
+
+        // Iterate the full order, not just `dirty`: the root repository usually
+        // only becomes dirty once its submodules have been committed.
+        let committed = 0;
+        for (const pkg of commitOrder) {
+          if (commitWorkingTree(pkg, options)) committed += 1;
+        }
+        if (!options.dryRun) {
+          logSuccess(`Committed ${committed} repository/repositories`);
+        }
+      }
+    }
+
+    // Step 5: preflight every repository before touching any of them
+    logStep('5', 'Running preflight checks...');
     const blocking = [];
     for (const pkg of selected) {
       const { errors, warnings } = preflightPackage(pkg, options);
@@ -777,6 +907,9 @@ async function main() {
     if (blocking.length > 0) {
       log('');
       logError(`${blocking.length} preflight problem(s) — nothing was tagged`);
+      if (options.dryRun && options.commit) {
+        logInfo('Dry run: --commit created no commits, so dirty/unpushed/version problems above are expected');
+      }
       process.exitCode = 1;
       return;
     }
@@ -793,8 +926,8 @@ async function main() {
       options.watch = false;
     }
 
-    // Step 5: confirm
-    logStep('5', 'Release plan');
+    // Step 6: confirm
+    logStep('6', 'Release plan');
     waves.forEach((wave, index) => {
       const todo = wave.filter(pkg => !pkg.alreadyPublished);
       if (todo.length === 0) return;
@@ -812,7 +945,7 @@ async function main() {
       }
     }
 
-    // Step 6: tag wave by wave, waiting for npm in between
+    // Step 7: tag wave by wave, waiting for npm in between
     const published = [];
     const skipped = [];
 
