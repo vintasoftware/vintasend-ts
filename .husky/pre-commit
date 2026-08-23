@@ -1,1 +1,1 @@
-npm run lint:implementations && npm run format:implementations
+npm run check:local:fix

@@ -28,6 +28,8 @@
     "lint:implementations": "node scripts/run-implementations-script.js lint",
     "format:implementations": "node scripts/run-implementations-script.js format",
     "test:implementations:local": "node scripts/test-implementations-local.js",
+    "check:local": "node scripts/check-all-local.js",
+    "check:local:fix": "node scripts/check-all-local.js --fix",
     "build:implementations:local": "node scripts/test-implementations-local.js --command=build",
     "release:prepare": "npm run format && npm test && npm run format:implementations && npm run test:implementations:local && npm run build:implementations:local",
     "release:bump": "node scripts/release-bump.js",
@@ -38,6 +40,8 @@
     "release:bump:alpha:major": "node scripts/release-bump.js --bump=alpha --alpha-base=major",
     "release:bump:promote": "node scripts/release-bump.js --bump=promote",
     "release:publish": "node scripts/release-publish.js",
+    "release:tag": "node scripts/release-tag.js",
+    "release:tag:dry": "node scripts/release-tag.js --dry-run",
     "prepare": "husky"
   },
   "devDependencies": {

@@ -31,6 +31,72 @@ Interactive mode:
 ### `release.js`
 Main orchestration script that handles the entire release process.
 
+### `release-tag.js`
+Publishes through GitHub Actions instead of from your machine. Pushes the git
+tags that trigger each repository's `publish.yml`, in dependency order.
+
+What it does:
+- Finds every package that has its own `.github/workflows/publish.yml` **and** is
+  the root of its own git repository (so `vintasend-implementation-template`,
+  which lives inside this repo, is excluded)
+- Groups them into waves: `vintasend` first, then everything depending only on
+  `vintasend`, then packages depending on those, and so on
+- Preflights each repo — clean tree, HEAD merged into the remote default branch,
+  committed `package.json` version matching the tag, no conflicting existing tag
+- Pushes `v<version>` for each package in a wave, then waits for npm to serve
+  that version before starting the next wave
+- Uses the `gh` CLI, when available, to fail fast if a publish workflow fails
+  rather than waiting out the timeout
+
+It never commits, branches or pushes anything except tags: the release commits
+are expected to be merged already. It is safe to re-run — packages already
+published at the release version are skipped, so an interrupted release resumes.
+
+```bash
+npm run release:tag:dry    # preflight everything, print the plan, push nothing
+npm run release:tag        # push tags and wait, wave by wave
+```
+
+Useful flags: `--only=`, `--skip=`, `--timeout=<sec>`, `--poll=<sec>`,
+`--no-watch`, `--allow-dirty`, `--allow-unpushed`, `--yes`. Run with `--help`
+for the full list.
+
+### `check-all-local.js`
+Runs the whole check suite across every package with all cross-package
+dependencies pointed at local sources.
+
+What it does:
+- Temporarily rewrites every dependency on another package in this repo to a
+  `file:` spec (including implementation-to-implementation dependencies, e.g.
+  `vintasend-medplum-template-manager` → `vintasend-managed-templates`)
+- Visits packages in dependency order, building each one before its dependents
+  so `tsc` can resolve types from the dependency's freshly built `dist/`
+- Runs `build`, `lint`, `format`, `typecheck` and `test` in each package,
+  preferring the package's own npm script and falling back to
+  `biome`/`prettier`/`tsc` where a script is missing
+- Keeps going after a failure and prints a pass/fail matrix at the end
+- Always restores the rewritten `package.json` files — on success, on failure,
+  and on Ctrl-C
+
+`format` runs in report-only mode by default, because every `format` script in
+this repo rewrites files (`biome check --write`, or `prettier --write` in the
+dashboards). Report-only uses the package's `format:check` script when it has
+one, else `biome format .` / `prettier --check .`. Pass `--fix` to run the
+package's own `format` script and let it write.
+
+```bash
+npm run check:local        # check everything, report formatting problems
+npm run check:local:fix    # same, but let format rewrite files
+```
+
+Useful flags: `--only=`, `--skip=`, `--checks=build,lint,format,typecheck,test`,
+`--bail`, `--no-install`, `--verbose`, `--include-template`, `--keep-links`.
+Run with `--help` for the full list.
+
+Compared to `test-implementations-local.js`, which runs a single npm script
+against a locally linked `vintasend`, this covers the whole dependency graph and
+every check in one pass.
+
 ### Utilities (`utils/`)
 - **version-finder.js**: Finds the highest version among implementation packages
 - **version-bumper.js**: Handles version bumping logic

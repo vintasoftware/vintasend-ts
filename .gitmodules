@@ -53,3 +53,15 @@
 	path = src/tools/vintasend-templates-management-api
 	url = git@github.com:vintasoftware/vintasend-ts-templates-management-api.git
 	branch = main
+[submodule "src/tools/vintasend-dashboard-core"]
+	path = src/tools/vintasend-dashboard-core
+	url = git@github.com:vintasoftware/vintasend-dashboard-core.git
+	branch = main
+[submodule "src/tools/vintasend-templates-management-dashboard-core"]
+	path = src/tools/vintasend-templates-management-dashboard-core
+	url = git@github.com:vintasoftware/vintasend-templates-management-dashboard-core.git
+	branch = main
+[submodule "src/tools/vintasend-templates-management-dashboard"]
+	path = src/tools/vintasend-templates-management-dashboard
+	url = git@github.com:vintasoftware/vintasend-templates-management-dashboard.git
+	branch = feat/templates-management-dashboard
