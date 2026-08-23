@@ -1,27 +1,34 @@
 #!/usr/bin/env node
 
 /**
- * Release step 2 (GitHub Actions flow): tag and wait.
+ * Release step 2 (GitHub Actions flow): commit, push, tag and wait.
  *
  * Instead of publishing from the local machine, this script pushes the git tags
  * that trigger each repository's `.github/workflows/publish.yml`, then waits for
  * npm to serve the new version before moving on.
  *
- * Packages are released in dependency waves: the root `vintasend` package first,
+ * Everything happens in dependency waves: the root `vintasend` package first,
  * then every package whose vintasend dependencies are all published, and so on
- * until nothing is left. That ordering matters because each publish workflow runs
- * `npm install` against the public registry — a dependent tagged too early
- * resolves a stale version (or fails outright).
+ * until nothing is left. A repository is only pushed once every workspace
+ * package it depends on is already on npm. That ordering is what keeps CI
+ * green: both `ci.yml` (on the branch push) and `publish.yml` (on the tag push)
+ * run `npm install`, so a repository pushed too early resolves a version that
+ * does not exist yet and fails every time.
  *
- * By default this script never commits, branches or pushes anything but tags:
- * release commits are expected to be merged into each repository's default
- * branch already, and preflight refuses to tag anything that isn't. Pass
- * `--commit` to have it stage and commit each working tree first (leaf packages
- * before the root repository, so the root records their new submodule pointers)
- * and push those commits, which is what the preflight checks then look for.
+ * With `--commit` the script also creates the release commits, in the same wave
+ * order. Two repositories need special handling there:
+ *
+ *   - The root repository is both the `vintasend` package and the superproject
+ *     holding every submodule. Its release commit deliberately excludes the
+ *     submodule pointers, because at that moment the submodules have not been
+ *     committed yet. A final commit at the end of the run syncs the pointers.
+ *   - The APIs and dashboards under `src/tools` carry the release version but
+ *     publish nothing (no publish.yml). They are committed and pushed after
+ *     every published package is live.
  *
  * It is safe to re-run: packages already published at the release version are
- * skipped, so an interrupted release resumes where it stopped.
+ * skipped, and repositories with nothing to commit are left alone, so an
+ * interrupted release resumes where it stopped.
  */
 
 import readline from 'node:readline';
@@ -30,16 +37,17 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 
-import { readPackageJson } from './utils/package-updater.js';
+import {
+  discoverWorkspacePackages,
+  internalPackageNames,
+  buildDependencyGraph,
+  buildWaves
+} from './utils/workspace-packages.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Paths
 const rootDir = path.join(__dirname, '..');
-const implementationsDir = path.join(rootDir, 'src', 'implementations');
-const toolsDir = path.join(rootDir, 'src', 'tools');
-
-const DEPENDENCY_FIELDS = ['dependencies', 'peerDependencies', 'devDependencies'];
 
 // Colors for console output
 const colors = {
@@ -88,23 +96,28 @@ function logDetail(message) {
 const HELP = `
 Usage: node scripts/release-tag.js [options]
 
-Pushes the release tags that trigger each package's publish.yml workflow, in
-dependency order, waiting for npm to serve each wave before tagging the next.
+Walks the workspace in dependency order and, one wave at a time, pushes the
+release tags that trigger each package's publish.yml workflow, waiting for npm
+to serve the wave before touching the next one.
 
 Options:
   --only=a,b          Only release these packages (by npm name or directory name)
   --skip=a,b          Skip these packages (by npm name or directory name)
-  --dry-run           Run every check and print the plan, but push no tags
-  --yes, -y           Don't ask for confirmation before pushing tags
+  --dry-run           Run every check and print the plan, but change nothing
+  --yes, -y           Don't ask for confirmation
+  --commit            Commit and push each repository's release commit as its wave runs
+  --commit-message=<msg>
+                      Message for those commits (default "Release <name>@<version>")
+  --no-verify         Pass --no-verify to git commit (skip husky hooks)
+  --no-push-commit    Create the --commit commits but don't push them (implies --allow-unpushed)
+  --no-companions     Don't commit/push the repositories that publish nothing
+  --no-submodule-sync Don't make the final submodule-pointer commit in the root repo
   --timeout=<sec>     How long to wait for a package to appear on npm (default 1800)
   --poll=<sec>        Seconds between npm checks (default 15)
+  --settle=<sec>      Pause after a wave is live, before pushing the next (default 20)
   --no-watch          Don't use the gh CLI to fail fast on failed workflow runs
   --allow-dirty       Tag even if a repository has uncommitted changes
   --allow-unpushed    Tag even if HEAD is not merged into the remote default branch
-  --commit            Commit each repository's working tree before tagging
-  --commit-message=<msg>
-                      Message for those commits (default "Release <name>@<version>")
-  --no-push-commit    Create the --commit commits but don't push them
   --registry=<url>    npm registry to poll (default https://registry.npmjs.org/)
   --help, -h          Show this message
 `.trim();
@@ -115,14 +128,18 @@ function parseArgs(argv) {
     skip: new Set(),
     dryRun: false,
     yes: false,
+    commit: false,
+    commitMessage: null,
+    noVerify: false,
+    pushCommit: true,
+    companions: true,
+    submoduleSync: true,
     timeoutSeconds: 1800,
     pollSeconds: 15,
+    settleSeconds: 20,
     watch: true,
     allowDirty: false,
     allowUnpushed: false,
-    commit: false,
-    commitMessage: null,
-    pushCommit: true,
     registry: 'https://registry.npmjs.org/',
     help: false
   };
@@ -133,6 +150,22 @@ function parseArgs(argv) {
       .map(item => item.trim())
       .filter(Boolean)
       .forEach(item => target.add(item));
+  };
+
+  const FLAGS = {
+    '--help': () => { options.help = true; },
+    '-h': () => { options.help = true; },
+    '--dry-run': () => { options.dryRun = true; },
+    '--yes': () => { options.yes = true; },
+    '-y': () => { options.yes = true; },
+    '--no-watch': () => { options.watch = false; },
+    '--allow-dirty': () => { options.allowDirty = true; },
+    '--allow-unpushed': () => { options.allowUnpushed = true; },
+    '--commit': () => { options.commit = true; },
+    '--no-verify': () => { options.noVerify = true; },
+    '--no-push-commit': () => { options.pushCommit = false; },
+    '--no-companions': () => { options.companions = false; },
+    '--no-submodule-sync': () => { options.submoduleSync = false; }
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -146,36 +179,8 @@ function parseArgs(argv) {
       return null;
     };
 
-    if (arg === '--help' || arg === '-h') {
-      options.help = true;
-      continue;
-    }
-    if (arg === '--dry-run') {
-      options.dryRun = true;
-      continue;
-    }
-    if (arg === '--yes' || arg === '-y') {
-      options.yes = true;
-      continue;
-    }
-    if (arg === '--no-watch') {
-      options.watch = false;
-      continue;
-    }
-    if (arg === '--allow-dirty') {
-      options.allowDirty = true;
-      continue;
-    }
-    if (arg === '--allow-unpushed') {
-      options.allowUnpushed = true;
-      continue;
-    }
-    if (arg === '--commit') {
-      options.commit = true;
-      continue;
-    }
-    if (arg === '--no-push-commit') {
-      options.pushCommit = false;
+    if (FLAGS[arg]) {
+      FLAGS[arg]();
       continue;
     }
 
@@ -210,6 +215,12 @@ function parseArgs(argv) {
       continue;
     }
 
+    const settle = takeValue('--settle');
+    if (settle !== null) {
+      options.settleSeconds = Number(settle);
+      continue;
+    }
+
     const registry = takeValue('--registry');
     if (registry !== null) {
       options.registry = registry;
@@ -224,6 +235,16 @@ function parseArgs(argv) {
   }
   if (!Number.isFinite(options.pollSeconds) || options.pollSeconds <= 0) {
     throw new Error('--poll must be a positive number of seconds');
+  }
+  if (!Number.isFinite(options.settleSeconds) || options.settleSeconds < 0) {
+    throw new Error('--settle must be zero or a positive number of seconds');
+  }
+
+  // A commit that is never pushed can't be an ancestor of the remote default
+  // branch, so the ancestor check would block every tag. Relax it rather than
+  // failing halfway through the run.
+  if (options.commit && !options.pushCommit) {
+    options.allowUnpushed = true;
   }
 
   return options;
@@ -273,30 +294,12 @@ function commandExists(command) {
 
 /** Quote a value for use as a single shell argument. */
 function shellQuote(value) {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
 // ---------------------------------------------------------------------------
 // Package discovery
 // ---------------------------------------------------------------------------
-
-function listSubdirectories(dir) {
-  if (!fs.existsSync(dir)) return [];
-  return fs
-    .readdirSync(dir, { withFileTypes: true })
-    .filter(dirent => dirent.isDirectory())
-    .map(dirent => path.join(dir, dirent.name));
-}
-
-function isGitRepositoryRoot(dir) {
-  const result = tryRun('git rev-parse --show-toplevel', dir);
-  if (!result.success) return false;
-  try {
-    return fs.realpathSync(result.output) === fs.realpathSync(dir);
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Turn a git remote URL into an `owner/repo` slug, or null for non-GitHub remotes.
@@ -308,111 +311,25 @@ function parseGitHubSlug(remoteUrl) {
 }
 
 /**
- * Find every package that releases through its own publish.yml workflow.
+ * Every workspace package, annotated with the git facts the release needs.
  *
- * A package qualifies when it has a package.json, is not private, ships
- * `.github/workflows/publish.yml`, and is the root of its own git repository.
- * That last condition is what excludes `vintasend-implementation-template`:
- * it lives inside this repository, so GitHub never runs the workflow file it
- * carries for scaffolding purposes, and it has no tag namespace of its own.
+ * Packages split into three roles:
+ *   - `publishable`: own repository + publish.yml → gets a tag and a wait
+ *   - companions: own repository, no publish.yml (the APIs and dashboards) →
+ *     committed and pushed, never tagged
+ *   - the implementation template: lives inside the root repository, so its
+ *     changes ride along in the root commit
  */
 function discoverPackages() {
-  const candidates = [rootDir, ...listSubdirectories(implementationsDir), ...listSubdirectories(toolsDir)];
-  const packages = [];
-
-  for (const dir of candidates) {
-    const packageJsonPath = path.join(dir, 'package.json');
-    if (!fs.existsSync(packageJsonPath)) continue;
-    if (!fs.existsSync(path.join(dir, '.github', 'workflows', 'publish.yml'))) continue;
-    if (!isGitRepositoryRoot(dir)) continue;
-
-    const packageJson = readPackageJson(packageJsonPath);
-    if (packageJson.private) continue;
-
-    const remote = tryRun('git remote get-url origin', dir);
-
-    packages.push({
-      name: packageJson.name,
-      dirName: path.basename(dir),
-      dir,
-      isRoot: dir === rootDir,
-      version: packageJson.version,
-      tag: `v${packageJson.version}`,
-      packageJson,
-      repoSlug: remote.success ? parseGitHubSlug(remote.output) : null
-    });
-  }
-
-  return packages;
-}
-
-/**
- * Map each package to the released packages it depends on.
- *
- * devDependencies count: the publish workflow runs `npm install` followed by
- * `npm test`, so a package's dev-only dependency on another released package
- * still has to exist on the registry before its workflow can succeed.
- */
-function buildDependencyGraph(packages) {
-  const releasedNames = new Set(packages.map(pkg => pkg.name));
+  const packages = discoverWorkspacePackages(rootDir);
 
   for (const pkg of packages) {
-    const dependencies = new Map();
-
-    for (const field of DEPENDENCY_FIELDS) {
-      const declared = pkg.packageJson[field];
-      if (!declared) continue;
-
-      for (const [depName, range] of Object.entries(declared)) {
-        if (depName === pkg.name) continue;
-        if (!releasedNames.has(depName)) continue;
-        if (!dependencies.has(depName)) {
-          dependencies.set(depName, []);
-        }
-        dependencies.get(depName).push({ field, range });
-      }
-    }
-
-    pkg.dependencies = dependencies;
+    pkg.tag = `v${pkg.version}`;
+    const remote = pkg.isGitRoot ? tryRun('git remote get-url origin', pkg.dir) : { success: false };
+    pkg.repoSlug = remote.success ? parseGitHubSlug(remote.output) : null;
   }
 
   return packages;
-}
-
-/**
- * Group packages into waves: everything in wave N can be tagged in parallel once
- * every wave before it is on npm.
- */
-function buildWaves(packages) {
-  const byName = new Map(packages.map(pkg => [pkg.name, pkg]));
-  const remaining = new Set(packages.map(pkg => pkg.name));
-  const settled = new Set();
-  const waves = [];
-
-  while (remaining.size > 0) {
-    const wave = [];
-
-    for (const name of remaining) {
-      const pkg = byName.get(name);
-      const pending = [...pkg.dependencies.keys()].filter(dep => remaining.has(dep) && !settled.has(dep));
-      if (pending.length === 0) wave.push(pkg);
-    }
-
-    if (wave.length === 0) {
-      throw new Error(
-        `Dependency cycle between released packages: ${[...remaining].sort().join(', ')}`
-      );
-    }
-
-    wave.sort((a, b) => (a.isRoot === b.isRoot ? a.name.localeCompare(b.name) : a.isRoot ? -1 : 1));
-    for (const pkg of wave) {
-      remaining.delete(pkg.name);
-      settled.add(pkg.name);
-    }
-    waves.push(wave);
-  }
-
-  return waves;
 }
 
 // ---------------------------------------------------------------------------
@@ -468,6 +385,201 @@ function getWorkflowRun(pkg) {
 }
 
 // ---------------------------------------------------------------------------
+// Commit and push
+// ---------------------------------------------------------------------------
+
+/**
+ * The submodule paths recorded in a repository's .gitmodules.
+ */
+function getSubmodulePaths(dir) {
+  const result = tryRun('git config --file .gitmodules --get-regexp "^submodule\\..*\\.path$"', dir);
+  if (!result.success || !result.output) return [];
+  return result.output
+    .split('\n')
+    .map(line => line.split(/\s+/).slice(1).join(' ').trim())
+    .filter(Boolean)
+    .sort();
+}
+
+function currentBranch(dir) {
+  const branch = tryRun('git rev-parse --abbrev-ref HEAD', dir);
+  if (!branch.success || !branch.output || branch.output === 'HEAD') return null;
+  return branch.output;
+}
+
+function workingTreeEntries(dir) {
+  const status = tryRun('git status --porcelain', dir);
+  if (!status.success) return null;
+  return status.output ? status.output.split('\n') : [];
+}
+
+/**
+ * The working tree changes that actually block a release.
+ *
+ * `--ignore-submodules=all` drops the gitlink entries, which is what makes the
+ * root repository releasable: its submodule pointers move as each submodule is
+ * committed during this very run, and they are recorded by the final sync
+ * commit. They never affect what the root package publishes either way.
+ */
+function releaseDirtyEntries(dir) {
+  const status = tryRun('git status --porcelain --ignore-submodules=all', dir);
+  if (!status.success) return null;
+  return status.output ? status.output.split('\n') : [];
+}
+
+/** `git diff --cached --quiet` exits non-zero exactly when something is staged. */
+function hasStagedChanges(dir) {
+  return !tryRun('git diff --cached --quiet', dir).success;
+}
+
+/**
+ * Stage and commit a repository's working tree.
+ *
+ * @param {object} pkg
+ * @param {object} options
+ * @param {{message?: string, pathspec?: string, describe?: string}} [config]
+ * @returns {boolean} true when a commit was created
+ */
+function commitRepository(pkg, options, config = {}) {
+  const dir = pkg.dir;
+  const entries = workingTreeEntries(dir);
+  if (entries === null) throw new Error(`${pkg.name}: git status failed`);
+  if (entries.length === 0) return false;
+
+  const pathspec = config.pathspec || '-A -- .';
+  const message = config.message || options.commitMessage || `Release ${pkg.name}@${pkg.version}`;
+
+  if (options.dryRun) {
+    logInfo(`[dry-run] would commit in ${pkg.relPath}: "${message}"`);
+    entries.slice(0, 8).forEach(entry => logDetail(entry));
+    if (entries.length > 8) logDetail(`… and ${entries.length - 8} more`);
+    return false;
+  }
+
+  if (!currentBranch(dir)) {
+    throw new Error(`${pkg.name}: cannot commit from a detached HEAD`);
+  }
+
+  run(`git add ${pathspec}`, dir);
+  if (!hasStagedChanges(dir)) {
+    logDetail(`${pkg.name}: nothing to stage${config.describe ? ` (${config.describe})` : ''}`);
+    return false;
+  }
+
+  const verify = options.noVerify ? '--no-verify ' : '';
+  run(`git commit ${verify}-m ${shellQuote(message)}`, dir);
+  logSuccess(`${pkg.name}: committed "${message}"`);
+  return true;
+}
+
+/**
+ * Push the current branch. This is the step whose timing matters: it starts the
+ * repository's CI run, so it must not happen before the packages it depends on
+ * are on npm.
+ *
+ * @returns {boolean} true when something was pushed
+ */
+function pushBranch(pkg, options) {
+  if (!options.pushCommit) {
+    logWarning(`${pkg.name}: --no-push-commit, leaving the branch local`);
+    return false;
+  }
+
+  const branch = currentBranch(pkg.dir);
+  if (!branch) throw new Error(`${pkg.name}: cannot push from a detached HEAD`);
+
+  // Checked before "is anything to push": a dry run never made the commit, so
+  // reporting the branch as up to date would hide what the real run would do.
+  if (options.dryRun) {
+    logInfo(`[dry-run] would push ${branch} to ${pkg.repoSlug || 'origin'}`);
+    return false;
+  }
+
+  const ahead = tryRun(`git rev-list --count origin/${branch}..HEAD`, pkg.dir);
+  if (ahead.success && ahead.output === '0') {
+    logDetail(`${pkg.name}: ${branch} already matches origin`);
+    return false;
+  }
+
+  run(`git push origin HEAD:refs/heads/${branch}`, pkg.dir);
+  logSuccess(`${pkg.name}: pushed ${branch} to ${pkg.repoSlug || 'origin'}`);
+  return true;
+}
+
+/**
+ * Commit and push one repository's release commit.
+ *
+ * The root repository excludes its submodule pointers: when its wave runs the
+ * submodules have not been committed yet, so staging them would record stale
+ * pointers and force a second corrective commit. `syncSubmodulePointers` picks
+ * them up once every submodule is done.
+ */
+function commitAndPush(pkg, options) {
+  let pathspec = '-A -- .';
+  let describe;
+
+  if (pkg.isRoot) {
+    const submodules = getSubmodulePaths(pkg.dir);
+    if (submodules.length > 0) {
+      pathspec = `-A -- . ${submodules.map(sub => shellQuote(`:(exclude)${sub}`)).join(' ')}`;
+      describe = 'submodule pointers are committed at the end of the run';
+    }
+  }
+
+  const committed = commitRepository(pkg, options, { pathspec, describe });
+  const pushed = pushBranch(pkg, options);
+  return { committed, pushed };
+}
+
+/**
+ * Record the submodule commits made during this release in the root repository.
+ *
+ * This is the second root commit the old flow needed by hand: every submodule
+ * release commit moves the pointer the superproject stores, and those moves are
+ * only knowable once the submodules have been committed.
+ */
+function submodulePointerEntries(pkg) {
+  const submodules = getSubmodulePaths(pkg.dir);
+  if (submodules.length === 0) return [];
+
+  const moved = tryRun(`git status --porcelain -- ${submodules.map(shellQuote).join(' ')}`, pkg.dir);
+  if (!moved.success) throw new Error(`${pkg.name}: git status failed while checking submodule pointers`);
+  return moved.output ? moved.output.split('\n') : [];
+}
+
+function syncSubmodulePointers(rootPkg, options, version) {
+  const submodules = getSubmodulePaths(rootPkg.dir);
+  if (submodules.length === 0) return false;
+
+  const paths = submodules.map(shellQuote).join(' ');
+  const moved = submodulePointerEntries(rootPkg);
+  if (moved.length === 0) {
+    logSuccess('Submodule pointers are already up to date');
+    return false;
+  }
+
+  for (const entry of moved) logDetail(entry);
+
+  const message = `chore: update submodule pointers for v${version}`;
+  if (options.dryRun) {
+    logInfo(`[dry-run] would commit in the root repo: "${message}"`);
+    return false;
+  }
+
+  run(`git add -- ${paths}`, rootPkg.dir);
+  if (!hasStagedChanges(rootPkg.dir)) {
+    logDetail('root: nothing to stage for the submodule pointers');
+    return false;
+  }
+
+  const verify = options.noVerify ? '--no-verify ' : '';
+  run(`git commit ${verify}-m ${shellQuote(message)}`, rootPkg.dir);
+  logSuccess(`root: committed "${message}"`);
+  pushBranch(rootPkg, options);
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // Preflight
 // ---------------------------------------------------------------------------
 
@@ -490,11 +602,29 @@ function getRemoteDefaultBranchRef(dir) {
 
 /**
  * Verify a package can be tagged, and gather the facts the plan needs.
- * Fatal problems land in `errors`; recoverable ones in `warnings`.
+ *
+ * Fatal problems land in `errors`, recoverable ones in `warnings`. With
+ * `fixable` set — the pre-check pass of a `--commit` run — the three problems
+ * that the commit step is about to resolve (a dirty tree, a version that is
+ * only in the working tree, a HEAD that is not on the remote yet) are reported
+ * as pending work instead of blocking the run before it starts.
+ *
+ * @param {object} pkg
+ * @param {object} options
+ * @param {{fixable?: boolean}} [mode]
  */
-function preflightPackage(pkg, options) {
+function preflightPackage(pkg, options, mode = {}) {
   const errors = [];
   const warnings = [];
+  const pending = [];
+
+  const willFix = Boolean(mode.fixable && options.commit);
+  const report = (message, hint) => {
+    if (willFix) pending.push(message);
+    else if (hint === 'dirty' && options.allowDirty) warnings.push(message);
+    else if (hint === 'unpushed' && options.allowUnpushed) warnings.push(message);
+    else errors.push(message);
+  };
 
   if (!pkg.repoSlug) {
     warnings.push('origin is not a GitHub remote — workflow runs cannot be watched');
@@ -505,22 +635,20 @@ function preflightPackage(pkg, options) {
     warnings.push(`git fetch origin failed: ${fetch.stderr.split('\n')[0]}`);
   }
 
-  const status = tryRun('git status --porcelain', pkg.dir);
-  if (!status.success) {
-    errors.push(`git status failed: ${status.stderr}`);
-    return { errors, warnings };
+  const entries = releaseDirtyEntries(pkg.dir);
+  if (entries === null) {
+    errors.push('git status failed');
+    return { errors, warnings, pending };
   }
-  const dirty = status.output.length > 0;
-  if (dirty) {
-    const message = `working tree has uncommitted changes (${status.output.split('\n').length} entries)`;
-    if (options.allowDirty) warnings.push(message);
-    else errors.push(`${message} — commit and merge them, or pass --allow-dirty`);
+  if (entries.length > 0) {
+    report(`working tree has uncommitted changes (${entries.length} entries)` +
+      (willFix ? '' : ' — commit and merge them, or pass --allow-dirty'), 'dirty');
   }
 
   const headSha = tryRun('git rev-parse HEAD', pkg.dir);
   if (!headSha.success) {
     errors.push('could not resolve HEAD');
-    return { errors, warnings };
+    return { errors, warnings, pending };
   }
   pkg.headSha = headSha.output;
 
@@ -537,9 +665,10 @@ function preflightPackage(pkg, options) {
       errors.push('HEAD package.json is not valid JSON');
     }
     if (committedVersion && committedVersion !== pkg.version) {
-      errors.push(
-        `HEAD package.json is version ${committedVersion} but the working tree says ${pkg.version} — ` +
-          'commit the version bump before tagging'
+      report(
+        `HEAD package.json is version ${committedVersion} but the working tree says ${pkg.version}` +
+          (willFix ? '' : ' — commit the version bump before tagging'),
+        'dirty'
       );
     }
   }
@@ -550,9 +679,11 @@ function preflightPackage(pkg, options) {
   pkg.remoteRef = remoteRef;
   const merged = tryRun(`git merge-base --is-ancestor ${pkg.headSha} ${remoteRef}`, pkg.dir);
   if (!merged.success) {
-    const message = `HEAD is not an ancestor of ${remoteRef} — push/merge the release commit first`;
-    if (options.allowUnpushed) warnings.push(message);
-    else errors.push(`${message} (or pass --allow-unpushed)`);
+    report(
+      `HEAD is not an ancestor of ${remoteRef}` +
+        (willFix ? '' : ' — push/merge the release commit first (or pass --allow-unpushed)'),
+      'unpushed'
+    );
   }
 
   const localTag = tryRun(`git rev-parse --quiet --verify refs/tags/${pkg.tag}`, pkg.dir);
@@ -561,14 +692,20 @@ function preflightPackage(pkg, options) {
   const remoteTag = tryRun(`git ls-remote --tags origin refs/tags/${pkg.tag}`, pkg.dir);
   pkg.remoteTagSha = remoteTag.success && remoteTag.output ? remoteTag.output.split(/\s+/)[0] : null;
 
-  if (pkg.localTagSha && pkg.localTagSha !== pkg.headSha) {
+  // A tag that already exists somewhere else is never fixable by committing:
+  // the release version has already been used for a different commit.
+  if (pkg.localTagSha && pkg.localTagSha !== pkg.headSha && !willFix) {
     errors.push(`local tag ${pkg.tag} points at ${pkg.localTagSha.slice(0, 8)}, not HEAD`);
   }
   if (pkg.remoteTagSha && pkg.remoteTagSha !== pkg.headSha) {
-    errors.push(`remote tag ${pkg.tag} already points at ${pkg.remoteTagSha.slice(0, 8)}, not HEAD`);
+    const message = `remote tag ${pkg.tag} already points at ${pkg.remoteTagSha.slice(0, 8)}, not HEAD`;
+    // Under --commit the local HEAD is about to move, so only a remote tag that
+    // is already published is worth stopping for at pre-check time.
+    if (willFix) warnings.push(`${message} (it will have to match after the release commit)`);
+    else errors.push(message);
   }
 
-  return { errors, warnings };
+  return { errors, warnings, pending };
 }
 
 /**
@@ -600,65 +737,6 @@ function checkDependencyRanges(packages) {
   }
 
   return warnings;
-}
-
-// ---------------------------------------------------------------------------
-// Commit
-// ---------------------------------------------------------------------------
-
-/**
- * Stage and commit everything in a repository's working tree, then push it.
- *
- * Preflight wants a clean tree whose HEAD carries the release version and is an
- * ancestor of the remote default branch, so a commit that stays local would only
- * trade one blocking error for another — hence the push, unless the caller
- * explicitly opted out with --no-push-commit.
- *
- * @returns {boolean} true when a new commit was created
- */
-function commitWorkingTree(pkg, options) {
-  const status = tryRun('git status --porcelain', pkg.dir);
-  if (!status.success) {
-    throw new Error(`${pkg.name}: git status failed: ${status.stderr}`);
-  }
-  if (!status.output) {
-    logDetail(`${pkg.name}: working tree is clean`);
-    return false;
-  }
-
-  const entries = status.output.split('\n');
-
-  if (options.dryRun) {
-    logInfo(`[dry-run] would commit ${entries.length} change(s) in ${pkg.name}`);
-    entries.slice(0, 10).forEach(entry => logDetail(entry));
-    if (entries.length > 10) logDetail(`… and ${entries.length - 10} more`);
-    return false;
-  }
-
-  const branch = tryRun('git rev-parse --abbrev-ref HEAD', pkg.dir);
-  if (!branch.success || !branch.output || branch.output === 'HEAD') {
-    throw new Error(`${pkg.name}: cannot commit from a detached HEAD`);
-  }
-
-  run('git add -A', pkg.dir);
-  // `git add -A` can still stage nothing — everything dirty was ignored.
-  if (tryRun('git diff --cached --quiet', pkg.dir).success) {
-    logDetail(`${pkg.name}: nothing to stage`);
-    return false;
-  }
-
-  const message = options.commitMessage || `Release ${pkg.name}@${pkg.version}`;
-  run(`git commit -m ${shellQuote(message)}`, pkg.dir);
-  logSuccess(`${pkg.name}: committed ${entries.length} change(s) on ${branch.output}`);
-
-  if (options.pushCommit) {
-    run(`git push origin HEAD:refs/heads/${branch.output}`, pkg.dir);
-    logSuccess(`${pkg.name}: pushed ${branch.output} to origin`);
-  } else {
-    logWarning(`${pkg.name}: commit was not pushed — preflight will need --allow-unpushed`);
-  }
-
-  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -754,44 +832,61 @@ async function main() {
 
   try {
     log('\n========================================', 'bright');
-    log('  VintaSend Release - Tag & Watch', 'bright');
+    log('  VintaSend Release - Commit, Tag & Watch', 'bright');
     log('========================================\n', 'bright');
     if (options.dryRun) {
       logWarning('Dry run: nothing will be committed, tagged or pushed');
     }
 
-    // Step 1: discover packages that publish through GitHub Actions
-    logStep('1', 'Discovering packages with a publish.yml workflow...');
-    const discovered = buildDependencyGraph(discoverPackages());
+    // Step 1: discover the workspace
+    logStep('1', 'Discovering workspace packages...');
+    const workspace = discoverPackages();
+    const internalNames = internalPackageNames(workspace);
+    buildDependencyGraph(workspace, internalNames);
+
+    const discovered = workspace.filter(pkg => pkg.publishable);
+    const allCompanions = workspace.filter(pkg => !pkg.publishable && !pkg.isTemplate && pkg.isGitRoot);
+    const rootPkg = workspace.find(pkg => pkg.isRoot);
+
     if (discovered.length === 0) {
       logError('No releasable packages found');
       process.exitCode = 1;
       return;
     }
     for (const pkg of discovered) {
-      logDetail(`${pkg.name}@${pkg.version} (${path.relative(rootDir, pkg.dir) || '.'})`);
+      logDetail(`${pkg.name}@${pkg.version} (${pkg.relPath})`);
     }
-    logSuccess(`Found ${discovered.length} packages`);
+    logSuccess(`Found ${discovered.length} publishable packages`);
+    if (allCompanions.length > 0) {
+      logInfo(`${allCompanions.length} repositories carry the version but publish nothing:`);
+      for (const pkg of allCompanions) logDetail(`${pkg.name}@${pkg.version} (${pkg.relPath})`);
+    }
 
     // Step 2: apply --only / --skip
     logStep('2', 'Applying selection filters...');
     const matches = (pkg, names) => names.has(pkg.name) || names.has(pkg.dirName) ||
       (pkg.isRoot && (names.has('root') || names.has('main')));
 
-    const knownNames = new Set(['root', 'main', ...discovered.flatMap(pkg => [pkg.name, pkg.dirName])]);
+    const knownNames = new Set([
+      'root',
+      'main',
+      ...workspace.flatMap(pkg => [pkg.name, pkg.dirName])
+    ]);
     for (const name of [...options.only, ...options.skip]) {
       if (!knownNames.has(name)) logWarning(`Unknown package name in filters: ${name}`);
     }
 
-    let selected = discovered;
-    if (options.only.size > 0) {
-      selected = selected.filter(pkg => matches(pkg, options.only));
-    }
-    if (options.skip.size > 0) {
-      selected = selected.filter(pkg => !matches(pkg, options.skip));
-    }
+    const applyFilters = list => {
+      let result = list;
+      if (options.only.size > 0) result = result.filter(pkg => matches(pkg, options.only));
+      if (options.skip.size > 0) result = result.filter(pkg => !matches(pkg, options.skip));
+      return result;
+    };
+
+    const selected = applyFilters(discovered);
+    const companions = options.companions ? applyFilters(allCompanions) : [];
     if (selected.length === 0) {
-      logError('Every package was filtered out');
+      logError('Every publishable package was filtered out');
       process.exitCode = 1;
       return;
     }
@@ -805,13 +900,14 @@ async function main() {
     // otherwise the skipped package's workflow would install a stale version.
     const selectedNames = new Set(selected.map(pkg => pkg.name));
     const excludedDependencies = [];
-    for (const pkg of selected) {
+    for (const pkg of [...selected, ...companions]) {
       for (const depName of pkg.dependencies.keys()) {
         if (!selectedNames.has(depName)) excludedDependencies.push({ pkg, depName });
       }
     }
     for (const { pkg, depName } of excludedDependencies) {
-      const dep = discovered.find(candidate => candidate.name === depName);
+      const dep = workspace.find(candidate => candidate.name === depName);
+      if (!dep) continue;
       const { published } = isVersionPublished(dep, options);
       if (published) {
         logDetail(`${depName}@${dep.version} is excluded but already published`);
@@ -832,53 +928,15 @@ async function main() {
         if (deps.length > 0) logDetail(`  ${pkg.name} waits for ${deps.join(', ')}`);
       }
     });
-
-    // Step 4: optionally commit the working trees so preflight sees clean repos
-    if (options.commit) {
-      logStep('4', 'Committing working tree changes...');
-
-      // Leaves first, root last: committing a submodule moves the pointer the
-      // root repository records, and that change has to land in the root commit.
-      const commitOrder = [...waves].reverse().flat();
-      const dirty = commitOrder.filter(pkg => {
-        const status = tryRun('git status --porcelain', pkg.dir);
-        return status.success && status.output.length > 0;
-      });
-
-      if (dirty.length === 0) {
-        logSuccess('Every working tree is already clean — nothing to commit');
-      } else {
-        for (const pkg of dirty) {
-          const status = tryRun('git status --porcelain', pkg.dir);
-          logDetail(`${pkg.name}: ${status.output.split('\n').length} uncommitted change(s)`);
-        }
-
-        if (!options.yes && !options.dryRun) {
-          const verb = options.pushCommit ? 'Commit and push' : 'Commit';
-          const answer = await question(`\n${verb} these changes? (yes/no): `);
-          if (!['y', 'yes'].includes(answer.trim().toLowerCase())) {
-            logWarning('Aborted — nothing was committed');
-            return;
-          }
-        }
-
-        // Iterate the full order, not just `dirty`: the root repository usually
-        // only becomes dirty once its submodules have been committed.
-        let committed = 0;
-        for (const pkg of commitOrder) {
-          if (commitWorkingTree(pkg, options)) committed += 1;
-        }
-        if (!options.dryRun) {
-          logSuccess(`Committed ${committed} repository/repositories`);
-        }
-      }
+    if (companions.length > 0) {
+      log(`  After every wave: ${companions.map(pkg => pkg.name).join(', ')}`, 'blue');
     }
 
-    // Step 5: preflight every repository before touching any of them
-    logStep('5', 'Running preflight checks...');
+    // Step 4: preflight every repository before touching any of them
+    logStep('4', 'Running preflight checks...');
     const blocking = [];
     for (const pkg of selected) {
-      const { errors, warnings } = preflightPackage(pkg, options);
+      const { errors, warnings, pending } = preflightPackage(pkg, options, { fixable: true });
       const { published, error } = isVersionPublished(pkg, options);
       if (error) {
         logWarning(`${pkg.name}: could not reach the registry (${error.split('\n')[0]})`);
@@ -886,39 +944,64 @@ async function main() {
       pkg.alreadyPublished = published;
 
       if (published) {
-        // Nothing to do for this one; its git state no longer matters.
-        logInfo(`${pkg.name}@${pkg.version} is already on npm — will skip`);
+        // Nothing to publish for this one; its git state no longer blocks the run.
+        logInfo(`${pkg.name}@${pkg.version} is already on npm — will skip the tag`);
         continue;
       }
       for (const warning of warnings) logWarning(`${pkg.name}: ${warning}`);
+      for (const note of pending) logDetail(`${pkg.name}: ${note} — --commit will handle it`);
       for (const problem of errors) {
         logError(`${pkg.name}: ${problem}`);
         blocking.push(`${pkg.name}: ${problem}`);
       }
-      if (errors.length === 0) {
+      if (errors.length === 0 && pending.length === 0) {
         logSuccess(`${pkg.name}@${pkg.version} ready to tag ${pkg.tag} at ${pkg.headSha.slice(0, 8)}`);
       }
     }
 
-    for (const warning of checkDependencyRanges(selected)) {
+    for (const warning of checkDependencyRanges([...selected, ...companions])) {
       logWarning(warning);
+    }
+
+    // Under --commit every repository has to be on a branch that the release is
+    // allowed to push to; a detached HEAD fails much later otherwise.
+    if (options.commit) {
+      for (const pkg of [...selected, ...companions]) {
+        const branch = currentBranch(pkg.dir);
+        if (!branch) {
+          blocking.push(`${pkg.name}: detached HEAD — check out a branch before using --commit`);
+          logError(`${pkg.name}: detached HEAD — check out a branch before using --commit`);
+        } else if (pkg.remoteRef && pkg.remoteRef !== `origin/${branch}`) {
+          logWarning(`${pkg.name}: on branch ${branch}, but ${pkg.remoteRef} is the release branch`);
+        }
+      }
     }
 
     if (blocking.length > 0) {
       log('');
-      logError(`${blocking.length} preflight problem(s) — nothing was tagged`);
-      if (options.dryRun && options.commit) {
-        logInfo('Dry run: --commit created no commits, so dirty/unpushed/version problems above are expected');
-      }
+      logError(`${blocking.length} preflight problem(s) — nothing was changed`);
       process.exitCode = 1;
       return;
     }
 
+    // "Nothing to do" has to account for more than unpublished packages: a run
+    // that died after the last publish still owes the release commits, the
+    // companion pushes and the submodule-pointer sync.
     const pending = selected.filter(pkg => !pkg.alreadyPublished);
-    if (pending.length === 0) {
+    const uncommitted = options.commit
+      ? [...selected, ...companions].filter(pkg => (releaseDirtyEntries(pkg.dir) || []).length > 0)
+      : [];
+    const pointerWork = options.commit && options.submoduleSync && rootPkg
+      ? submodulePointerEntries(rootPkg)
+      : [];
+
+    if (pending.length === 0 && uncommitted.length === 0 && pointerWork.length === 0) {
       log('');
       logSuccess('Every selected package is already published — nothing to do');
       return;
+    }
+    if (pending.length === 0) {
+      logInfo('Every package is published; finishing the commits this release still owes');
     }
 
     if (options.watch && !commandExists('gh')) {
@@ -926,40 +1009,83 @@ async function main() {
       options.watch = false;
     }
 
-    // Step 6: confirm
-    logStep('6', 'Release plan');
+    // Step 5: confirm
+    logStep('5', 'Release plan');
     waves.forEach((wave, index) => {
-      const todo = wave.filter(pkg => !pkg.alreadyPublished);
+      const todo = wave.filter(pkg => !pkg.alreadyPublished || options.commit);
       if (todo.length === 0) return;
       log(`  Wave ${index + 1}`, 'bright');
       for (const pkg of todo) {
-        logDetail(`push ${pkg.tag} to ${pkg.repoSlug || 'origin'} → publishes ${pkg.name}@${pkg.version}`);
+        const steps = [];
+        if (options.commit) steps.push('commit', options.pushCommit ? 'push' : 'commit only');
+        if (!pkg.alreadyPublished) steps.push(`tag ${pkg.tag}`, 'wait for npm');
+        else steps.push('already published');
+        logDetail(`${pkg.name}: ${steps.join(' → ')}`);
       }
     });
+    if (options.commit && companions.length > 0) {
+      log('  Once every wave is live', 'bright');
+      for (const pkg of companions) logDetail(`${pkg.name}: commit → push (never tagged)`);
+    }
+    if (options.commit && options.submoduleSync && rootPkg) {
+      log('  Finally', 'bright');
+      logDetail('root: commit the submodule pointers this release moved → push');
+    }
 
     if (!options.yes && !options.dryRun) {
-      const answer = await question('\nPush these tags? (yes/no): ');
+      const answer = await question('\nRun this release? (yes/no): ');
       if (!['y', 'yes'].includes(answer.trim().toLowerCase())) {
-        logWarning('Aborted — no tags were pushed');
+        logWarning('Aborted — nothing was changed');
         return;
       }
     }
 
-    // Step 7: tag wave by wave, waiting for npm in between
+    // Step 6: wave by wave — commit, push, tag, wait
     const published = [];
     const skipped = [];
 
     for (let index = 0; index < waves.length; index++) {
       const wave = waves[index];
       const todo = wave.filter(pkg => !pkg.alreadyPublished);
-      const done = wave.filter(pkg => pkg.alreadyPublished);
-      done.forEach(pkg => skipped.push(pkg));
+      wave.filter(pkg => pkg.alreadyPublished).forEach(pkg => skipped.push(pkg));
 
-      if (todo.length === 0) continue;
+      const needsCommit = options.commit ? wave : [];
+      if (todo.length === 0 && needsCommit.length === 0) continue;
 
       log(`\n${'─'.repeat(60)}`, 'cyan');
-      log(`Wave ${index + 1}/${waves.length}: ${todo.map(pkg => pkg.name).join(', ')}`, 'bright');
+      log(`Wave ${index + 1}/${waves.length}: ${wave.map(pkg => pkg.name).join(', ')}`, 'bright');
       log('─'.repeat(60), 'cyan');
+
+      // Commit and push first: this is the point where the repository's CI run
+      // starts, and by now every package it depends on is already on npm.
+      if (options.commit) {
+        for (const pkg of wave) {
+          commitAndPush(pkg, options);
+        }
+
+        // Re-run the checks against the commit that was just made. A dry run
+        // has nothing to re-check — it never committed anything — and would
+        // just report the problems the commit was going to fix.
+        if (!options.dryRun) {
+          const waveBlocking = [];
+          for (const pkg of todo) {
+            const { errors, warnings } = preflightPackage(pkg, options);
+            for (const warning of warnings) logWarning(`${pkg.name}: ${warning}`);
+            for (const problem of errors) {
+              logError(`${pkg.name}: ${problem}`);
+              waveBlocking.push(problem);
+            }
+          }
+          if (waveBlocking.length > 0) {
+            log('');
+            logError('Stopping before tagging this wave — the release commits are already pushed.');
+            process.exitCode = 1;
+            return;
+          }
+        }
+      }
+
+      if (todo.length === 0) continue;
 
       for (const pkg of todo) {
         pushTag(pkg, options);
@@ -993,6 +1119,32 @@ async function main() {
         process.exitCode = 1;
         return;
       }
+
+      // `npm view` answering is not quite the same as every CDN edge serving the
+      // tarball, and the next wave installs it the moment it is pushed.
+      const moreToDo = index < waves.length - 1 || companions.length > 0;
+      if (options.settleSeconds > 0 && moreToDo) {
+        logDetail(`letting the registry settle for ${options.settleSeconds}s`);
+        await sleep(options.settleSeconds * 1000);
+      }
+    }
+
+    // Step 7: the repositories that carry the version but publish nothing
+    if (options.commit && companions.length > 0) {
+      log(`\n${'─'.repeat(60)}`, 'cyan');
+      log(`Repositories that publish nothing: ${companions.map(pkg => pkg.name).join(', ')}`, 'bright');
+      log('─'.repeat(60), 'cyan');
+      for (const pkg of companions) {
+        commitAndPush(pkg, options);
+      }
+    }
+
+    // Step 8: record the submodule commits in the root repository
+    if (options.commit && options.submoduleSync && rootPkg) {
+      log(`\n${'─'.repeat(60)}`, 'cyan');
+      log('Syncing submodule pointers in the root repository', 'bright');
+      log('─'.repeat(60), 'cyan');
+      syncSubmodulePointers(rootPkg, options, rootPkg.version);
     }
 
     // Summary
@@ -1005,8 +1157,7 @@ async function main() {
         console.log(`Already published (skipped): ${skipped.length}`);
       }
       console.log('\nNext steps:');
-      console.log('  1. Update the submodule pointers in the root repo if they moved');
-      console.log('  2. Draft the GitHub releases for the new tags');
+      console.log('  1. Draft the GitHub releases for the new tags');
       console.log('');
     }
   } catch (error) {
