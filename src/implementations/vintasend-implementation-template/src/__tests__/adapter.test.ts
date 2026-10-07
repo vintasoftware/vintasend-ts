@@ -1,11 +1,13 @@
-import type {
-  BaseEmailTemplateRenderer,
-  BaseNotificationBackend,
-  DatabaseNotification,
-  DatabaseOneOffNotification,
+import {
+  type BaseEmailTemplateRenderer,
+  type BaseNotificationBackend,
+  type DatabaseNotification,
+  type DatabaseOneOffNotification,
+  logMessageMatching,
+  renderLogMessage,
 } from 'vintasend';
-import { type Mocked, vi, describe, it, expect, beforeEach } from 'vitest';
-import { NotificationAdapterFactory } from '../adapter';
+import { beforeEach, describe, expect, it, type Mocked, vi } from 'vitest';
+import { NotificationAdapter, NotificationAdapterFactory } from '../adapter';
 
 describe('NotificationAdapter', () => {
   const mockTemplateRenderer = {
@@ -134,6 +136,45 @@ describe('NotificationAdapter', () => {
       mockBackend.getUserEmailFromNotification.mockResolvedValue(undefined);
 
       await expect(adapter.send(mockNotification, {})).rejects.toThrow('User email not found');
+    });
+
+    it('should log a provider failure by id and error name only', async () => {
+      class FailingAdapter extends NotificationAdapter<BaseEmailTemplateRenderer<any>, any> {
+        protected override async deliver(): Promise<void> {
+          throw Object.assign(
+            new Error('Rejected Jane Synthetic <jane.synthetic@example.com>: Lab results ready'),
+            { status: 400 },
+          );
+        }
+      }
+      const adapter = new FailingAdapter(mockTemplateRenderer, false);
+      const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+      adapter.injectBackend(mockBackend);
+      adapter.injectLogger(logger);
+      mockTemplateRenderer.render.mockResolvedValue({
+        subject: 'Lab results for Jane Synthetic',
+        body: '<p>Hello Jane Synthetic</p>',
+      });
+      mockBackend.getUserEmailFromNotification.mockResolvedValue('jane.synthetic@example.com');
+
+      await expect(adapter.send(mockNotification, { name: 'Jane Synthetic' })).rejects.toThrow(
+        'Rejected Jane Synthetic',
+      );
+
+      expect(logger.error).toHaveBeenCalledWith(
+        logMessageMatching(
+          'Provider rejected notification 123 via adapter-key: Error (status 400)',
+        ),
+      );
+      const lines = [
+        ...logger.info.mock.calls,
+        ...logger.warn.mock.calls,
+        ...logger.error.mock.calls,
+      ]
+        .map(([message]) => renderLogMessage(message))
+        .join('\n');
+      expect(lines).not.toContain('Jane Synthetic');
+      expect(lines).not.toContain('jane.synthetic@example.com');
     });
   });
 

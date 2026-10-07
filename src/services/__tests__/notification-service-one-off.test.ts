@@ -6,6 +6,7 @@ import type {
 } from '../../types/one-off-notification';
 import type { BaseGitCommitShaProvider } from '../git-commit-sha/base-git-commit-sha-provider';
 import type { BaseLogger } from '../loggers/base-logger';
+import { logMessageMatching } from '../loggers/log-message';
 import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
@@ -149,7 +150,7 @@ describe('NotificationService - One-Off Notifications', () => {
       );
       expect(result).toEqual(mockOneOffNotification);
       expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('One-off notification 123 created'),
+        logMessageMatching(expect.stringContaining('One-off notification 123 created')),
       );
     });
 
@@ -159,7 +160,9 @@ describe('NotificationService - One-Off Notifications', () => {
       await service.createOneOffNotification(mockOneOffNotificationInput);
 
       expect(mockAdapter.send).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('sent immediately'));
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        logMessageMatching(expect.stringContaining('sent immediately')),
+      );
     });
 
     it('should send immediately when sendAfter is in the past', async () => {
@@ -175,7 +178,9 @@ describe('NotificationService - One-Off Notifications', () => {
       await service.createOneOffNotification(inputWithPastDate);
 
       expect(mockAdapter.send).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('sent immediately'));
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        logMessageMatching(expect.stringContaining('sent immediately')),
+      );
     });
 
     it('should schedule when sendAfter is in the future', async () => {
@@ -191,7 +196,9 @@ describe('NotificationService - One-Off Notifications', () => {
       await service.createOneOffNotification(inputWithFutureDate);
 
       expect(mockAdapter.send).not.toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('scheduled for'));
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        logMessageMatching(expect.stringContaining('scheduled for')),
+      );
     });
 
     it('should throw error for invalid email format', async () => {
@@ -290,7 +297,7 @@ describe('NotificationService - One-Off Notifications', () => {
       expect(mockBackend.persistOneOffNotificationUpdate).toHaveBeenCalledWith('123', updateData);
       expect(result).toEqual(updatedNotification);
       expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('One-off notification 123 updated'),
+        logMessageMatching(expect.stringContaining('One-off notification 123 updated')),
       );
     });
 
@@ -303,7 +310,9 @@ describe('NotificationService - One-Off Notifications', () => {
       await service.updateOneOffNotification('123', updateData);
 
       expect(mockAdapter.send).toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('sent after update'));
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        logMessageMatching(expect.stringContaining('sent after update')),
+      );
     });
 
     it('should re-send if updated sendAfter is in the past', async () => {

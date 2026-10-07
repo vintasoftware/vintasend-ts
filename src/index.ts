@@ -6,6 +6,26 @@ export { LocalFileAttachmentManager } from './services/attachment-manager/local-
 export type { BaseGitCommitShaProvider } from './services/git-commit-sha/base-git-commit-sha-provider.js';
 // Logger
 export type { BaseLogger } from './services/loggers/base-logger.js';
+export type {
+  LogValue,
+  LogValueKind,
+  RenderLogMessageOptions,
+} from './services/loggers/log-message.js';
+export {
+  isLogMessage,
+  isLogValue,
+  LogMessage,
+  log,
+  logCount,
+  logError,
+  logId,
+  logIds,
+  logLabel,
+  logMessageMatching,
+  logTimestamp,
+  renderLogMessage,
+  renderLogValue,
+} from './services/loggers/log-message.js';
 // Notification Adapters and Backends
 export {
   BaseNotificationAdapter,

@@ -7,6 +7,7 @@ import type {
 import type { NotificationType } from '../../types/notification-type.js';
 import type { BaseNotificationTypeConfig } from '../../types/notification-type-config.js';
 import type { BaseLogger } from '../loggers/base-logger.js';
+import { log, logLabel } from '../loggers/log-message.js';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend.js';
 import type {
   EmailTemplate,
@@ -81,7 +82,7 @@ export abstract class BaseNotificationAdapter<
   protected async prepareAttachments(attachments: StoredAttachment[]): Promise<unknown> {
     if (this.supportsAttachments && attachments.length > 0) {
       this.logger?.warn?.(
-        `Adapter ${this.key} claims to support attachments but prepareAttachments is not implemented`,
+        log`Adapter ${logLabel(this.key)} claims to support attachments but prepareAttachments is not implemented`,
       );
     }
     return null;

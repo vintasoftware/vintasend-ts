@@ -1,6 +1,6 @@
 import type { BaseLogger } from 'vintasend';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { NotificationBackend } from '../backend';
-import { describe, it, expect, beforeEach } from 'vitest';
 
 describe('NotificationBackend', () => {
   let backend: NotificationBackend<any>;

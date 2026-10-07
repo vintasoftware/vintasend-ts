@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, type Mock, type Mocked, vi } from 'vi
 import { VintaSendFactory } from '../../index';
 import type { DatabaseNotification, NotificationInput } from '../../types/notification';
 import type { BaseLogger } from '../loggers/base-logger';
+import { logMessageMatching } from '../loggers/log-message';
 import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
@@ -156,7 +157,9 @@ describe('VintaSend multi-backend error handling (Phase 4)', () => {
       id: 'notif-1',
     });
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to replicate createNotification to backend replica-a'),
+      logMessageMatching(
+        expect.stringContaining('Failed to replicate createNotification to backend replica-a'),
+      ),
     );
   });
 
@@ -187,7 +190,9 @@ describe('VintaSend multi-backend error handling (Phase 4)', () => {
     expect(primaryBackend.storeAdapterAndContextUsed).toHaveBeenCalled();
     expect(failingReplica.storeAdapterAndContextUsed).toHaveBeenCalled();
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to replicate markAsSent to backend replica-a'),
+      logMessageMatching(
+        expect.stringContaining('Failed to replicate markAsSent to backend replica-a'),
+      ),
     );
   });
 
@@ -215,10 +220,14 @@ describe('VintaSend multi-backend error handling (Phase 4)', () => {
     await expect(service.markRead('notif-1')).resolves.toMatchObject({ id: 'notif-1' });
 
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to replicate markRead to backend replica-a'),
+      logMessageMatching(
+        expect.stringContaining('Failed to replicate markRead to backend replica-a'),
+      ),
     );
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to replicate markRead to backend replica-b'),
+      logMessageMatching(
+        expect.stringContaining('Failed to replicate markRead to backend replica-b'),
+      ),
     );
   });
 });

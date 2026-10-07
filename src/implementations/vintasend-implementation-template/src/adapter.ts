@@ -2,10 +2,10 @@ import type {
   BaseEmailTemplateRenderer,
   BaseNotificationTypeConfig,
   DatabaseNotification,
-  JsonObject,
   EmailTemplate,
+  JsonObject,
 } from 'vintasend';
-import { BaseNotificationAdapter } from 'vintasend';
+import { BaseNotificationAdapter, log, logError, logId, logLabel } from 'vintasend';
 
 export class NotificationAdapter<
   TemplateRenderer extends BaseEmailTemplateRenderer<Config>,
@@ -22,7 +22,10 @@ export class NotificationAdapter<
    * Returns what the renderer produced so the service can record which template version rendered
    * this notification. Nothing else reads it — the message is already sent by then.
    */
-  async send(notification: DatabaseNotification<Config>, context: JsonObject): Promise<EmailTemplate> {
+  async send(
+    notification: DatabaseNotification<Config>,
+    context: JsonObject,
+  ): Promise<EmailTemplate> {
     if (!this.backend) {
       throw new Error('Backend not injected');
     }
@@ -39,9 +42,24 @@ export class NotificationAdapter<
       throw new Error('User email not found');
     }
 
-    // TODO: Implement the logic to send the notification
+    try {
+      await this.deliver(userEmail, template);
+    } catch (error) {
+      // VintaSend logs the failed send as well; log here what only the adapter knows, such as the
+      // provider's HTTP status. Never the address, the rendered template or `error.message`:
+      // providers quote the request they rejected in their errors.
+      this.logger?.error(
+        log`Provider rejected notification ${logId(notification.id)} via ${logLabel(this.key)}: ${logError(error)}`,
+      );
+      throw error;
+    }
 
     return template;
+  }
+
+  /** Hand the rendered template to your provider. */
+  protected async deliver(_recipient: string, _template: EmailTemplate): Promise<void> {
+    // TODO: Implement the logic to send the notification
   }
 }
 

@@ -76,7 +76,7 @@ Use this workflow for **any** implementation type: backend, adapter, template re
   - Implement `render()` and `renderFromTemplateContent()`
   - Validate missing/invalid template input and surface clear errors
 - **Logger**
-  - Implement `info`, `warn`, and `error` methods
+  - Implement `info`, `warn`, and `error` methods; they receive a `LogMessage`, printed with `renderLogMessage`
   - Add environment-aware transport/output configuration if needed
 - **Attachment Manager**
   - Implement file upload/read/url/delete lifecycle and deduplication hooks
@@ -259,9 +259,27 @@ The logger component receives VintaSend log messages and forwards them to your l
 **Implementation Steps:**
 
 1. Rename `Logger` to your implementation name.
-2. Implement `info`, `warn`, and `error` methods.
+2. Implement `info`, `warn`, and `error` methods. Each receives a `LogMessage`, not a string: print
+   it with `renderLogMessage(message)`, or read `message.strings` / `message.values` to emit
+   structured fields.
 3. Configure transports/formatters for your runtime environments.
 4. Keep logging side effects predictable and non-blocking.
+
+Log messages are built with the `log` tagged template, whose interpolations must be typed values,
+so notification content cannot reach a log line by accident:
+
+```ts
+import { log, logError, logId, logLabel } from 'vintasend';
+
+this.logger?.error(
+  log`Failed to send notification ${logId(notification.id)} via ${logLabel(this.key)}: ${logError(error)}`,
+);
+```
+
+Use `logId`/`logIds` for record ids, `logCount` for numbers, `logLabel` only for names defined in
+code (adapter keys, template paths), `logTimestamp` for dates and `logError` for errors (it keeps
+the name and HTTP status, never the message). Never log recipients, rendered content, context or
+provider responses.
 
 **Testing Focus:**
 - Correct method forwarding (`info`, `warn`, `error`)

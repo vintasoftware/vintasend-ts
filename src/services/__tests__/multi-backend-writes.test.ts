@@ -6,6 +6,7 @@ import type {
   OneOffNotificationInput,
 } from '../../types/one-off-notification';
 import type { BaseLogger } from '../loggers/base-logger';
+import { logMessageMatching } from '../loggers/log-message';
 import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseNotificationReplicationQueueService } from '../notification-queue-service/base-notification-replication-queue-service';
@@ -315,7 +316,7 @@ describe('VintaSend multi-backend writes (Phase 4)', () => {
       id: 'notif-fallback-1',
     });
     expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('no replication queue service is registered'),
+      logMessageMatching(expect.stringContaining('no replication queue service is registered')),
     );
   });
 

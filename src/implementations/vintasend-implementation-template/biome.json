@@ -25,7 +25,20 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "recommended"
+      "preset": "recommended",
+      "suspicious": {
+        "noConsole": "error"
+      },
+      "style": {
+        "noRestrictedGlobals": {
+          "level": "error",
+          "options": {
+            "deniedGlobals": {
+              "console": "Log through the injected BaseLogger so the host can redact and silence it."
+            }
+          }
+        }
+      }
     }
   },
   "javascript": {
@@ -47,6 +60,9 @@
         "rules": {
           "suspicious": {
             "noExplicitAny": "off"
+          },
+          "style": {
+            "noRestrictedGlobals": "off"
           }
         }
       }

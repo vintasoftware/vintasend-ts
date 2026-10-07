@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, type Mock, type Mocked, vi } from 'vi
 import { VintaSendFactory } from '../../index';
 import type { DatabaseNotification } from '../../types/notification';
 import type { BaseLogger } from '../loggers/base-logger';
+import { logMessageMatching } from '../loggers/log-message';
 import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseEmailTemplateRenderer } from '../notification-template-renderers/base-email-template-renderer';
@@ -511,7 +512,7 @@ describe('VintaSend multi-backend management (Phase 6)', () => {
     expect(result.successes).toEqual(['replica']);
     expect(result.failures).toEqual([]);
     expect(logger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('Retrying as update for idempotency'),
+      logMessageMatching(expect.stringContaining('Retrying as update for idempotency')),
     );
   });
 

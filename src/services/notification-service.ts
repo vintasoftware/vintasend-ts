@@ -12,6 +12,7 @@ import type { OneOffNotificationInput } from '../types/one-off-notification.js';
 import type { BaseAttachmentManager } from './attachment-manager/base-attachment-manager.js';
 import type { BaseGitCommitShaProvider } from './git-commit-sha/base-git-commit-sha-provider.js';
 import type { BaseLogger } from './loggers/base-logger.js';
+import { log, logCount, logError, logId, logLabel, logTimestamp } from './loggers/log-message.js';
 import {
   type BaseNotificationAdapter,
   isOneOffNotification,
@@ -445,11 +446,11 @@ export class VintaSend<
         try {
           await additionalWrite(additionalBackend, primaryResult);
           this.logger.info(
-            `${operation} replicated to backend ${backendIdentifier} in inline mode`,
+            log`${logLabel(operation)} replicated to backend ${logLabel(backendIdentifier)} in inline mode`,
           );
         } catch (replicationError) {
           this.logger.error(
-            `Failed to replicate ${operation} to backend ${backendIdentifier}: ${replicationError}`,
+            log`Failed to replicate ${logLabel(operation)} to backend ${logLabel(backendIdentifier)}: ${logError(replicationError)}`,
           );
         }
       }
@@ -460,7 +461,7 @@ export class VintaSend<
 
       if (!notificationIdToReplicate) {
         this.logger.warn(
-          `Replication mode is queued, but no notification id was resolved for ${operation}. Falling back to inline replication.`,
+          log`Replication mode is queued, but no notification id was resolved for ${logLabel(operation)}. Falling back to inline replication.`,
         );
         await executeInlineReplication();
         return primaryResult;
@@ -468,7 +469,7 @@ export class VintaSend<
 
       if (!this.replicationQueueService) {
         this.logger.warn(
-          `Replication mode is queued, but no replication queue service is registered for ${operation}. Falling back to inline replication.`,
+          log`Replication mode is queued, but no replication queue service is registered for ${logLabel(operation)}. Falling back to inline replication.`,
         );
         await executeInlineReplication();
         return primaryResult;
@@ -503,30 +504,30 @@ export class VintaSend<
 
       if (failedEnqueues.length === 0) {
         this.logger.info(
-          `${operation} replication enqueued for notification ${String(notificationIdToReplicate)} to ${additionalBackends.length} backend(s) in queued mode`,
+          log`${logLabel(operation)} replication enqueued for notification ${logId(notificationIdToReplicate)} to ${logCount(additionalBackends.length)} backend(s) in queued mode`,
         );
         return primaryResult;
       }
 
       for (const failedEnqueue of failedEnqueues) {
         this.logger.error(
-          `Failed to enqueue replication for ${operation}, notification ${String(notificationIdToReplicate)} and backend ${failedEnqueue.backendIdentifier}: ${failedEnqueue.error}`,
+          log`Failed to enqueue replication for ${logLabel(operation)}, notification ${logId(notificationIdToReplicate)} and backend ${logLabel(failedEnqueue.backendIdentifier)}: ${logError(failedEnqueue.error)}`,
         );
       }
 
       this.logger.warn(
-        `Falling back to inline replication for ${operation} in ${failedEnqueues.length} backend(s) after queue enqueue failure.`,
+        log`Falling back to inline replication for ${logLabel(operation)} in ${logCount(failedEnqueues.length)} backend(s) after queue enqueue failure.`,
       );
 
       for (const failedEnqueue of failedEnqueues) {
         try {
           await additionalWrite(failedEnqueue.backend, primaryResult);
           this.logger.info(
-            `${operation} replicated to backend ${failedEnqueue.backendIdentifier} in inline fallback mode`,
+            log`${logLabel(operation)} replicated to backend ${logLabel(failedEnqueue.backendIdentifier)} in inline fallback mode`,
           );
         } catch (replicationError) {
           this.logger.error(
-            `Failed to replicate ${operation} to backend ${failedEnqueue.backendIdentifier} in inline fallback mode: ${replicationError}`,
+            log`Failed to replicate ${logLabel(operation)} to backend ${logLabel(failedEnqueue.backendIdentifier)} in inline fallback mode: ${logError(replicationError)}`,
           );
         }
       }
@@ -676,9 +677,7 @@ export class VintaSend<
         }
       } catch (resolveError) {
         this.logger.error(
-          `Template renderer for adapter ${adapter.key ?? 'unknown'} threw while resolving the ` +
-            `current version of template "${bodyTemplate}"; leaving the notification unpinned: ` +
-            `${resolveError}`,
+          log`Template renderer for adapter ${logLabel(adapter.key ?? 'unknown')} threw while resolving the current version of template "${logLabel(bodyTemplate)}"; leaving the notification unpinned: ${logError(resolveError)}`,
         );
       }
     }
@@ -821,7 +820,7 @@ export class VintaSend<
       // failure. A missing line of audit metadata is the smaller loss, and the log says which
       // notification lost it.
       this.logger.error(
-        `Error storing the template version used for notification ${String(notification.id)}: ${storeError}`,
+        log`Error storing the template version used for notification ${logId(notification.id)}: ${logError(storeError)}`,
       );
       return;
     }
@@ -839,7 +838,7 @@ export class VintaSend<
     );
     if (adaptersOfType.length === 0) {
       this.logger.error(
-        `No adapter found for notification type ${notificationWithExecutionGitCommitSha.notificationType}`,
+        log`No adapter found for notification type ${logLabel(notificationWithExecutionGitCommitSha.notificationType)}`,
       );
       if (this.options.raiseErrorOnFailedSend) {
         throw new Error(
@@ -856,21 +855,21 @@ export class VintaSend<
     for (const adapter of adaptersOfType) {
       if (adapter.enqueueNotifications) {
         if (!this.queueService) {
-          this.logger.error('Distributed adapter found but no queue service provided');
+          this.logger.error(log`Distributed adapter found but no queue service provided`);
           continue;
         }
         try {
           this.logger.info(
-            `Enqueuing notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key}`,
+            log`Enqueuing notification ${logId(notificationWithExecutionGitCommitSha.id)} with adapter ${logLabel(adapter.key)}`,
           );
           await this.queueService.enqueueNotification(notificationWithExecutionGitCommitSha.id);
           this.logger.info(
-            `Enqueued notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key} successfully`,
+            log`Enqueued notification ${logId(notificationWithExecutionGitCommitSha.id)} with adapter ${logLabel(adapter.key)} successfully`,
           );
           continue;
         } catch (enqueueError) {
           this.logger.error(
-            `Error enqueuing notification ${notificationWithExecutionGitCommitSha.id}: ${enqueueError} with adapter ${adapter.key}`,
+            log`Error enqueuing notification ${logId(notificationWithExecutionGitCommitSha.id)}: ${logError(enqueueError)} with adapter ${logLabel(adapter.key)}`,
           );
           continue;
         }
@@ -886,11 +885,11 @@ export class VintaSend<
             notificationWithExecutionGitCommitSha.contextParameters,
           );
           this.logger.info(
-            `Generated context for notification ${notificationWithExecutionGitCommitSha.id}`,
+            log`Generated context for notification ${logId(notificationWithExecutionGitCommitSha.id)}`,
           );
         } catch (contextError) {
           this.logger.error(
-            `Error getting context for notification ${notificationWithExecutionGitCommitSha.id}: ${contextError}`,
+            log`Error getting context for notification ${logId(notificationWithExecutionGitCommitSha.id)}: ${logError(contextError)}`,
           );
           if (this.options.raiseErrorOnFailedSend) {
             throw contextError;
@@ -903,15 +902,15 @@ export class VintaSend<
       let sendInput: NotificationSendInput | void;
       try {
         this.logger.info(
-          `Sending notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key}`,
+          log`Sending notification ${logId(notificationWithExecutionGitCommitSha.id)} with adapter ${logLabel(adapter.key)}`,
         );
         sendInput = await adapter.send(notificationWithExecutionGitCommitSha, context);
         this.logger.info(
-          `Sent notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key} successfully`,
+          log`Sent notification ${logId(notificationWithExecutionGitCommitSha.id)} with adapter ${logLabel(adapter.key)} successfully`,
         );
       } catch (sendError) {
         this.logger.error(
-          `Error sending notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key}: ${sendError}`,
+          log`Error sending notification ${logId(notificationWithExecutionGitCommitSha.id)} with adapter ${logLabel(adapter.key)}: ${logError(sendError)}`,
         );
         try {
           await this.executeMultiBackendWrite(
@@ -926,7 +925,7 @@ export class VintaSend<
           );
         } catch (markFailedError) {
           this.logger.error(
-            `Error marking notification ${notificationWithExecutionGitCommitSha.id} as failed: ${markFailedError}`,
+            log`Error marking notification ${logId(notificationWithExecutionGitCommitSha.id)} as failed: ${logError(markFailedError)}`,
           );
         }
         continue;
@@ -945,7 +944,7 @@ export class VintaSend<
         );
       } catch (markSentError) {
         this.logger.error(
-          `Error marking notification ${notificationWithExecutionGitCommitSha.id} as sent: ${markSentError}`,
+          log`Error marking notification ${logId(notificationWithExecutionGitCommitSha.id)} as sent: ${logError(markSentError)}`,
         );
       }
 
@@ -970,7 +969,7 @@ export class VintaSend<
         );
       } catch (storeContextError) {
         this.logger.error(
-          `Error storing adapter and context for notification ${notificationWithExecutionGitCommitSha.id}: ${storeContextError}`,
+          log`Error storing adapter and context for notification ${logId(notificationWithExecutionGitCommitSha.id)}: ${logError(storeContextError)}`,
         );
       }
 
@@ -1008,16 +1007,16 @@ export class VintaSend<
         });
       },
     );
-    this.logger.info(`Notification ${createdNotification.id} created`);
+    this.logger.info(log`Notification ${logId(createdNotification.id)} created`);
 
     if (!notification.sendAfter || notification.sendAfter <= new Date()) {
       this.logger.info(
-        `Notification ${createdNotification.id} sent immediately because sendAfter is null or in the past`,
+        log`Notification ${logId(createdNotification.id)} sent immediately because sendAfter is null or in the past`,
       );
       await this.send(createdNotification);
     } else {
       this.logger.info(
-        `Notification ${createdNotification.id} scheduled for ${notification.sendAfter}`,
+        log`Notification ${logId(createdNotification.id)} scheduled for ${logTimestamp(notification.sendAfter)}`,
       );
     }
 
@@ -1063,7 +1062,7 @@ export class VintaSend<
       },
       notificationId,
     );
-    this.logger.info(`Notification ${notificationId} updated`);
+    this.logger.info(log`Notification ${logId(notificationId)} updated`);
     return updatedNotification;
   }
 
@@ -1098,14 +1097,14 @@ export class VintaSend<
         });
       },
     );
-    this.logger.info(`One-off notification ${createdNotification.id} created`);
+    this.logger.info(log`One-off notification ${logId(createdNotification.id)} created`);
 
     if (!notification.sendAfter || notification.sendAfter <= new Date()) {
-      this.logger.info(`One-off notification ${createdNotification.id} sent immediately`);
+      this.logger.info(log`One-off notification ${logId(createdNotification.id)} sent immediately`);
       await this.send(createdNotification);
     } else {
       this.logger.info(
-        `One-off notification ${createdNotification.id} scheduled for ${notification.sendAfter}`,
+        log`One-off notification ${logId(createdNotification.id)} scheduled for ${logTimestamp(notification.sendAfter)}`,
       );
     }
 
@@ -1154,10 +1153,10 @@ export class VintaSend<
       },
       notificationId,
     );
-    this.logger.info(`One-off notification ${notificationId} updated`);
+    this.logger.info(log`One-off notification ${logId(notificationId)} updated`);
 
     if (!updatedNotification.sendAfter || updatedNotification.sendAfter <= new Date()) {
-      this.logger.info(`One-off notification ${notificationId} sent after update`);
+      this.logger.info(log`One-off notification ${logId(notificationId)} sent after update`);
       await this.send(updatedNotification);
     }
 
@@ -1347,7 +1346,7 @@ export class VintaSend<
       },
       notificationId,
     );
-    this.logger.info(`Notification ${notificationId} marked as read`);
+    this.logger.info(log`Notification ${logId(notificationId)} marked as read`);
     return notification;
   }
 
@@ -1369,7 +1368,7 @@ export class VintaSend<
       },
       notificationId,
     );
-    this.logger.info(`Notification ${notificationId} cancelled`);
+    this.logger.info(log`Notification ${logId(notificationId)} cancelled`);
   }
 
   async resendNotification(
@@ -1379,7 +1378,7 @@ export class VintaSend<
     const notification = await this.getNotification(notificationId, false);
 
     if (!notification) {
-      this.logger.error(`Notification ${notificationId} not found`);
+      this.logger.error(log`Notification ${logId(notificationId)} not found`);
       if (this.options.raiseErrorOnFailedSend) {
         throw new Error(`Notification ${notificationId} not found`);
       }
@@ -1389,7 +1388,7 @@ export class VintaSend<
     // Check if this is a one-off notification (which cannot be resent this way)
     if (isOneOffNotification(notification)) {
       this.logger.error(
-        `Cannot resend one-off notification ${notificationId} using resendNotification. One-off notifications are not supported.`,
+        log`Cannot resend one-off notification ${logId(notificationId)} using resendNotification. One-off notifications are not supported.`,
       );
       if (this.options.raiseErrorOnFailedSend) {
         throw new Error(
@@ -1400,7 +1399,7 @@ export class VintaSend<
     }
 
     if (notification.sendAfter && notification.sendAfter > new Date()) {
-      this.logger.error(`Notification ${notificationId} is scheduled for the future`);
+      this.logger.error(log`Notification ${logId(notificationId)} is scheduled for the future`);
       if (this.options.raiseErrorOnFailedSend) {
         throw new Error(`Notification ${notificationId} is scheduled for the future`);
       }
@@ -1408,7 +1407,7 @@ export class VintaSend<
     }
 
     if (useStoredContextIfAvailable && !notification.contextUsed) {
-      this.logger.error(`Context not found for notification ${notificationId}`);
+      this.logger.error(log`Context not found for notification ${logId(notificationId)}`);
       if (this.options.raiseErrorOnFailedSend) {
         throw new Error(`Context not found for notification ${notificationId}`);
       }
@@ -1447,7 +1446,7 @@ export class VintaSend<
     }
 
     this.logger.info(
-      `Notification ${createdNotification.id} created for resending notification ${notificationId}`,
+      log`Notification ${logId(createdNotification.id)} created for resending notification ${logId(notificationId)}`,
     );
     this.send(createdNotification);
     return createdNotification;
@@ -1457,7 +1456,7 @@ export class VintaSend<
     const notification = await this.getNotification(notificationId, false);
 
     if (!notification) {
-      this.logger.error(`Notification ${notificationId} not found`);
+      this.logger.error(log`Notification ${logId(notificationId)} not found`);
       if (this.options.raiseErrorOnFailedSend) {
         throw new Error(`Notification ${notificationId} not found`);
       }
@@ -1469,7 +1468,7 @@ export class VintaSend<
     );
 
     if (enqueueNotificationsAdapters.length === 0) {
-      this.logger.error('Delayed send is not supported if there are no distributed adapters');
+      this.logger.error(log`Delayed send is not supported if there are no distributed adapters`);
       if (this.options.raiseErrorOnFailedSend) {
         throw new Error('Delayed send is not supported if there are no distributed adapters');
       }
@@ -1503,12 +1502,12 @@ export class VintaSend<
           );
         } catch (markSentError) {
           this.logger.error(
-            `Error marking notification ${notificationWithExecutionGitCommitSha.id} as sent: ${markSentError}`,
+            log`Error marking notification ${logId(notificationWithExecutionGitCommitSha.id)} as sent: ${logError(markSentError)}`,
           );
         }
       } catch (sendError) {
         this.logger.error(
-          `Error sending notification ${notificationWithExecutionGitCommitSha.id} with adapter ${adapter.key}: ${sendError}`,
+          log`Error sending notification ${logId(notificationWithExecutionGitCommitSha.id)} with adapter ${logLabel(adapter.key)}: ${logError(sendError)}`,
         );
         try {
           await this.executeMultiBackendWrite(
@@ -1523,7 +1522,7 @@ export class VintaSend<
           );
         } catch (markFailedError) {
           this.logger.error(
-            `Error marking notification ${notificationWithExecutionGitCommitSha.id} as failed: ${markFailedError}`,
+            log`Error marking notification ${logId(notificationWithExecutionGitCommitSha.id)} as failed: ${logError(markFailedError)}`,
           );
         }
       } finally {
@@ -1548,7 +1547,7 @@ export class VintaSend<
           );
         } catch (storeContextError) {
           this.logger.error(
-            `Error storing adapter and context for notification ${notificationWithExecutionGitCommitSha.id}: ${storeContextError}`,
+            log`Error storing adapter and context for notification ${logId(notificationWithExecutionGitCommitSha.id)}: ${logError(storeContextError)}`,
           );
         }
       }
@@ -1801,7 +1800,7 @@ export class VintaSend<
 
             if (!conditionalApplyResult.applied) {
               this.logger.info(
-                `Skipped replication for notification ${String(notificationId)} on backend ${backendIdentifier} because destination state is newer or equal`,
+                log`Skipped replication for notification ${logId(notificationId)} on backend ${logLabel(backendIdentifier)} because destination state is newer or equal`,
               );
             }
 
@@ -1831,7 +1830,7 @@ export class VintaSend<
               }
 
               this.logger.warn(
-                `Detected duplicate replication create on backend ${backendIdentifier} for notification ${String(notificationId)}. Retrying as update for idempotency.`,
+                log`Detected duplicate replication create on backend ${logLabel(backendIdentifier)} for notification ${logId(notificationId)}. Retrying as update for idempotency.`,
               );
 
               await backend.persistNotificationUpdate(

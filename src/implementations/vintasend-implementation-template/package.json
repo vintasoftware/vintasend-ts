@@ -25,7 +25,7 @@
   "author": "Hugo Bessa",
   "license": "MIT",
   "dependencies": {
-    "vintasend": "^1.0.0-alpha4"
+    "vintasend": "^1.0.0-alpha5"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.10",

@@ -1,3 +1,4 @@
+import { logMessageMatching } from '../loggers/log-message';
 /**
  * Template version pinning, end to end through the service.
  *
@@ -251,7 +252,7 @@ describe('pinning on create', () => {
       'requestedTemplateVersion',
     );
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('leaving the notification unpinned'),
+      logMessageMatching(expect.stringContaining('leaving the notification unpinned')),
     );
   });
 
@@ -455,7 +456,7 @@ describe('recording what rendered', () => {
     await expect(service.createNotification(sendable)).resolves.toBeDefined();
     expect(backend.markAsSent).toHaveBeenCalled();
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('Error storing the template version'),
+      logMessageMatching(expect.stringContaining('Error storing the template version')),
     );
   });
 

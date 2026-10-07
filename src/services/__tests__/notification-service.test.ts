@@ -3,6 +3,7 @@ import { VintaSendFactory } from '../../index';
 import type { DatabaseNotification } from '../../types/notification';
 import type { BaseGitCommitShaProvider } from '../git-commit-sha/base-git-commit-sha-provider';
 import type { BaseLogger } from '../loggers/base-logger';
+import { logMessageMatching, renderLogMessage } from '../loggers/log-message';
 import type { BaseNotificationAdapter } from '../notification-adapters/base-notification-adapter';
 import type { BaseNotificationBackend } from '../notification-backends/base-notification-backend';
 import type { BaseNotificationQueueService } from '../notification-queue-service/base-notification-queue-service';
@@ -178,9 +179,33 @@ describe('NotificationService', () => {
       await service.send(mockNotification);
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        `Error getting context for notification ${mockNotification.id}: ${error}`,
+        logMessageMatching(`Error getting context for notification ${mockNotification.id}: Error`),
       );
       expect(mockAdapter.send).not.toHaveBeenCalled();
+    });
+
+    it('should keep error messages from context generators and adapters out of the logger', async () => {
+      notificationContextgenerators.testContext.generate.mockRejectedValueOnce(
+        new Error('No chart for Jane Synthetic, DOB 1970-01-01'),
+      );
+      await service.send(mockNotification);
+
+      notificationContextgenerators.testContext.generate.mockResolvedValue({});
+      mockAdapter.send.mockRejectedValueOnce(
+        new Error('Provider rejected jane.synthetic@example.com'),
+      );
+      await service.send(mockNotification);
+
+      const rendered = [
+        ...mockLogger.info.mock.calls,
+        ...mockLogger.warn.mock.calls,
+        ...mockLogger.error.mock.calls,
+      ].map(([message]) => renderLogMessage(message));
+      expect(rendered.length).toBeGreaterThan(0);
+      for (const line of rendered) {
+        expect(line).not.toContain('Jane Synthetic');
+        expect(line).not.toContain('jane.synthetic@example.com');
+      }
     });
 
     it('should throw error when notification has no ID', async () => {
@@ -214,7 +239,7 @@ describe('NotificationService', () => {
       await service.send(mockNotification);
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error marking notification 123 as sent'),
+        logMessageMatching(expect.stringContaining('Error marking notification 123 as sent')),
       );
     });
 
@@ -229,7 +254,7 @@ describe('NotificationService', () => {
       await serviceWithDistributedAdapter.send(mockNotification);
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Distributed adapter found but no queue service provided',
+        logMessageMatching('Distributed adapter found but no queue service provided'),
       );
       expect(mockAdapter.send).not.toHaveBeenCalled();
     });
@@ -248,7 +273,7 @@ describe('NotificationService', () => {
       await serviceWithQueue.send(mockNotification);
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error enqueuing notification'),
+        logMessageMatching(expect.stringContaining('Error enqueuing notification')),
       );
     });
 
@@ -265,7 +290,9 @@ describe('NotificationService', () => {
         {},
       );
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error storing adapter and context for notification'),
+        logMessageMatching(
+          expect.stringContaining('Error storing adapter and context for notification'),
+        ),
       );
     });
 
@@ -278,7 +305,9 @@ describe('NotificationService', () => {
       await service.send(mockNotification);
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error storing adapter and context for notification'),
+        logMessageMatching(
+          expect.stringContaining('Error storing adapter and context for notification'),
+        ),
       );
       // Should still complete the send operation
       expect(mockAdapter.send).toHaveBeenCalled();
@@ -458,7 +487,9 @@ describe('NotificationService', () => {
 
       expect(service.send).toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'Notification 123 sent immediately because sendAfter is null or in the past',
+        logMessageMatching(
+          'Notification 123 sent immediately because sendAfter is null or in the past',
+        ),
       );
     });
 
@@ -477,7 +508,9 @@ describe('NotificationService', () => {
       await service.createNotification(notification);
 
       expect(service.send).not.toHaveBeenCalled();
-      expect(mockLogger.info).toHaveBeenCalledWith(`Notification 123 scheduled for ${futureDate}`);
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        logMessageMatching(`Notification 123 scheduled for ${futureDate.toISOString()}`),
+      );
     });
 
     it('should log info when notification is created', async () => {
@@ -485,7 +518,7 @@ describe('NotificationService', () => {
 
       await service.createNotification(mockNewNotification);
 
-      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 created');
+      expect(mockLogger.info).toHaveBeenCalledWith(logMessageMatching('Notification 123 created'));
     });
 
     it('should handle notification with null sendAfter date', async () => {
@@ -503,7 +536,9 @@ describe('NotificationService', () => {
       await service.createNotification(notificationWithNullSendAfter);
 
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'Notification 123 sent immediately because sendAfter is null or in the past',
+        logMessageMatching(
+          'Notification 123 sent immediately because sendAfter is null or in the past',
+        ),
       );
       expect(service.send).toHaveBeenCalled();
     });
@@ -554,7 +589,7 @@ describe('NotificationService', () => {
       await service.delayedSend('123');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        'Delayed send is not supported if there are no distributed adapters',
+        logMessageMatching('Delayed send is not supported if there are no distributed adapters'),
       );
     });
 
@@ -592,7 +627,7 @@ describe('NotificationService', () => {
       await serviceWithQueue.delayedSend('123');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error marking notification 123 as sent'),
+        logMessageMatching(expect.stringContaining('Error marking notification 123 as sent')),
       );
       expect(distributedAdapter.send).toHaveBeenCalled();
     });
@@ -614,7 +649,7 @@ describe('NotificationService', () => {
       await serviceWithQueue.delayedSend('123');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error sending notification 123'),
+        logMessageMatching(expect.stringContaining('Error sending notification 123')),
       );
       expect(mockBackend.markAsFailed).toHaveBeenCalled();
       expect(mockBackend.markAsSent).not.toHaveBeenCalled();
@@ -637,7 +672,7 @@ describe('NotificationService', () => {
       await serviceWithQueue.delayedSend('123');
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error marking notification 123 as failed'),
+        logMessageMatching(expect.stringContaining('Error marking notification 123 as failed')),
       );
       expect(mockBackend.markAsSent).not.toHaveBeenCalled();
     });
@@ -753,7 +788,7 @@ describe('NotificationService', () => {
 
       expect(mockBackend.persistNotificationUpdate).toHaveBeenCalledWith('123', updates);
       expect(result).toHaveProperty('title', 'Updated Title');
-      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 updated');
+      expect(mockLogger.info).toHaveBeenCalledWith(logMessageMatching('Notification 123 updated'));
     });
   });
 
@@ -842,7 +877,7 @@ describe('NotificationService', () => {
       await service.sendPendingNotifications();
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error getting context for notification'),
+        logMessageMatching(expect.stringContaining('Error getting context for notification')),
       );
       expect(mockAdapter.send).not.toHaveBeenCalled();
     });
@@ -858,10 +893,10 @@ describe('NotificationService', () => {
       await service.sendPendingNotifications();
 
       expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('Generated context for notification 1'),
+        logMessageMatching(expect.stringContaining('Generated context for notification 1')),
       );
       expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('Generated context for notification 2'),
+        logMessageMatching(expect.stringContaining('Generated context for notification 2')),
       );
     });
 
@@ -874,7 +909,9 @@ describe('NotificationService', () => {
       await service.sendPendingNotifications();
 
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining(`Error sending notification ${mockNotification.id}`),
+        logMessageMatching(
+          expect.stringContaining(`Error sending notification ${mockNotification.id}`),
+        ),
       );
     });
 
@@ -893,7 +930,7 @@ describe('NotificationService', () => {
 
       expect(mockAdapter.send).toHaveBeenCalledTimes(2);
       expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error sending notification 1'),
+        logMessageMatching(expect.stringContaining('Error sending notification 1')),
       );
     });
 
@@ -907,8 +944,12 @@ describe('NotificationService', () => {
 
       await service.sendPendingNotifications();
 
-      expect(mockLogger.info).toHaveBeenCalledWith('Generated context for notification 1');
-      expect(mockLogger.info).toHaveBeenCalledWith('Generated context for notification 2');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        logMessageMatching('Generated context for notification 1'),
+      );
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        logMessageMatching('Generated context for notification 2'),
+      );
     });
   });
 
@@ -921,7 +962,9 @@ describe('NotificationService', () => {
       } as unknown as DatabaseNotification<any>);
       await service.markRead('123');
       expect(mockBackend.markAsRead).toHaveBeenCalledWith('123', true);
-      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 marked as read');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        logMessageMatching('Notification 123 marked as read'),
+      );
     });
 
     it('should get unread in-app notifications', async () => {
@@ -933,7 +976,9 @@ describe('NotificationService', () => {
     it('should cancel a notification', async () => {
       await service.cancelNotification('123');
       expect(mockBackend.cancelNotification).toHaveBeenCalledWith('123');
-      expect(mockLogger.info).toHaveBeenCalledWith('Notification 123 cancelled');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        logMessageMatching('Notification 123 cancelled'),
+      );
     });
   });
 
@@ -976,7 +1021,9 @@ describe('NotificationService', () => {
 
       await serviceWithError.delayedSend('nonexistent');
 
-      expect(mockLogger.error).toHaveBeenCalledWith('Notification nonexistent not found');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        logMessageMatching('Notification nonexistent not found'),
+      );
     });
   });
 
@@ -1039,7 +1086,7 @@ describe('NotificationService', () => {
         }),
       );
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'Notification 456 created for resending notification 123',
+        logMessageMatching('Notification 456 created for resending notification 123'),
       );
     });
 
@@ -1069,7 +1116,9 @@ describe('NotificationService', () => {
       const result = await service.resendNotification('123');
 
       expect(result).toBeUndefined();
-      expect(mockLogger.error).toHaveBeenCalledWith('Notification 123 not found');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        logMessageMatching('Notification 123 not found'),
+      );
     });
 
     it('should fail when notification is scheduled for the future', async () => {
@@ -1081,7 +1130,9 @@ describe('NotificationService', () => {
       const result = await service.resendNotification('123');
 
       expect(result).toBeUndefined();
-      expect(mockLogger.error).toHaveBeenCalledWith('Notification 123 is scheduled for the future');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        logMessageMatching('Notification 123 is scheduled for the future'),
+      );
     });
 
     it('should fail when using stored context but none exists', async () => {
@@ -1094,7 +1145,9 @@ describe('NotificationService', () => {
       const result = await service.resendNotification('123', true);
 
       expect(result).toBeUndefined();
-      expect(mockLogger.error).toHaveBeenCalledWith('Context not found for notification 123');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        logMessageMatching('Context not found for notification 123'),
+      );
     });
 
     it('should throw errors when raiseErrorOnFailedSend is enabled', async () => {

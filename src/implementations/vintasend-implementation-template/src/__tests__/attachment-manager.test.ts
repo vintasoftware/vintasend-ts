@@ -1,6 +1,5 @@
+import { beforeEach, describe, expect, it } from 'vitest';
 import { TemplateAttachmentManager } from '../attachment-manager';
-import { describe, it, expect, beforeEach } from 'vitest';
-
 
 describe('TemplateAttachmentManager', () => {
   let manager: TemplateAttachmentManager;
