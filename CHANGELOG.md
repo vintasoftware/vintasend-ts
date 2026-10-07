@@ -1,5 +1,70 @@
 # Changelog
 
+# Version 1.0.0-alpha4
+
+Fixes to how managed templates are sent, deleted and audited, found by building a Medplum-backed
+application on alpha3, plus the native fallback that application needed. The Python packages
+received the same changes in `vintasend-managed-templates` 3.2.0 and its siblings, and the two
+`openapi.yaml` copies are byte-identical again.
+
+**Three behaviour changes need action from a host**: a template must be activated before it is
+sent, a published version can no longer be deleted, and `changedBy` should be resolved by the host
+rather than trusted from the request body.
+
+* **`vintasend-managed-templates`: sends no longer render drafts.** An unpinned `render` used the
+  newest version of a key whatever its status, so editing a published template sent the unreviewed
+  draft, and `pinTemplateVersions` pinned new notifications to it. "Latest" now means two things:
+  * The *editing view* — `getTemplate(key)` with no version — still returns the newest version of
+    any status, for editors and the API.
+  * The *send path* — `render`, `renderManaged` with no version or pin, and
+    `getLatestTemplateVersion` — resolves the newest **active** version. When several versions of a
+    key are active, the highest-numbered one wins.
+  * A key with versions but none active throws `ManagedTemplateNoActiveVersionError`, a subclass of
+    `ManagedTemplateNotFoundError`, so an API still maps it to 404.
+  * A pinned notification keeps rendering its pinned version after that version is deactivated:
+    the pin is there so a notification renders what was reviewed.
+  * The backend seam gains an optional `getActiveTemplate(key)`. A backend that leaves it out is
+    answered through `getFilteredTemplates({ key, status: 'active' })`.
+  * **Action:** templates that were being sent as drafts must be activated.
+* **`vintasend-managed-templates`: native fallback for keys with nothing published.**
+  `ManagedTemplateEmailRenderer` and `ManagedTemplateTextRenderer` take
+  `{ fallback: { renderer?, templates } }`: a default per key, rendered through a renderer of the
+  host's choosing — a file-based Pug renderer, typically — while the key has no active version. It
+  applies only on `render`, only to an unpinned notification, only to a registered key (matched
+  with `Object.hasOwn`), and never when a stored template fails to compose. A fallback payload
+  carries `templateSource: 'fallback'` and no `templateVersion`, so `usedTemplateVersion` stays
+  null. Only the key and notification id are logged. `getFallbackTemplate(key)` exposes the default
+  to a dashboard. A host subclass that caught the not-found error to do this can be deleted.
+* **Deletes are restricted to versions that were never published.** `deleteTemplate` refuses any
+  version that is not `draft`, or whose status history holds anything but `draft`, with
+  `ManagedTemplateDeletionNotAllowedError` — a notification may be pinned to it, and its history
+  records who published it. Archive it instead.
+  * `ManagedTemplateService` enforces this for every backend; the in-memory and Medplum backends
+    enforce it themselves too. Each takes `allowDeletingPublishedVersions`, off by default, and a
+    hard delete through the service needs both switched on.
+  * Status history is never deleted. **`vintasend-medplum-template-manager` used to delete a
+    version's `Provenance` resources along with it**, erasing the audit trail; it no longer does.
+  * A version number is never reused, so a new version cannot inherit a deleted one's history or
+    the notifications pinned to it. Medplum tags each status-change `Provenance` with the key and
+    version it was recorded against (`STATUS_CHANGE_TAG_SYSTEM`) so the numbers stay known after
+    the version is gone. `Provenance` written before this release carries no tags.
+  * `isTemplateVersionDeletable` and `assertTemplateVersionDeletable` are exported for backend
+    authors.
+  * **Action:** anything that deleted published versions must archive them instead.
+* **`vintasend-templates-management-api`: hardening.**
+  * `createApp({ resolveActor })`: when set, its answer is the `changedBy` every status route
+    records, replacing anything in the request body, so a caller holding the API key can no longer
+    write someone else's identity into the audit trail. **Action:** set it; without it the body is
+    still trusted, as before.
+  * Unhandled errors are no longer logged whole. The default is one line with the error's class
+    name, a request id and the route pattern — never the message, stack, request body or preview
+    context, which can carry health data. `onUnhandledError(error, c, { requestId })` overrides it,
+    and the default line is logged if that handler throws. The 500 now carries `X-Request-Id`.
+  * Refused deletes are a 409 `CONFLICT`, on both DELETE routes. `openapi.yaml` declares it.
+* **Every package moves to `1.0.0-alpha4` together.** `vintasend-medplum-template-manager` pins
+  `vintasend-managed-templates` exactly and uses its new exports, so the two cannot be mixed across
+  releases.
+
 # Version 1.0.0-alpha3
 
 Two fixes found by checking the TypeScript packages against the Python implementations of the same

@@ -1,6 +1,6 @@
 {
   "name": "vintasend-implementation-template",
-  "version": "1.0.0-alpha3",
+  "version": "1.0.0-alpha4",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/vintasoftware/vintasend-ts.git",
@@ -25,7 +25,7 @@
   "author": "Hugo Bessa",
   "license": "MIT",
   "dependencies": {
-    "vintasend": "^1.0.0-alpha3"
+    "vintasend": "^1.0.0-alpha4"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.10",
