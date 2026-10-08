@@ -1,6 +1,6 @@
 {
   "name": "vintasend-implementation-template",
-  "version": "1.0.0-alpha4",
+  "version": "1.0.0-alpha5",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/vintasoftware/vintasend-ts.git",

@@ -1,5 +1,61 @@
 # Changelog
 
+# Version 1.0.0-alpha5
+
+Keeps health data out of process logs. Hosts of these packages are HIPAA Business Associates, and
+their process logs (Vercel, CloudWatch) sit outside the audit trail, so a FHIR resource, a
+notification body or a provider's error message written there is a PHI exposure. A review of an
+application adopting `vintasend-medplum` found raw Medplum errors and `Communication.payload`
+items reaching `console`; the fix is enforced in the type system for every package.
+
+**One breaking change needs action from anyone who implements `BaseLogger` or calls a logger**:
+loggers now receive a `LogMessage`, never a string.
+
+* **`vintasend`: typed log messages.** `BaseLogger.info/warn/error` take a `LogMessage`, built with
+  the `log` tagged template. Every interpolated value must come from a helper that says what it is:
+  `logId`, `logIds`, `logCount`, `logLabel` (code-defined names only), `logTimestamp` or `logError`.
+  A plain string, a raw interpolation or a hand-built value does not compile, and `log` throws if a
+  cast smuggles one past the type checker.
+  * `logError(error, { status? })` keeps only the error's `name` and HTTP status (from `options`,
+    or a numeric `status` / `statusCode` on the error). Messages and stacks are dropped: data
+    stores and providers quote the failing request in them.
+  * `renderLogMessage(message, { renderValue? })` prints one (`String(message)` does the same);
+    `renderValue` lets a host hash ids or drop labels. `message.strings` and `message.values` are
+    there for structured logging.
+  * `logMessageMatching(expected)` is an asymmetric matcher for Vitest/Jest assertions on loggers.
+  * Core's own lines no longer print raw errors: send, context-generation, enqueue, replication,
+    mark-as-sent/failed and template-version failures now log the error's name only.
+  * **Action:** a custom logger takes `LogMessage` and prints `renderLogMessage(message)`; a call
+    such as ``logger.error(`Failed ${id}: ${error}`)`` becomes
+    ``logger.error(log`Failed ${logId(id)}: ${logError(error)}`)``.
+* **`vintasend-medplum`**:
+  * `getUserEmailFromNotification`, `getAttachments` and `MedplumAttachmentManager.deleteFile`
+    logged raw Medplum errors through `console` or as message text; `getAttachments` also
+    serialised every `Communication.payload` item at `info`. They now log ids and the error's name
+    and status through the injected logger, and the payload line is gone.
+  * `MedplumAttachmentManager` accepts `injectLogger`; the backend forwards its own logger to it.
+  * New `logMedplumError(error)`: `logError` with the status Medplum derives from an
+    `OperationOutcome`.
+  * `MedplumLogger` renders `LogMessage`s. It writes to process output and is meant for local
+    development; hosts handling PHI should inject a logger that redacts and ships to managed storage.
+* **`vintasend-sendgrid`**: attachment log lines printed the user-supplied filename, dumped the
+  storage metadata as JSON and dumped whole error objects. They now log the attachment id and the
+  error's name and status. Send failures are logged (with SendGrid's HTTP status) before being
+  rethrown.
+* **`vintasend-pug`**: render-failure lines name the notification, template key and error name;
+  Pug's error message, which can quote template source and context values, is never logged.
+* **`vintasend-winston`**: `WinstonLogger` takes `LogMessage`s.
+* `vintasend-prisma`, `vintasend-react-email`, `vintasend-managed-templates` and
+  `vintasend-medplum-template-manager` log through the typed API; none of them logged content.
+* **`vintasend-api`**: the 500 handler logged whole unhandled errors. It now logs the error name, a
+  request id and the route, and returns the request id in `X-Request-Id`.
+* **Lint**: Biome now fails on any `console` reference in library code across the root package,
+  the implementations and the implementation template (`noConsole` and `noRestrictedGlobals`).
+  Tests may spy on `console`, build-time CLIs under `src/scripts` may print, and the two
+  console-backed sample loggers carry one documented suppression each.
+* **Implementation template**: the sample logger and adapter demonstrate the typed API, and the
+  template requires `vintasend ^1.0.0-alpha5`.
+
 # Version 1.0.0-alpha4
 
 Fixes to how managed templates are sent, deleted and audited, found by building a Medplum-backed
