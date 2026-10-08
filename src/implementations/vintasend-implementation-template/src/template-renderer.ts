@@ -1,5 +1,6 @@
 import type {
   AnyNotification,
+  BaseLogger,
   BaseNotificationTemplateRenderer,
   BaseNotificationTypeConfig,
   DatabaseNotification,
@@ -9,6 +10,8 @@ import type {
 export class TemplateRenderer<Config extends BaseNotificationTypeConfig>
   implements BaseNotificationTemplateRenderer<Config>
 {
+  logger: BaseLogger | null = null;
+
   async render(notification: DatabaseNotification<Config>, context: JsonObject): Promise<unknown> {
     throw new Error('Not implemented');
   }
@@ -19,6 +22,10 @@ export class TemplateRenderer<Config extends BaseNotificationTypeConfig>
     context: JsonObject,
   ): Promise<unknown> {
     throw new Error('Not implemented');
+  }
+
+  injectLogger(logger: BaseLogger): void {
+    this.logger = logger;
   }
 }
 
