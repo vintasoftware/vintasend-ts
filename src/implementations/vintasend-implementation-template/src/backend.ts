@@ -11,7 +11,6 @@ import type {
   Notification,
   NotificationFilter,
   NotificationFilterCapabilities,
-  NotificationInput,
   NotificationOrderBy,
   OneOffNotificationInput,
   StoredAttachment,
@@ -20,41 +19,41 @@ import type {
 export class NotificationBackend<Config extends BaseNotificationTypeConfig>
   implements BaseNotificationBackend<Config>
 {
-  private logger: BaseLogger | null = null;
+  protected logger: BaseLogger | null = null;
 
   getBackendIdentifier?(): string {
     return 'vintasend-implementation-template'; // Return a unique identifier for this backend implementation (e.g., 'postgresql', 'mongodb', 'dynamodb', etc.)
   }
 
-  getAllPendingNotifications(): Promise<AnyDatabaseNotification<Config>[]> {
+  async getAllPendingNotifications(): Promise<AnyDatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  getPendingNotifications(
+  async getPendingNotifications(
     page: number,
     pageSize: number,
   ): Promise<AnyDatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  getAllFutureNotifications(): Promise<AnyDatabaseNotification<Config>[]> {
+  async getAllFutureNotifications(): Promise<AnyDatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  getFutureNotifications(
+  async getFutureNotifications(
     page: number,
     pageSize: number,
   ): Promise<AnyDatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  getAllFutureNotificationsFromUser(
+  async getAllFutureNotificationsFromUser(
     userId: Config['UserIdType'],
   ): Promise<DatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  getFutureNotificationsFromUser(
+  async getFutureNotificationsFromUser(
     userId: Config['UserIdType'],
     page: number,
     pageSize: number,
@@ -62,7 +61,7 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
     throw new Error('Method not implemented.');
   }
 
-  persistNotification(
+  async persistNotification(
     notification: Omit<Notification<Config>, 'id'> & {
       id?: Config['NotificationIdType'];
     },
@@ -70,72 +69,72 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
     throw new Error('Method not implemented.');
   }
 
-  getAllNotifications(): Promise<AnyDatabaseNotification<Config>[]> {
+  async getAllNotifications(): Promise<AnyDatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  getNotifications(page: number, pageSize: number): Promise<AnyDatabaseNotification<Config>[]> {
+  async getNotifications(page: number, pageSize: number): Promise<AnyDatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  bulkPersistNotifications(
+  async bulkPersistNotifications(
     notifications: Omit<AnyNotification<Config>, 'id'>[],
   ): Promise<Config['NotificationIdType'][]> {
     throw new Error('Method not implemented.');
   }
 
-  persistNotificationUpdate(
+  async persistNotificationUpdate(
     notificationId: Config['NotificationIdType'],
     notification: Partial<Omit<Notification<Config>, 'id'>>,
   ): Promise<DatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
 
-  applyReplicationSnapshotIfNewer?(snapshot: AnyDatabaseNotification<Config>): Promise<{
+  async applyReplicationSnapshotIfNewer?(snapshot: AnyDatabaseNotification<Config>): Promise<{
     applied: boolean;
   }> {
     throw new Error('Method not implemented.');
   }
 
-  markAsSent(
+  async markAsSent(
     notificationId: Config['NotificationIdType'],
     checkIsPending: boolean,
   ): Promise<AnyDatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
 
-  markAsFailed(
+  async markAsFailed(
     notificationId: Config['NotificationIdType'],
     checkIsPending: boolean,
   ): Promise<AnyDatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
 
-  markAsRead(
+  async markAsRead(
     notificationId: Config['NotificationIdType'],
     checkIsSent: boolean,
   ): Promise<DatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
 
-  cancelNotification(notificationId: Config['NotificationIdType']): Promise<void> {
+  async cancelNotification(notificationId: Config['NotificationIdType']): Promise<void> {
     throw new Error('Method not implemented.');
   }
 
-  getNotification(
+  async getNotification(
     notificationId: Config['NotificationIdType'],
     forUpdate: boolean,
   ): Promise<AnyDatabaseNotification<Config> | null> {
     throw new Error('Method not implemented.');
   }
 
-  filterAllInAppUnreadNotifications(
+  async filterAllInAppUnreadNotifications(
     userId: Config['UserIdType'],
   ): Promise<DatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  filterInAppUnreadNotifications(
+  async filterInAppUnreadNotifications(
     userId: Config['UserIdType'],
     page: number,
     pageSize: number,
@@ -143,13 +142,13 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
     throw new Error('Method not implemented.');
   }
 
-  getUserEmailFromNotification(
+  async getUserEmailFromNotification(
     notificationId: Config['NotificationIdType'],
   ): Promise<string | undefined> {
     throw new Error('Method not implemented.');
   }
 
-  storeAdapterAndContextUsed(
+  async storeAdapterAndContextUsed(
     notificationId: Config['NotificationIdType'],
     adapterKey: string,
     context: InputJsonValue,
@@ -170,14 +169,14 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
    * `persistOneOffNotification` and their update twins — it arrives as an ordinary field, not
    * through a dedicated method.
    */
-  storeTemplateVersion(
+  async storeTemplateVersion(
     notificationId: Config['NotificationIdType'],
     templateVersion: number,
   ): Promise<void> {
     throw new Error('Method not implemented.');
   }
 
-  persistOneOffNotification(
+  async persistOneOffNotification(
     notification: Omit<OneOffNotificationInput<Config>, 'id'> & {
       id?: Config['NotificationIdType'];
     },
@@ -185,25 +184,25 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
     throw new Error('Method not implemented.');
   }
 
-  persistOneOffNotificationUpdate(
+  async persistOneOffNotificationUpdate(
     notificationId: Config['NotificationIdType'],
     notification: Partial<Omit<OneOffNotificationInput<Config>, 'id'>>,
   ): Promise<DatabaseOneOffNotification<Config>> {
     throw new Error('Method not implemented.');
   }
 
-  getOneOffNotification(
+  async getOneOffNotification(
     notificationId: Config['NotificationIdType'],
     forUpdate: boolean,
   ): Promise<DatabaseOneOffNotification<Config> | null> {
     throw new Error('Method not implemented.');
   }
 
-  getAllOneOffNotifications(): Promise<DatabaseOneOffNotification<Config>[]> {
+  async getAllOneOffNotifications(): Promise<DatabaseOneOffNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 
-  getOneOffNotifications(
+  async getOneOffNotifications(
     page: number,
     pageSize: number,
   ): Promise<DatabaseOneOffNotification<Config>[]> {
@@ -221,7 +220,7 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
    * @param pageSize - Number of results per page
    * @returns Matching notifications
    */
-  filterNotifications(
+  async filterNotifications(
     filter: NotificationFilter<Config>,
     page: number,
     pageSize: number,
@@ -264,7 +263,7 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
    * Called after AttachmentManager.uploadFile() returns storageIdentifiers.
    * Backend persists file metadata and storage identifiers for later retrieval.
    */
-  storeAttachmentFileRecord?(record: AttachmentFileRecord): Promise<void> {
+  async storeAttachmentFileRecord?(record: AttachmentFileRecord): Promise<void> {
     throw new Error('Method not implemented.');
   }
 
@@ -273,7 +272,7 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
    * Returns the file metadata and storage identifiers needed to reconstruct file access.
    * Used by AttachmentManager.reconstructAttachmentFile() to get file content.
    */
-  getAttachmentFileRecord(fileId: string): Promise<AttachmentFileRecord | null> {
+  async getAttachmentFileRecord(fileId: string): Promise<AttachmentFileRecord | null> {
     throw new Error('Method not implemented.');
   }
 
@@ -281,7 +280,7 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
    * @deprecated Use getAttachmentFileRecord instead.
    * Get an attachment file record by ID
    */
-  getAttachmentFile(fileId: string): Promise<AttachmentFileRecord | null> {
+  async getAttachmentFile(fileId: string): Promise<AttachmentFileRecord | null> {
     throw new Error('Method not implemented.');
   }
 
@@ -290,35 +289,35 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
    * Backend queries its database for files with matching checksums.
    * Used during file upload to avoid storing duplicate files.
    */
-  findAttachmentFileByChecksum(checksum: string): Promise<AttachmentFileRecord | null> {
+  async findAttachmentFileByChecksum(checksum: string): Promise<AttachmentFileRecord | null> {
     throw new Error('Method not implemented.');
   }
 
   /**
    * Delete an attachment file (only if not referenced by any notifications)
    */
-  deleteAttachmentFile(fileId: string): Promise<void> {
+  async deleteAttachmentFile(fileId: string): Promise<void> {
     throw new Error('Method not implemented.');
   }
 
   /**
    * Get all attachment files not referenced by any notifications (for cleanup)
    */
-  getOrphanedAttachmentFiles(): Promise<AttachmentFileRecord[]> {
+  async getOrphanedAttachmentFiles(): Promise<AttachmentFileRecord[]> {
     throw new Error('Method not implemented.');
   }
 
   /**
    * Get all attachments for a specific notification
    */
-  getAttachments(notificationId: Config['NotificationIdType']): Promise<type[]> {
+  async getAttachments(notificationId: Config['NotificationIdType']): Promise<StoredAttachment[]> {
     throw new Error('Method not implemented.');
   }
 
   /**
    * Delete a specific attachment from a notification
    */
-  deleteNotificationAttachment?(
+  async deleteNotificationAttachment?(
     notificationId: Config['NotificationIdType'],
     attachmentId: string,
   ): Promise<void> {

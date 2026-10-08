@@ -107,8 +107,8 @@ export class TemplateAttachmentManager extends BaseAttachmentManager {
  */
 export class TemplateAttachmentFile implements AttachmentFile {
   constructor(
-    private fileId: string,
-    private storageIdentifiers: StorageIdentifiers,
+    protected readonly fileId: string,
+    protected readonly storageIdentifiers: StorageIdentifiers,
   ) {
     // TODO: Store any additional context needed for file operations
     // Example: private s3Client: S3Client, private bucket: string, private key: string
