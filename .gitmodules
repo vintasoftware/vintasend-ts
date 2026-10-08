@@ -65,3 +65,7 @@
 	path = src/tools/vintasend-templates-management-dashboard
 	url = git@github.com:vintasoftware/vintasend-templates-management-dashboard.git
 	branch = feat/templates-management-dashboard
+[submodule "src/implementations/vintasend-liquidjs"]
+	path = src/implementations/vintasend-liquidjs
+	url = git@github.com:vintasoftware/vintasend-liquidjs.git
+	branch = main

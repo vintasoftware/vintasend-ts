@@ -900,6 +900,7 @@ Storage for [managed templates](#managed-templates) — where the versions, tags
 * **[vintasend-medplum-template-manager](https://github.com/vintasoftware/vintasend-medplum-template-manager/)**: Stores managed templates as FHIR `MessageDefinition` resources, alongside the notifications that reference them.
 
 ##### Template Renderers
+* **[vintasend-liquidjs](https://github.com/vintasoftware/vintasend-liquidjs/)**: Renders emails and SMS using LiquidJS, from template files or an in-memory template map.
 * **[vintasend-pug](https://github.com/vintasoftware/vintasend-pug/)**: Renders emails using Pug.
 * **[vintasend-react-email](https://github.com/vintasoftware/vintasend-react-email/)**: Renders emails using React Email, including uncompiled TS/TSX template support.
 
