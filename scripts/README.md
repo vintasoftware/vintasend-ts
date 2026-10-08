@@ -8,11 +8,17 @@ This directory contains automation scripts for releasing new versions of vintase
 Creates a new implementation package from `vintasend-implementation-template`.
 
 What it does:
-- Copies the template to a new directory under `src/implementations`
-- Updates the new package `name` in `package.json`
+- Copies the template to a new directory under `src/implementations`, skipping
+  local artifacts (`node_modules`, `coverage`, `dist`, `package-lock.json`,
+  `.DS_Store`, `Thumbs.db`)
+- Updates the new package `name`, `description` and `repository` in `package.json`
+  (`repository` points at `github.com/<repo>`, with no `directory`)
+- Fills in the `Repository:` line in `.github/workflows/publish.yml` with the
+  same repository, for registering the npm trusted publisher
 - Keeps only selected components (backend, attachment-manager, adapter, template-renderer, logger)
 - Deletes unused component source and test files
-- Rewrites `src/index.ts` exports to match selected components
+- Rewrites `src/index.ts` exports to match selected components (with `.js`
+  extensions, as required by `moduleResolution: NodeNext`)
 - Replaces `README.md` with a concise package-specific version
 
 Usage:
@@ -21,6 +27,8 @@ npm run implementation:generate -- --dir=vintasend-aws-ses --package=@acme/vinta
 ```
 
 Optional flags:
+- `--repo=<owner>/<name>` (or just `--repo=<name>`) to set the GitHub repository;
+  defaults to `vintasoftware/<dir>`
 - `--force` to overwrite an existing target directory
 - `--help` to show all options
 

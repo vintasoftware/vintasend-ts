@@ -12,33 +12,33 @@ const COMPONENTS = {
     sourceFile: 'backend.ts',
     testFile: 'backend.test.ts',
     exportLines: [
-      "export { NotificationBackend, NotificationBackendFactory } from './backend';",
+      "export { NotificationBackend, NotificationBackendFactory } from './backend.js';",
     ],
   },
   adapter: {
     sourceFile: 'adapter.ts',
     testFile: 'adapter.test.ts',
     exportLines: [
-      "export { NotificationAdapter, NotificationAdapterFactory } from './adapter';",
+      "export { NotificationAdapter, NotificationAdapterFactory } from './adapter.js';",
     ],
   },
   'template-renderer': {
     sourceFile: 'template-renderer.ts',
     testFile: 'template-renderer.test.ts',
     exportLines: [
-      "export { TemplateRenderer, TemplateRendererFactory } from './template-renderer';",
+      "export { TemplateRenderer, TemplateRendererFactory } from './template-renderer.js';",
     ],
   },
   logger: {
     sourceFile: 'logger.ts',
     testFile: 'logger.test.ts',
-    exportLines: ["export { Logger } from './logger';"],
+    exportLines: ["export { Logger } from './logger.js';"],
   },
   'attachment-manager': {
     sourceFile: 'attachment-manager.ts',
     testFile: 'attachment-manager.test.ts',
     exportLines: [
-      "export { TemplateAttachmentFile, TemplateAttachmentManager } from './attachment-manager';",
+      "export { TemplateAttachmentFile, TemplateAttachmentManager } from './attachment-manager.js';",
     ],
   },
 };
@@ -62,6 +62,18 @@ const COMPONENT_ALIASES = {
   attachmentmanager: 'attachment-manager',
   attachments: 'attachment-manager',
 };
+
+const DEFAULT_REPO_OWNER = 'vintasoftware';
+
+// Local artifacts in the template directory that must not end up in a generated package.
+const COPY_EXCLUDED_NAMES = new Set([
+  'node_modules',
+  'coverage',
+  'dist',
+  'package-lock.json',
+  '.DS_Store',
+  'Thumbs.db',
+]);
 
 const COMPONENT_ORDER = [
   'backend',
@@ -94,6 +106,8 @@ Required:
   --components    Comma-separated components to keep
 
 Optional:
+  --repo          GitHub repository for the new package, as <owner>/<name> or <name>
+                  (default: ${DEFAULT_REPO_OWNER}/<dir>)
   --force         Overwrite target directory if it already exists
   --help          Show this help
 
@@ -116,6 +130,7 @@ function parseArgs(argv) {
     dirName: null,
     packageName: null,
     components: null,
+    repo: null,
     force: false,
     help: false,
   };
@@ -143,6 +158,11 @@ function parseArgs(argv) {
 
     if (arg.startsWith('--components=')) {
       output.components = arg.split('=')[1] || null;
+      continue;
+    }
+
+    if (arg.startsWith('--repo=')) {
+      output.repo = arg.split('=')[1] || null;
       continue;
     }
 
@@ -174,6 +194,17 @@ function validatePackageName(packageName) {
   if (packageName.includes(' ')) {
     throw new Error('--package must not contain spaces');
   }
+}
+
+function normalizeRepo(repoRaw, dirName) {
+  const repo = repoRaw || dirName;
+  const fullRepo = repo.includes('/') ? repo : `${DEFAULT_REPO_OWNER}/${repo}`;
+
+  if (!/^[a-z0-9][a-z0-9-]*\/[a-z0-9._-]+$/i.test(fullRepo)) {
+    throw new Error('--repo must be <owner>/<name> or <name>');
+  }
+
+  return fullRepo;
 }
 
 function normalizeComponents(componentsRaw) {
@@ -245,11 +276,28 @@ ${bullets}
 `;
 }
 
-function updatePackageJson(packageJsonPath, packageName, keptComponents) {
+function updatePackageJson(packageJsonPath, packageName, repo, keptComponents) {
   const packageData = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
   packageData.name = packageName;
   packageData.description = `VintaSend implementation package (${keptComponents.join(', ')})`;
+  packageData.repository = {
+    type: 'git',
+    url: `git+https://github.com/${repo}.git`,
+  };
   fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageData, null, 2)}\n`, 'utf8');
+}
+
+function updatePublishWorkflow(workflowPath, repo) {
+  if (!fs.existsSync(workflowPath)) {
+    return;
+  }
+
+  const content = fs.readFileSync(workflowPath, 'utf8');
+  const updated = content.replace(
+    /^(#\s+Repository:\s+).*$/m,
+    (_match, prefix) => `${prefix}${repo}`,
+  );
+  fs.writeFileSync(workflowPath, updated, 'utf8');
 }
 
 function writeIndex(indexPath, keptComponents) {
@@ -285,7 +333,10 @@ function copyTemplate(templateDir, targetDir, force) {
     fs.rmSync(targetDir, { recursive: true, force: true });
   }
 
-  fs.cpSync(templateDir, targetDir, { recursive: true });
+  fs.cpSync(templateDir, targetDir, {
+    recursive: true,
+    filter: (source) => !COPY_EXCLUDED_NAMES.has(path.basename(source)),
+  });
 }
 
 function cleanupReadme(readmePath, packageName, dirName, keptComponents) {
@@ -412,6 +463,7 @@ async function main() {
     validatePackageName(packageName);
 
     const keptComponents = normalizeComponents(componentsRaw);
+    const repo = normalizeRepo(parsed.repo, dirName);
 
     const rootDir = path.join(__dirname, '..');
     const implementationsDir = path.join(rootDir, 'src', 'implementations');
@@ -437,7 +489,10 @@ async function main() {
     writeIndex(path.join(targetDir, 'src', 'index.ts'), keptComponents);
 
     logInfo('Updating package metadata...');
-    updatePackageJson(path.join(targetDir, 'package.json'), packageName, keptComponents);
+    updatePackageJson(path.join(targetDir, 'package.json'), packageName, repo, keptComponents);
+
+    logInfo('Updating publish workflow...');
+    updatePublishWorkflow(path.join(targetDir, '.github', 'workflows', 'publish.yml'), repo);
 
     logInfo('Cleaning README...');
     cleanupReadme(
