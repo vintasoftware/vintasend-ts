@@ -1,7 +1,5 @@
 // Attachment Manager
 export { BaseAttachmentManager } from './services/attachment-manager/base-attachment-manager.js';
-export type { LocalFileAttachmentManagerConfig } from './services/attachment-manager/local-file-attachment-manager.js';
-export { LocalFileAttachmentManager } from './services/attachment-manager/local-file-attachment-manager.js';
 // Git Commit SHA Provider
 export type { BaseGitCommitShaProvider } from './services/git-commit-sha/base-git-commit-sha-provider.js';
 // Logger

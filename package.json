@@ -11,11 +11,19 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./local-file-attachment-manager": {
+      "types": "./dist/local-file-attachment-manager.d.ts",
+      "import": "./dist/local-file-attachment-manager.js"
     }
   },
   "files": [
     "dist"
   ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.16"
+  },
   "author": "Hugo Bessa",
   "license": "MIT",
   "type": "module",
@@ -50,9 +58,9 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.10",
-    "@types/mime-types": "^3.0.1",
     "@types/node": "^25.0.8",
     "@vitest/coverage-v8": "4.0.18",
+    "esbuild": "^0.28.2",
     "husky": "^9.1.7",
     "tsc-esm-fix": "^3.1.2",
     "typescript": "^5.9.3",
@@ -60,6 +68,6 @@
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.2",
-    "mime-types": "^3.0.2"
+    "mime": "^4.1.0"
   }
 }

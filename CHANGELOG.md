@@ -1,5 +1,22 @@
 # Changelog
 
+# Unreleased
+
+* **The `vintasend` entry loads in a browser.** It used to re-export `LocalFileAttachmentManager`,
+  whose module called Node's `promisify` as it loaded, so a browser bundle of anything importing
+  `vintasend` (`vintasend-managed-templates` included) failed at load.
+  * **Breaking:** `LocalFileAttachmentManager` moves to its own entry.
+    **Action:** `import { LocalFileAttachmentManager } from 'vintasend'` becomes
+    `import { LocalFileAttachmentManager } from 'vintasend/local-file-attachment-manager'`.
+  * `BaseAttachmentManager` imports no Node module: `calculateChecksum`, and `fileToBuffer` given a
+    path, fetch `node:crypto` and `node:fs/promises` through `process.getBuiltinModule` when they
+    run. Their signatures do not change. That needs Node.js 20.16 or later, now declared in
+    `engines`.
+  * Content types come from `mime` rather than `mime-types`, which imports Node's `path`.
+  * `package.json` declares `"sideEffects": false`.
+  * A test bundles the entry for the browser and loads it with no Node globals, and another checks
+    that nothing in its module graph imports a Node built-in.
+
 # Version 1.0.0-alpha6
 
 The two HTTP APIs become packages a host can install and mount, and their contracts get stricter

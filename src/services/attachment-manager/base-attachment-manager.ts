@@ -1,13 +1,18 @@
-import * as crypto from 'node:crypto';
 import type { Readable } from 'node:stream';
-import * as mime from 'mime-types';
+import mime from 'mime';
 import type {
   AttachmentFile,
   AttachmentFileRecord,
   FileAttachment,
   StorageIdentifiers,
 } from '../../types/attachment.js';
+import { nodeBuiltin } from '../node-builtins.js';
 
+/**
+ * Loading this module touches no Node API, so the `vintasend` entry loads in a browser. The
+ * methods that need one (`calculateChecksum`, and `fileToBuffer` given a path) fetch it when they
+ * run.
+ */
 export abstract class BaseAttachmentManager {
   /**
    * Upload a file and return file record (reusable across notifications)
@@ -33,7 +38,7 @@ export abstract class BaseAttachmentManager {
    * Public to allow backends and custom implementations to use it
    */
   public detectContentType(filename: string): string {
-    return mime.lookup(filename) || 'application/octet-stream';
+    return mime.getType(filename) || 'application/octet-stream';
   }
 
   /**
@@ -41,7 +46,7 @@ export abstract class BaseAttachmentManager {
    * Public to allow backends to perform deduplication checks
    */
   public calculateChecksum(data: Buffer): string {
-    return crypto.createHash('sha256').update(data).digest('hex');
+    return nodeBuiltin('node:crypto').createHash('sha256').update(data).digest('hex');
   }
 
   /**
@@ -61,8 +66,7 @@ export abstract class BaseAttachmentManager {
       return this.nodeStreamToBuffer(file);
     }
     if (typeof file === 'string') {
-      const fs = await import('node:fs/promises');
-      return fs.readFile(file);
+      return nodeBuiltin('node:fs/promises').readFile(file);
     }
     throw new Error('Unsupported file type');
   }
