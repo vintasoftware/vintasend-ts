@@ -12,6 +12,8 @@
     path, fetch `node:crypto` and `node:fs/promises` through `process.getBuiltinModule` when they
     run. Their signatures do not change. That needs Node.js 20.16 or later, now declared in
     `engines`.
+  * **Breaking:** Node.js 18, past its end of life since April 2025, is no longer supported, and CI
+    runs on Node.js 20, 22 and 24.
   * Content types come from `mime` rather than `mime-types`, which imports Node's `path`.
   * `package.json` declares `"sideEffects": false`.
   * A test bundles the entry for the browser and loads it with no Node globals, and another checks
