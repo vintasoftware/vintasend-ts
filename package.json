@@ -1,6 +1,6 @@
 {
   "name": "vintasend",
-  "version": "1.0.0-alpha5",
+  "version": "1.0.0-alpha6",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/vintasoftware/vintasend-ts.git"
