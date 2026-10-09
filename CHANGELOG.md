@@ -1,5 +1,87 @@
 # Changelog
 
+# Version 1.0.0-alpha6
+
+The two HTTP APIs become packages a host can install and mount, and their contracts get stricter
+about what they accept. A team running a copy of the templates management API behind its own
+authentication reported the contract gaps and bugs below; every one also existed here, and most in
+the Python implementations too, which change in the same release.
+
+**Breaking changes, each needing action:**
+
+* **`createApp` takes `authenticate`** in both `vintasend-api` and
+  `vintasend-templates-management-api`. It replaces `apiKey`, and in the templates API also
+  `resolveActor`.
+  * **Action:** `createApp({ apiKey: key, … })` becomes
+    `createApp({ authenticate: apiKeyAuthenticator(key), … })`. A templates API host that passed
+    `resolveActor: (c) => user` returns `{ actor: user }` from its authenticator instead.
+* **`ManagedTemplateServicePort.getComposedTemplate(key, version)` is now
+  `composeTemplate(template)`**, matching the library's own method, and
+  `asManagedTemplateServicePort` is no longer exported: it only ever mattered to the module-path
+  loader, which still runs it.
+* **Request bodies must be JSON.** A request declaring `application/json` (or any
+  `application/*+json`) must carry valid JSON, so an empty one is now a 400. A request declaring no
+  media type, or another one, still counts as an omitted body when it is empty, and is now a 400
+  otherwise — it used to be read as `{}`, which on `archive` meant "the latest version".
+  * **Action:** a client sending a body sets `Content-Type: application/json`. `curl -d` does not
+    unless told to.
+* **`hasMore` means the next page has a row**, in both APIs. It used to mean "this page came back
+  full", so a list exactly filling its last page offered an empty next one.
+* **`useCreateTemplate` and the other write hooks in `vintasend-templates-management-dashboard-core`
+  no longer wait for the lists to refetch** before the caller's `onSuccess`. `mutateAsync` resolves
+  before the lists have refreshed; await `useInvalidateTemplates()` where something must wait for
+  them.
+
+* **`vintasend-api` and `vintasend-templates-management-api` are published to npm.**
+  * Mount `createApp` in any server that speaks `fetch` (a Next.js route handler, TanStack Start,
+    Express through `@hono/node-server`), or run the `vintasend-api` /
+    `vintasend-templates-management-api` command for the standalone server.
+  * `vintasend` and `vintasend-managed-templates` are peer dependencies, so the host's service and
+    the API share one copy; with two, the templates API could not recognise the library's errors
+    and answered 404s and 409s as 500s.
+  * Both apps use Web APIs only (`crypto.subtle`, `crypto.randomUUID`), so they run outside Node.
+    The standalone server and the module-path loader are the Node-only parts.
+  * One `authenticate` serves both. Throw `ApiError.unauthorized` or `ApiError.forbidden`; either
+    package recognises the other's `ApiError` by name and code.
+* **Both contracts** (`openapi.yaml`, shared with the Python implementations):
+  * `FORBIDDEN` (403) for a caller the host knows and refuses, declared on every route.
+  * Every 400 carries `details.issues: [{ path, message }]`, including malformed JSON, a body in the
+    wrong media type, an invalid path parameter and a refusal from the library.
+* **`vintasend-templates-management-api`**:
+  * Preview reports a template that cannot be composed as `TEMPLATE_COMPOSITION_ERROR`, as
+    `GET /composition` does, rather than `PREVIEW_UNAVAILABLE`. A store failure while composing is
+    a generic 500 that reaches `onUnhandledError`; it used to return the backend's message to the
+    client in a 409.
+  * An invalid body on `activate`, `deactivate`, `archive` or `preview` is a 400; it was a 500.
+  * `/versions/1abc` and `/versions/1.9` are 400s; they used to act on version 1, and `DELETE`
+    deleted it.
+  * `GET /composition` reads the version once, so its references and composed sources always
+    describe the same version.
+  * `POST /templates/{key}/versions` declares its body optional, as it always was.
+  * Validated input is typed (`validate` is generic).
+  * The documentation recommends `vintasend-liquidjs`, with its DoS limits, for managed templates:
+    Pug runs the JavaScript in a template, so with it editing a template is running code.
+* **`vintasend-api`**: gains `onUnhandledError`, and its GitHub template client decodes with Web
+  APIs.
+* **`vintasend-templates-management-dashboard-core`**:
+  * `useFilterText` keeps a text filter's typed text locally and writes the trimmed value once
+    typing pauses; bound straight to `filters.name`, an input dropped every space.
+  * Query hooks retry only `INTERNAL_ERROR` and failures with no code (`retryUnlessDefinitive`), so
+    a 404, 409 or 400 shows at once instead of after about 7 seconds. A `retry` set on the app's
+    `QueryClient` is respected.
+  * `useFilteredTemplates` passes `enabled`, `retry`, `retryDelay`, `throwOnError` and
+    `networkMode` on to the capabilities read.
+  * New `/tanstack-router` entry point: `useTanStackRouterAdapter()` reads the search TanStack
+    Router has parsed, so its JSON-encoded arrays and quoted numbers reach the filters intact.
+    `@tanstack/react-router` is an optional peer dependency.
+  * `FORBIDDEN` is a recognised error code.
+* **`vintasend-dashboard-core`**: `FORBIDDEN` is a recognised error code; an unlisted one made
+  `isApiErrorResponse` reject a real answer.
+* **`vintasend-managed-templates`**: the README says to pick a renderer that cannot run code.
+* **New package, `vintasend-liquidjs`**: LiquidJS email and SMS renderers, from template files or
+  an in-memory map. Liquid templates cannot run arbitrary code.
+* **Release tooling**: both APIs now publish in the dependency waves.
+
 # Version 1.0.0-alpha5
 
 Keeps health data out of process logs. Hosts of these packages are HIPAA Business Associates, and

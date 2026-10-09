@@ -843,15 +843,25 @@ It is storage-agnostic — it defines the seam, not the database — and it adds
   and hands it one flat string.
 * **Tags and filtering**, spelled the same way VintaSend spells its notification filters.
 
-To send through it, wrap your existing renderer and set the notification's `bodyTemplate` to a
-template **key** instead of a path. Nothing else about creating or sending notifications changes.
+To send through it, wrap a renderer and set the notification's `bodyTemplate` to a template
+**key** instead of a path. Nothing else about creating or sending notifications changes.
+
+Wrap one whose engine cannot run code. A managed template is source that anyone who can edit
+templates hands straight to the engine: Liquid evaluates expressions and filters only, while Pug
+compiles a template to JavaScript and runs it, so with Pug editing a template is running code on
+the server. Keep Pug for templates that live in your repository.
 
 ```typescript
+import { LiquidEmailTemplateRendererFactory } from 'vintasend-liquidjs';
 import { ManagedTemplateEmailRenderer, ManagedTemplateService } from 'vintasend-managed-templates';
 import { MedplumTemplateManagerBackend } from 'vintasend-medplum-template-manager';
 
 const managerBackend = new MedplumTemplateManagerBackend(medplum);
-const renderer = new ManagedTemplateEmailRenderer<Config>(managerBackend, pugRenderer);
+const liquidRenderer = new LiquidEmailTemplateRendererFactory<Config>().create({
+  renderLimit: 1_000, // milliseconds: an edited template cannot make a send hang
+  strictFilters: true,
+});
+const renderer = new ManagedTemplateEmailRenderer<Config>(managerBackend, liquidRenderer);
 const templates = new ManagedTemplateService<Config>(managerBackend, renderer);
 
 await notificationService.createNotification({
@@ -901,7 +911,7 @@ Storage for [managed templates](#managed-templates) — where the versions, tags
 
 ##### Template Renderers
 * **[vintasend-liquidjs](https://github.com/vintasoftware/vintasend-liquidjs/)**: Renders emails and SMS using LiquidJS, from template files or an in-memory template map.
-* **[vintasend-pug](https://github.com/vintasoftware/vintasend-pug/)**: Renders emails using Pug.
+* **[vintasend-pug](https://github.com/vintasoftware/vintasend-pug/)**: Renders emails using Pug. Pug runs the JavaScript in a template, so use it only for templates in your repository, never for managed templates someone can edit.
 * **[vintasend-react-email](https://github.com/vintasoftware/vintasend-react-email/)**: Renders emails using React Email, including uncompiled TS/TSX template support.
 
 ##### Loggers
@@ -914,13 +924,13 @@ A dashboard for inspecting, previewing, resending and cancelling notifications,
 split into an API and a UI so the UI can be reused with any implementation of
 the API's contract — including one built on the Python `vintasend` package.
 
-* **[vintasend-api](https://github.com/vintasoftware/vintasend-ts-api/)** (`src/tools/vintasend-api`): REST API that exposes a configured VintaSend service over HTTP. Its `openapi.yaml` is the normative contract.
+* **[vintasend-api](https://github.com/vintasoftware/vintasend-ts-api/)** (`src/tools/vintasend-api`): REST API that exposes a configured VintaSend service over HTTP. Its `openapi.yaml` is the normative contract. Mount it in your own server with `createApp`, or run it on its own with the `vintasend-api` command.
 * **[vintasend-dashboard](https://github.com/vintasoftware/vintasend-dashboard/)** (`src/tools/vintasend-dashboard`): Next.js UI that consumes that contract. It holds no backend credentials of its own.
 
 And an API for editing the templates themselves, sharing its `openapi.yaml` byte-for-byte with the
 Python implementation so one generated client works against either server.
 
-* **[vintasend-templates-management-api](https://github.com/vintasoftware/vintasend-ts-templates-management-api/)** (`src/tools/vintasend-templates-management-api`): REST API over a configured `ManagedTemplateService` — versions, the status lifecycle, tags, composition and previews.
+* **[vintasend-templates-management-api](https://github.com/vintasoftware/vintasend-ts-templates-management-api/)** (`src/tools/vintasend-templates-management-api`): REST API over a configured `ManagedTemplateService` — versions, the status lifecycle, tags, composition and previews. Mount it in your own server with `createApp`, or run it on its own with the `vintasend-templates-management-api` command.
 
 ## Examples
 
