@@ -1,5 +1,57 @@
 # Changelog
 
+# Unreleased
+
+* **The `vintasend` entry loads in a browser.** It used to re-export `LocalFileAttachmentManager`,
+  whose module called Node's `promisify` as it loaded, so a browser bundle of anything importing
+  `vintasend` (`vintasend-managed-templates` included) failed at load.
+  * **Breaking:** `LocalFileAttachmentManager` moves to its own entry.
+    **Action:** `import { LocalFileAttachmentManager } from 'vintasend'` becomes
+    `import { LocalFileAttachmentManager } from 'vintasend/local-file-attachment-manager'`.
+  * `BaseAttachmentManager` imports no Node module: `calculateChecksum`, and `fileToBuffer` given a
+    path, fetch `node:crypto` and `node:fs/promises` through `process.getBuiltinModule` when they
+    run. Their signatures do not change. That needs Node.js 20.16 or later, now declared in
+    `engines`.
+  * **Breaking:** Node.js 18, past its end of life since April 2025, is no longer supported, and CI
+    runs on Node.js 20, 22 and 24.
+  * Content types come from `mime` rather than `mime-types`, which imports Node's `path`.
+  * `package.json` declares `"sideEffects": false`.
+  * A test bundles the entry for the browser and loads it with no Node globals, and another checks
+    that nothing in its module graph imports a Node built-in.
+
+* **`vintasend-templates-management-api`: `createApp` takes `templateManagedBackend`.** When set,
+  every new template is stored under that backend name, whatever the create request carries, so a
+  host serving one backend does not let a browser label a template with another. When absent, the
+  request's value is stored, as before. The field stays required in the contract.
+
+* **`vintasend-templates-management-api/testing`: the API in memory.** `createHarness` builds the
+  library's `ManagedTemplateService` over `InMemoryTemplateManagerBackend` and `createApp` over
+  that, and returns `{ app, backend, service, request, json }`. It takes `authenticate`,
+  `onUnhandledError`, `templateManagedBackend`, `capabilities`, `now` and `renderer`. Its
+  `TestEmailRenderer` fills `{{ name }}` variables and throws on a template containing `boom`. Also
+  `createInput`, `post`, `put`, `patch` and `API_KEY`. It loads in a browser, for a UI's stories and
+  tests, and the package's own route tests run on it.
+
+* **Both APIs' entries load in a browser.**
+  * **Breaking:** `loadServerConfig`, `ServerConfig` and the service-module loader
+    (`createServiceProvider`, `loadTemplateService` / `loadNotificationService`) move to a
+    `./server` entry. **Action:** import them from `vintasend-templates-management-api/server` or
+    `vintasend-api/server`.
+  * **Breaking:** `vintasend-templates-management-api` no longer exports `ServiceCaller`,
+    `buildTemplatePreview`, `PREVIEW_CONTEXT_NAME`, `buildBackendFilter`, `buildStatusFilter`,
+    `buildStringFilter` or `describeMissing`, which were internals.
+  * Both declare `"sideEffects": false`, and a test bundles each entry for the browser and checks
+    its module graph for Node built-ins.
+
+* **Both APIs export `bearerToken(header)`**, the token in an `Authorization: Bearer` header or
+  `null`, for a host writing its own `Authenticator`.
+
+* **Both APIs use Zod 4** and `@hono/zod-validator` 0.9, so a host on Zod 4 installs one copy.
+
+* **`@hono/node-server` is an optional peer dependency of both APIs**, used only by the standalone
+  command. **Action:** to run `vintasend-api` or `vintasend-templates-management-api` as a command,
+  also `npm install @hono/node-server`.
+
 # Version 1.0.0-alpha6
 
 The two HTTP APIs become packages a host can install and mount, and their contracts get stricter

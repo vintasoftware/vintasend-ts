@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
+import { access, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import { Readable } from 'node:stream';
-import { promisify } from 'node:util';
 import type {
   AttachmentFile,
   AttachmentFileRecord,
@@ -9,12 +9,6 @@ import type {
   StorageIdentifiers,
 } from '../../types/attachment.js';
 import { BaseAttachmentManager } from './base-attachment-manager.js';
-
-const writeFile = promisify(fs.writeFile);
-const readFile = promisify(fs.readFile);
-const unlink = promisify(fs.unlink);
-const access = promisify(fs.access);
-const stat = promisify(fs.stat);
 
 /**
  * Configuration options for LocalFileAttachmentManager
@@ -36,6 +30,9 @@ export interface LocalFileAttachmentManagerConfig {
 /**
  * Local filesystem-based attachment manager for development and testing.
  *
+ * Node only: import it from `vintasend/local-file-attachment-manager`. The `vintasend` entry
+ * leaves it out so that the entry loads in a browser.
+ *
  * WARNING: This implementation is NOT recommended for production use.
  * Use cloud storage solutions (S3, Azure Blob, GCS) for production.
  *
@@ -53,6 +50,8 @@ export interface LocalFileAttachmentManagerConfig {
  *
  * @example
  * ```typescript
+ * import { LocalFileAttachmentManager } from 'vintasend/local-file-attachment-manager';
+ *
  * const attachmentManager = new LocalFileAttachmentManager({
  *   baseDirectory: './uploads/attachments'
  * });

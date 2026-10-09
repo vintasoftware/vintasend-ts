@@ -120,6 +120,25 @@ describe('BaseAttachmentManager', () => {
 
         expect(checksum1).not.toBe(checksum2);
       });
+
+      it('names what it needs where there is no Node crypto', () => {
+        const getBuiltinModule = process.getBuiltinModule;
+        // A browser has no process.getBuiltinModule; neither does Node before 20.16.
+        Object.defineProperty(process, 'getBuiltinModule', {
+          value: undefined,
+          configurable: true,
+        });
+        try {
+          expect(() => manager.calculateChecksum(Buffer.from('test content'))).toThrow(
+            'node:crypto is not available here',
+          );
+        } finally {
+          Object.defineProperty(process, 'getBuiltinModule', {
+            value: getBuiltinModule,
+            configurable: true,
+          });
+        }
+      });
     });
 
     describe('fileToBuffer', () => {

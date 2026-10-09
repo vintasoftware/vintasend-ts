@@ -605,7 +605,7 @@ Version 0.4.0 introduces file attachment support with a **breaking change** to t
 
 3. **If you want to use attachments** - Pass the `attachmentManager`:
    ```typescript
-   import { LocalFileAttachmentManager } from 'vintasend';
+   import { LocalFileAttachmentManager } from 'vintasend/local-file-attachment-manager';
    
    const attachmentManager = new LocalFileAttachmentManager({ uploadDir: './uploads' });
    
