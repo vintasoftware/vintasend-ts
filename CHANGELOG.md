@@ -1,6 +1,10 @@
 # Changelog
 
-# Unreleased
+# Version 1.0.0-alpha7
+
+`vintasend` and both HTTP APIs load in a browser, so a UI's Storybook and tests can run the
+templates management API in memory with no stubs. A team embedding 1.0.0-alpha6 reported the gaps
+below. The Python templates management API gains the same backend-name option in the same round.
 
 * **The `vintasend` entry loads in a browser.** It used to re-export `LocalFileAttachmentManager`,
   whose module called Node's `promisify` as it loaded, so a browser bundle of anything importing
