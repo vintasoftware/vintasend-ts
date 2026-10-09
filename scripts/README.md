@@ -41,8 +41,8 @@ Release step 1: puts every package in the workspace on one new version.
 
 What it does:
 - Discovers **every** package — the root `vintasend`, everything under
-  `src/implementations`, everything under `src/tools` (including the APIs and
-  dashboards that carry the version but publish nothing), and
+  `src/implementations`, everything under `src/tools` (including the two
+  dashboard apps that carry the version but publish nothing), and
   `vintasend-implementation-template`
 - Starts from the highest version found anywhere and applies the chosen bump
 - Writes that version into every `package.json`

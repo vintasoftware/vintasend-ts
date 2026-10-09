@@ -48,8 +48,8 @@ new version into every package.
 What it touches:
 
 - **Every package**, not just the implementations: the root package, everything
-  under `src/implementations`, everything under `src/tools` (including the APIs
-  and dashboards, which carry the version but publish nothing), and
+  under `src/implementations`, everything under `src/tools` (including the two
+  dashboard apps, which carry the version but publish nothing), and
   `vintasend-implementation-template` so newly scaffolded packages start on the
   current version.
 - **Every internal dependency range**, in `dependencies`, `peerDependencies`,
@@ -95,9 +95,7 @@ For each dependency wave, in order:
 Then, once every wave is published:
 
 6. commit and push the repositories that carry the version but publish nothing
-   (`vintasend-api`, `vintasend-dashboard`,
-   `vintasend-templates-management-api`,
-   `vintasend-templates-management-dashboard`)
+   (`vintasend-dashboard`, `vintasend-templates-management-dashboard`)
 7. commit and push the **submodule pointers** in the root repository
 
 ### Why the waves matter
@@ -113,11 +111,11 @@ the plan before it starts:
 ```
 [3] Ordering packages into dependency waves...
   Wave 1: vintasend
-  Wave 2: vintasend-managed-templates, vintasend-medplum, vintasend-pug, ...
+  Wave 2: vintasend-api, vintasend-managed-templates, vintasend-medplum, vintasend-pug, ...
     vintasend-pug waits for vintasend
   Wave 3: vintasend-medplum-template-manager, vintasend-templates-management-api
     vintasend-medplum-template-manager waits for vintasend, vintasend-managed-templates
-  After every wave: vintasend-api, vintasend-dashboard, ...
+  After every wave: vintasend-dashboard, vintasend-templates-management-dashboard
 ```
 
 After a wave is live the script pauses for `--settle` seconds (default 20)

@@ -35,7 +35,7 @@ repository's `publish.yml`, which publishes to npm through GitHub Actions.
 
 Then, once every wave is live:
 
-5. ✓ Commits and pushes the repos that carry the version but publish nothing (APIs, dashboards)
+5. ✓ Commits and pushes the repos that carry the version but publish nothing (the dashboard apps)
 6. ✓ Commits and pushes the submodule pointers in the root repo
 
 ## Why the order matters
