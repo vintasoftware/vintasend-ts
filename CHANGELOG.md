@@ -1,5 +1,32 @@
 # Changelog
 
+# Version 1.0.0-alpha8
+
+Every package moves to the latest release of its dependencies. Nothing in the public API changes;
+the notes below are what a host or a contributor can observe.
+
+* **Runtime dependencies.** `@prisma/adapter-pg`, `@prisma/client` and `prisma` 7.10, `mime` 4.1.2,
+  `liquidjs` 10.30, `pug` 3.0.4, `@react-email/render` 2.2 with React 19.3 and esbuild 0.28, the
+  AWS SDK clients 3.1160, `hono` 4.13 and Zod 4.6.7. Prisma stays on 7: its `latest` tag points at
+  an 8.0 release candidate.
+
+* **`vintasend-nodemailer` requires nodemailer 10**, which ships its own type declarations.
+  **Action:** remove `@types/nodemailer` from a host that installed it only for this package.
+
+* **`@hono/node-server` 2 is accepted** by both APIs' optional peer dependency, alongside 1.x.
+
+* **Built and tested with TypeScript 7, vitest 5 and Biome 2.6.** The published declarations are
+  emitted by TypeScript 7. Node.js 20.16 remains the runtime minimum in `engines`, but CI now runs
+  on Node.js 22 and 24 only, because vitest 5 needs 22.12 or later.
+
+* **Dashboard apps.** `vintasend-dashboard` and `vintasend-templates-management-dashboard` move to
+  Next 16.4, Clerk 7, TanStack Table 9, react-day-picker 10 and lucide-react 1. Their tests run on
+  vitest instead of Jest, and Biome replaces ESLint and Prettier.
+
+* **`vintasend-dashboard-core` and `vintasend-templates-management-dashboard-core`** no longer
+  install `openapi-typescript`. `npm run generate:api` runs it through `npm exec` with TypeScript
+  5.9, the only line it supports; the generated client is unchanged.
+
 # Version 1.0.0-alpha7
 
 `vintasend` and both HTTP APIs load in a browser, so a UI's Storybook and tests can run the
