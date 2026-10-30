@@ -21,6 +21,7 @@ import { BaseAttachmentManager } from 'vintasend';
  * 5. Add appropriate configuration options
  */
 export class TemplateAttachmentManager extends BaseAttachmentManager {
+  // biome-ignore lint/complexity/noUselessConstructor: placeholder where implementations take their storage configuration
   constructor() {
     super();
     // TODO: Add configuration parameters for your storage backend

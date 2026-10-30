@@ -73,7 +73,10 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
     throw new Error('Method not implemented.');
   }
 
-  async getNotifications(page: number, pageSize: number): Promise<AnyDatabaseNotification<Config>[]> {
+  async getNotifications(
+    page: number,
+    pageSize: number,
+  ): Promise<AnyDatabaseNotification<Config>[]> {
     throw new Error('Method not implemented.');
   }
 

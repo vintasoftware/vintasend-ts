@@ -57,17 +57,17 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.10",
-    "@types/node": "^25.0.8",
-    "@vitest/coverage-v8": "4.0.18",
+    "@biomejs/biome": "^2.6.4",
+    "@types/node": "^26.6.6",
+    "@vitest/coverage-v8": "5.0.5",
     "esbuild": "^0.28.2",
     "husky": "^9.1.7",
     "tsc-esm-fix": "^3.1.2",
-    "typescript": "^5.9.3",
-    "vitest": "4.0.18"
+    "typescript": "^7.0.2",
+    "vitest": "5.0.5"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.4.2",
-    "mime": "^4.1.0"
+    "@prisma/adapter-pg": "^7.10.1",
+    "mime": "^4.1.2"
   }
 }
