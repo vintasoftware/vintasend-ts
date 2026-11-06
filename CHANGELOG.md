@@ -1,5 +1,51 @@
 # Changelog
 
+# Version 1.0.0-alpha9
+
+Fixes for the managed-template stack on Medplum, reported by a team running
+`vintasend-managed-templates`, `vintasend-medplum-template-manager`, `vintasend-liquidjs` and
+`vintasend-mailgun` on 1.0.0-alpha8. Every other package moves to this version with no change.
+
+* **`createTemplate` on a key that already has versions no longer makes a second "version 1".**
+  The condition choosing the version number was inverted in both
+  `vintasend-medplum-template-manager` and `InMemoryTemplateManagerBackend`: a key with versions
+  got 1, and a new key got `nextVersion`. The second row could never be published or deleted,
+  because `getTemplate`, `setStatus` and `deleteTemplate` all resolved to the first.
+  * `ManagedTemplateService.createTemplate` now throws the new
+    `ManagedTemplateAlreadyExistsError` when the key has versions, so every backend behaves the
+    same. **Action:** a caller that used `createTemplate` to add a version must call
+    `updateTemplate`.
+  * A key with no versions is numbered by `nextVersion`: 1 for a new key, above its history for one
+    whose published versions were all deleted. A draft that was never published leaves no history,
+    so its number can be reused.
+
+* **A blank subject or preheader no longer writes an invalid FHIR resource.**
+  `vintasend-medplum-template-manager` wrote `{ url, valueString: '' }` for `''` and
+  whitespace-only strings, which `validateResource` rejects and a strict-mode Medplum server
+  refuses. `@medplum/mock` does not validate, so tests passed anyway.
+  * A blank value (empty or whitespace-only) is stored as no value, on create and on update. The
+    Medplum mapping also writes no extension for a blank body, tenant or tag text, and omits a
+    blank `title` and `description`; they read back as `''`.
+  * `ManagedTemplateUpdateInput` can clear a field: `''` or whitespace removes the subject or
+    preheader, while `null` and `undefined` still carry the latest version's value forward.
+    Carry-forward reads the key's **latest** version, even when the caller started the new version
+    from an older one; pass the field explicitly to restore the older value.
+  * New exports from `vintasend-managed-templates`: `isBlank`, `blankToNull` and
+    `resolveUpdatedField`, the rules every backend applies.
+  * The Medplum tests run `validateResource` on every resource the backend writes.
+
+* **The preheader is rendered.** `LiquidEmailTemplateRenderer.renderFromTemplateContent` renders
+  the template content's `preheader` with the body's HTML escaping and inserts it as a hidden
+  element at the top of the body, or right after `<body>` in a full document, which is what mail
+  clients show as inbox preview text. `vintasend-mailgun` needs no change, since it sends the
+  body. A blank or missing preheader leaves the body untouched, `LiquidSmsTemplateRenderer`
+  ignores it, and the file-based `render` has no preheader.
+
+* **CI installs from a committed lockfile.** `vintasend-managed-templates`,
+  `vintasend-medplum-template-manager` and `vintasend-liquidjs` now commit `package-lock.json` and
+  run `npm ci`. A fresh `npm install` crashed on npm 10 with
+  `Cannot read properties of null (reading 'edgesOut')`.
+
 # Version 1.0.0-alpha8
 
 Every package moves to the latest release of its dependencies. Nothing in the public API changes;
