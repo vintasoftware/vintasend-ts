@@ -83,6 +83,10 @@ class TestBackendWithAttachments implements BaseNotificationBackend<TestConfig> 
     // Implementation
   }
 
+  async requeueNotification(): Promise<AnyDatabaseNotification<TestConfig>> {
+    throw new Error('Not implemented');
+  }
+
   async getNotification(): Promise<AnyDatabaseNotification<TestConfig> | null> {
     return null;
   }

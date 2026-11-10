@@ -63,8 +63,10 @@ jobs:
       - name: Install latest npm
         run: npm install -g npm@latest
 
+      # From the committed lockfile, as in ci.yml: a fresh `npm install` crashes resolving the
+      # dependency tree.
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Test
         run: npm test

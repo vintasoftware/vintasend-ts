@@ -13,6 +13,7 @@ import type {
   NotificationFilterCapabilities,
   NotificationOrderBy,
   OneOffNotificationInput,
+  RequeueNotificationOptions,
   StoredAttachment,
 } from 'vintasend';
 
@@ -121,6 +122,18 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
   }
 
   async cancelNotification(notificationId: Config['NotificationIdType']): Promise<void> {
+    throw new Error('Method not implemented.');
+  }
+
+  /**
+   * Move a notification whose status is in `REQUEUEABLE_NOTIFICATION_STATUSES` back to
+   * `PENDING_SEND`, clear `sentAt`, and set `sendAfter` only when `options` has that key. Check the
+   * status and write in one step if the store allows it, and throw for any other status.
+   */
+  async requeueNotification(
+    notificationId: Config['NotificationIdType'],
+    options: RequeueNotificationOptions,
+  ): Promise<AnyDatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
 

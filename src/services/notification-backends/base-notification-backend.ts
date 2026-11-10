@@ -191,6 +191,39 @@ export const DEFAULT_BACKEND_FILTER_CAPABILITIES = {
   'pagination.oneIndexed': false,
 };
 
+/**
+ * The statuses a notification can be re-queued from: the ones that end without a delivery.
+ *
+ * `SENT` and `READ` are left out on purpose. Re-queuing a delivered notification would deliver it
+ * twice under one record and overwrite the record of the first delivery; `resendNotification`
+ * creates a new notification for that instead. `PENDING_SEND` is already queued.
+ */
+export const REQUEUEABLE_NOTIFICATION_STATUSES: readonly NotificationStatus[] = [
+  'FAILED',
+  'CANCELLED',
+];
+
+/**
+ * The statuses whose template pin can still be changed: every one that may yet render.
+ *
+ * A sent notification's `requestedTemplateVersion` describes what it was asked to render when it
+ * went out, so moving it afterwards would make the record disagree with what was delivered.
+ */
+export const REPINNABLE_NOTIFICATION_STATUSES: readonly NotificationStatus[] = [
+  'PENDING_SEND',
+  'FAILED',
+  'CANCELLED',
+];
+
+/**
+ * What `BaseNotificationBackend.requeueNotification` is asked to change besides the status.
+ *
+ * `sendAfter` left out keeps the notification's own; `null` means "as soon as possible".
+ */
+export type RequeueNotificationOptions = {
+  sendAfter?: Date | null;
+};
+
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
   /**
    * Get a unique identifier for this backend instance.
@@ -289,6 +322,30 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     notificationId: Config['NotificationIdType'],
     templateVersion: number,
   ): Promise<void>;
+
+  /**
+   * Put a notification that did not go out back into `PENDING_SEND`, so it is sent again.
+   *
+   * Works for regular and one-off notifications alike. An implementation must:
+   * * only move a notification whose status is one of `REQUEUEABLE_NOTIFICATION_STATUSES`, and
+   *   throw for any other, checking and writing in one step where the store allows it, so two
+   *   callers racing cannot both succeed against a notification a worker has meanwhile sent;
+   * * clear `sentAt`, which `markAsFailed` uses to record when the attempt failed;
+   * * set `sendAfter` to `options.sendAfter` when that key is present, `null` included, and leave
+   *   it as it is when the key is absent.
+   *
+   * Everything else stays as it is: the template pin, `contextUsed`, `adapterUsed` and the git
+   * commit SHA are history of the earlier attempt, and the next send overwrites what it needs to.
+   *
+   * The returned notification is what the service sends next, so it must carry everything
+   * `getNotification` returns for it, attachments included.
+   *
+   * Required since 1.0.0-alpha10. A backend written against an earlier version must add it.
+   */
+  requeueNotification(
+    notificationId: Config['NotificationIdType'],
+    options: RequeueNotificationOptions,
+  ): Promise<AnyDatabaseNotification<Config>>;
 
   // One-off notification methods
   persistOneOffNotification(

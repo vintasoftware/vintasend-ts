@@ -23,8 +23,10 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: null
     
-    - name: Install dependencies and generate lock file
-      run: npm install
+    # From the committed lockfile: a fresh `npm install` crashes resolving the dependency
+    # tree on npm 10 and 11 (`Cannot read properties of null (reading 'edgesOut')`).
+    - name: Install dependencies
+      run: npm ci
     
     - name: Build
       run: npm run build

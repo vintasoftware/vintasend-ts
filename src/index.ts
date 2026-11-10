@@ -24,6 +24,14 @@ export {
   renderLogMessage,
   renderLogValue,
 } from './services/loggers/log-message.js';
+export type {
+  NotificationAction,
+  NotificationActionErrorReason,
+} from './services/notification-action-error.js';
+export {
+  isNotificationActionError,
+  NotificationActionError,
+} from './services/notification-action-error.js';
 // Notification Adapters and Backends
 export {
   BaseNotificationAdapter,
@@ -38,17 +46,22 @@ export type {
   NotificationOrderBy,
   NotificationOrderByField,
   NotificationOrderDirection,
+  RequeueNotificationOptions,
   StringFieldFilter,
   StringFilterLookup,
 } from './services/notification-backends/base-notification-backend.js';
 export {
   isFieldFilter,
+  REPINNABLE_NOTIFICATION_STATUSES,
+  REQUEUEABLE_NOTIFICATION_STATUSES,
   supportsAttachments,
   supportsTemplateVersions,
 } from './services/notification-backends/base-notification-backend.js';
 export type { BaseNotificationQueueService } from './services/notification-queue-service/base-notification-queue-service.js';
 export type { BaseNotificationReplicationQueueService } from './services/notification-queue-service/base-notification-replication-queue-service.js';
 export type {
+  RepinOptions,
+  RequeueOptions,
   TemplateVersionPinningOptions,
   VintaSend,
 } from './services/notification-service.js';

@@ -13,6 +13,7 @@ import type { BaseAttachmentManager } from './attachment-manager/base-attachment
 import type { BaseGitCommitShaProvider } from './git-commit-sha/base-git-commit-sha-provider.js';
 import type { BaseLogger } from './loggers/base-logger.js';
 import { log, logCount, logError, logId, logLabel, logTimestamp } from './loggers/log-message.js';
+import { NotificationActionError } from './notification-action-error.js';
 import {
   type BaseNotificationAdapter,
   isOneOffNotification,
@@ -22,6 +23,9 @@ import {
   DEFAULT_BACKEND_FILTER_CAPABILITIES,
   type NotificationFilterFields,
   type NotificationOrderBy,
+  REPINNABLE_NOTIFICATION_STATUSES,
+  REQUEUEABLE_NOTIFICATION_STATUSES,
+  type RequeueNotificationOptions,
   supportsTemplateVersions,
 } from './notification-backends/base-notification-backend.js';
 import { NotificationContextGeneratorsMap } from './notification-context-generators-map.js';
@@ -65,6 +69,23 @@ type VintaSendOptions = {
  */
 export type TemplateVersionPinningOptions = {
   pinTemplateVersions?: boolean;
+};
+
+/**
+ * Options for `VintaSend.requeueNotification`.
+ *
+ * `sendAfter` left out keeps the notification's own schedule. `null`, or a date in the past, sends
+ * it right away; a future date leaves it pending until then.
+ */
+export type RequeueOptions = RequeueNotificationOptions;
+
+/**
+ * Options for `VintaSend.repinNotification`.
+ *
+ * `templateVersion` left out pins to the version the renderer reports as current right now.
+ */
+export type RepinOptions = {
+  templateVersion?: number;
 };
 
 type RenderEmailTemplateContextInput<Config extends BaseNotificationTypeConfig> =
@@ -1369,6 +1390,207 @@ export class VintaSend<
       notificationId,
     );
     this.logger.info(log`Notification ${logId(notificationId)} cancelled`);
+  }
+
+  /**
+   * The notification an action is about, regular or one-off, read from the primary backend.
+   *
+   * Tries `getOneOffNotification` as well because a backend is not required to return one-off
+   * notifications from `getNotification`.
+   */
+  private async getNotificationForAction(
+    notificationId: Config['NotificationIdType'],
+    action: 'requeue' | 'repin',
+  ): Promise<AnyDatabaseNotification<Config>> {
+    const notification =
+      (await this.backend.getNotification(notificationId, false)) ??
+      (await this.backend.getOneOffNotification(notificationId, false));
+
+    if (!notification) {
+      throw new NotificationActionError({
+        action,
+        reason: 'NOT_FOUND',
+        notificationId,
+        message: `Notification ${String(notificationId)} not found`,
+      });
+    }
+    return notification;
+  }
+
+  /**
+   * Put a failed or cancelled notification back into `PENDING_SEND`, so it is sent again.
+   *
+   * The notification keeps its ID, content and template pin: this retries the same notification,
+   * where `resendNotification` creates a new one from a notification that was delivered. Once the
+   * notification is pending again it is due when `sendAfter` is `null` or past, and then it is
+   * sent at once, the same as `createNotification` does. A notification handled by an adapter with
+   * `enqueueNotifications` goes back on the queue service. A future `sendAfter` leaves it for
+   * whatever sends pending notifications.
+   *
+   * The stored context is not regenerated. A notification created with `contextUsed`, or failed
+   * through `delayedSend`, is sent with the context stored on it.
+   *
+   * To change the template version as well, call `repinNotification` first: it leaves the status
+   * alone, so the order is safe.
+   *
+   * @param options `sendAfter` left out keeps the notification's own. `null` means "now".
+   * @returns the notification as it stands after being re-queued, before any send that follows.
+   * @throws NotificationActionError when the notification is not found (`NOT_FOUND`), is not
+   *   `FAILED` or `CANCELLED` (`INVALID_STATUS`). Nothing has been written in either case.
+   */
+  async requeueNotification(
+    notificationId: Config['NotificationIdType'],
+    options: RequeueOptions = {},
+  ): Promise<AnyDatabaseNotification<Config>> {
+    const notification = await this.getNotificationForAction(notificationId, 'requeue');
+    if (!REQUEUEABLE_NOTIFICATION_STATUSES.includes(notification.status)) {
+      throw new NotificationActionError({
+        action: 'requeue',
+        reason: 'INVALID_STATUS',
+        notificationId,
+        status: notification.status,
+        message:
+          `Cannot requeue notification ${String(notificationId)} in status ${notification.status}: ` +
+          `only ${REQUEUEABLE_NOTIFICATION_STATUSES.join(' and ')} notifications can be requeued. ` +
+          'Use resendNotification to send a delivered notification again.',
+      });
+    }
+
+    // Only the key the caller passed: an absent `sendAfter` means "keep it", and spreading
+    // `undefined` in would read as "set it to undefined" to a backend that checks with `in`.
+    const backendOptions: RequeueNotificationOptions =
+      options.sendAfter === undefined ? {} : { sendAfter: options.sendAfter };
+
+    const requeuedNotification = await this.executeMultiBackendWrite(
+      'requeueNotification',
+      async (backend) => backend.requeueNotification(notificationId, backendOptions),
+      async (backend) => {
+        await backend.requeueNotification(notificationId, backendOptions);
+      },
+      notificationId,
+    );
+    this.logger.info(log`Notification ${logId(notificationId)} requeued`);
+
+    if (!requeuedNotification.sendAfter || requeuedNotification.sendAfter <= new Date()) {
+      this.logger.info(
+        log`Notification ${logId(notificationId)} sent after requeue because sendAfter is null or in the past`,
+      );
+      await this.send(requeuedNotification);
+    } else {
+      this.logger.info(
+        log`Notification ${logId(notificationId)} requeued for ${logTimestamp(requeuedNotification.sendAfter)}`,
+      );
+    }
+
+    return requeuedNotification;
+  }
+
+  /**
+   * Pin a notification to a template version, by default the one that is current right now.
+   *
+   * Use it after publishing a fixed template, to move notifications that are pending, failed or
+   * cancelled onto the fix. `updateNotification` keeps an existing pin unless `bodyTemplate`
+   * changes, so it cannot do this.
+   * Works the same whether the notification was pinned before or not, and for one-off
+   * notifications too. It changes `requestedTemplateVersion` only. It sends nothing and leaves the
+   * status alone, so re-pin a failed notification, then `requeueNotification` it.
+   *
+   * Re-pinning to the version already pinned writes nothing and returns the notification as it is.
+   *
+   * @param options `templateVersion` pins that version instead of the current one. It is not
+   *   checked against the renderer: a version that does not exist fails when the notification is
+   *   rendered, as it does when passed to `createNotification`.
+   * @returns the notification with its new pin.
+   * @throws NotificationActionError when the notification is not found (`NOT_FOUND`), was already
+   *   delivered (`INVALID_STATUS`), or no version was given and the renderer reports none
+   *   (`NO_TEMPLATE_VERSION`). Nothing has been written in any of those cases.
+   * @throws RangeError when `templateVersion` is not a non-negative integer.
+   */
+  async repinNotification(
+    notificationId: Config['NotificationIdType'],
+    options: RepinOptions = {},
+  ): Promise<AnyDatabaseNotification<Config>> {
+    const { templateVersion } = options;
+    if (
+      templateVersion !== undefined &&
+      !(Number.isInteger(templateVersion) && templateVersion >= 0)
+    ) {
+      throw new RangeError(
+        `Cannot repin notification ${String(notificationId)}: templateVersion must be a non-negative integer`,
+      );
+    }
+
+    const notification = await this.getNotificationForAction(notificationId, 'repin');
+    if (!REPINNABLE_NOTIFICATION_STATUSES.includes(notification.status)) {
+      throw new NotificationActionError({
+        action: 'repin',
+        reason: 'INVALID_STATUS',
+        notificationId,
+        status: notification.status,
+        message:
+          `Cannot repin notification ${String(notificationId)} in status ${notification.status}: ` +
+          'it has already been delivered, and its pin records what it was asked to render.',
+      });
+    }
+
+    const version =
+      templateVersion ??
+      (await this.resolveTemplateVersionToPin(
+        notification.notificationType,
+        notification.bodyTemplate,
+        null,
+        true,
+      ));
+
+    if (version === null) {
+      throw new NotificationActionError({
+        action: 'repin',
+        reason: 'NO_TEMPLATE_VERSION',
+        notificationId,
+        message:
+          `Cannot repin notification ${String(notificationId)}: ` +
+          `no template renderer for notification type ${notification.notificationType} reports a version for its template`,
+      });
+    }
+
+    if (notification.requestedTemplateVersion === version) {
+      this.logger.info(
+        log`Notification ${logId(notificationId)} is already pinned to template version ${logCount(version)}`,
+      );
+      return notification;
+    }
+
+    let repinnedNotification: AnyDatabaseNotification<Config>;
+    if (isOneOffNotification(notification)) {
+      const update: Partial<Omit<OneOffNotificationInput<Config>, 'id'>> = {
+        requestedTemplateVersion: version,
+      };
+      repinnedNotification = await this.executeMultiBackendWrite(
+        'repinOneOffNotification',
+        async (backend) => backend.persistOneOffNotificationUpdate(notificationId, update),
+        async (backend) => {
+          await backend.persistOneOffNotificationUpdate(notificationId, update);
+        },
+        notificationId,
+      );
+    } else {
+      const update: Partial<Omit<Notification<Config>, 'id'>> = {
+        requestedTemplateVersion: version,
+      };
+      repinnedNotification = await this.executeMultiBackendWrite(
+        'repinNotification',
+        async (backend) => backend.persistNotificationUpdate(notificationId, update),
+        async (backend) => {
+          await backend.persistNotificationUpdate(notificationId, update);
+        },
+        notificationId,
+      );
+    }
+
+    this.logger.info(
+      log`Notification ${logId(notificationId)} repinned to template version ${logCount(version)}`,
+    );
+    return repinnedNotification;
   }
 
   async resendNotification(
