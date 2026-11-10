@@ -45,6 +45,31 @@ rows by hand to retry a failed send or move it onto a fixed template.
 * **`vintasend-dashboard`** adds "Requeue" and "Repin template" to the row menu. Each is shown only
   in the statuses the API accepts and asks for confirmation first.
 
+* **`vintasend-medplum`: updates now write every field they are given.**
+  `persistNotificationUpdate` and `persistOneOffNotificationUpdate` wrote only the status, the
+  template identifiers and the subject template, and silently dropped everything else. So
+  `updateNotification(id, { sendAfter, userId, contextParameters })` resolved, but the notification
+  kept its old send time, recipient and context, and was sent with them.
+  `updateOneOffNotification`, which checks the returned `sendAfter` to decide whether to send at
+  once, was affected the same way.
+  * Both now write `sendAfter`, `contextParameters`, `title`, `contextName`, `notificationType` and
+    the body template to the same place the create path does. The regular update also writes
+    `userId`, and the one-off update writes `emailOrPhone`, `firstName` and `lastName`. Fields left
+    out of an update are not touched, and `sendAfter: null` clears the send time.
+  * Medplum stores `sendAfter` and `sentAt` in one field, `Communication.sent`, so changing
+    `sendAfter` on a notification that was already sent moves its `sentAt` too. The create path
+    already behaves this way.
+
+* **Every package installs from a committed lockfile.** A fresh `npm install` crashes on npm 10
+  and 11 with `Cannot read properties of null (reading 'edgesOut')`, and had broken CI since
+  1.0.0-alpha9. `vintasend`, `vintasend-prisma`, `vintasend-medplum`, `vintasend-nodemailer`,
+  `vintasend-pug`, `vintasend-react-email`, `vintasend-aws-sqs`, `vintasend-mailgun`,
+  `vintasend-sendgrid`, `vintasend-twilio` and `vintasend-winston` now commit `package-lock.json`
+  and run `npm ci` in CI and when publishing. The `vintasend-dashboard` and
+  `vintasend-templates-management-dashboard` lockfiles, which had stopped matching their
+  `package.json` in 1.0.0-alpha8, are back in sync. Nothing changes for a project that installs
+  these packages.
+
 # Version 1.0.0-alpha9
 
 Fixes for the managed-template stack on Medplum, reported by a team running
