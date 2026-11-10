@@ -5,6 +5,12 @@
 Re-pinning and re-queuing notifications through the library, so nobody has to edit notification
 rows by hand to retry a failed send or move it onto a fixed template.
 
+* **Pin this version exactly.** npm compares `alpha10` and `alpha9` as text, so it sorts
+  `1.0.0-alpha10` *below* `1.0.0-alpha9`, and a caret range such as `^1.0.0-alpha10` installs
+  alpha9. **Action:** depend on `"vintasend": "1.0.0-alpha10"`, with no `^`. `npm install
+  vintasend@alpha` installs it but saves a caret range, so remove the `^` afterwards. Every
+  internal dependency between VintaSend packages is pinned the same way.
+
 * **`VintaSend.requeueNotification(id, { sendAfter? })`** puts a `FAILED` or `CANCELLED`
   notification back into `PENDING_SEND` under the same ID and clears `sentAt`. When it is due it is
   sent at once, as `createNotification` does. An omitted `sendAfter` keeps the notification's own,
