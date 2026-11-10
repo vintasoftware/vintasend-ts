@@ -800,6 +800,80 @@ exactly as it did.
   backend with nowhere to put it needs no changes at all; the cost is only that
   `usedTemplateVersion` stays absent on the records it holds.
 
+## Re-pinning and Re-queuing Notifications
+
+Two service methods change an existing notification, so the database never has to be edited by
+hand. Both work on regular and one-off notifications, write to every configured backend, and refuse
+with a `NotificationActionError` before writing anything. Its `reason` is `NOT_FOUND`,
+`INVALID_STATUS` or `NO_TEMPLATE_VERSION`.
+
+### `repinNotification`
+
+This moves a notification that has not been delivered onto a template version: the current one by
+default, or the one you name.
+
+```typescript
+await notificationService.repinNotification(notificationId);                         // current version
+await notificationService.repinNotification(notificationId, { templateVersion: 4 }); // exactly v4
+```
+
+* **Allowed in `PENDING_SEND`, `FAILED` and `CANCELLED`.** A sent notification's pin records what
+  it was asked to render when it went out, so `SENT` and `READ` are refused.
+* **Changes `requestedTemplateVersion` only.** It neither sends nor changes the status, and works
+  whether the notification was pinned before or not. Re-pinning to the pinned version writes
+  nothing.
+* **`NO_TEMPLATE_VERSION`** means no version was named and the renderer for that notification type
+  reports none. A file-based renderer always answers this way.
+* Unlike `updateNotification`, it moves the pin without changing `bodyTemplate`.
+
+### `requeueNotification`
+
+This puts a `FAILED` or `CANCELLED` notification back into `PENDING_SEND` under the same ID. It
+retries that notification. `resendNotification` creates a new one from a notification that was
+delivered.
+
+```typescript
+await notificationService.requeueNotification(notificationId);                     // keep its sendAfter
+await notificationService.requeueNotification(notificationId, { sendAfter: null }); // send now
+await notificationService.requeueNotification(notificationId, { sendAfter: tomorrow });
+```
+
+* **Sends when due.** Once pending again, a notification whose `sendAfter` is `null` or past is
+  sent at once, as `createNotification` does. An adapter with `enqueueNotifications` puts it back
+  on the queue service. A future `sendAfter` leaves it for `sendPendingNotifications`.
+* **Keeps everything else.** The template pin, stored `contextUsed` and attachments are unchanged;
+  `sentAt`, which `markAsFailed` sets to the failure time, is cleared.
+* **`PENDING_SEND`, `SENT` and `READ` are refused.** A pending notification is already queued, and
+  re-queuing a delivered one would deliver it twice under one record.
+
+To retry a notification that failed on a broken template, publish the fix, then re-pin and re-queue.
+`repinNotification` leaves the status alone, so it goes first:
+
+```typescript
+await notificationService.repinNotification(notificationId);
+await notificationService.requeueNotification(notificationId);
+```
+
+`vintasend-api` exposes both as `POST /api/v1/notifications/{id}/repin` and `/requeue`;
+`vintasend-dashboard-core` wraps them as `useRepinNotification` and `useRequeueNotification`.
+
+### What a backend has to do
+
+`requeueNotification(notificationId, { sendAfter? })` is **required** on `BaseNotificationBackend`
+from 1.0.0-alpha10. It must:
+
+* move only a notification in `REQUEUEABLE_NOTIFICATION_STATUSES` (`FAILED`, `CANCELLED`) and throw
+  for any other, checking and writing in one step where the store allows it;
+* set `status` to `PENDING_SEND` and clear `sentAt`;
+* set `sendAfter` when the key is present (`null` included) and leave it alone when it is absent;
+* return the notification as `getNotification` would, attachments included, because the service
+  sends what it returns.
+
+`vintasend-prisma` does it in one conditional `UPDATE`. `vintasend-medplum` sends `If-Match` on the
+version it read. Medplum's `cancelNotification` deletes the `Communication`, so only failed
+notifications can be re-queued there. Re-pinning needs nothing new from a backend: it goes through
+`persistNotificationUpdate`.
+
 ## Glossary
 
 * **Notification Backend**: It is a class that implements the methods necessary for VintaSend services to create, update, and retrieve Notifications from the database.

@@ -1,5 +1,44 @@
 # Changelog
 
+# Version 1.0.0-alpha10
+
+Re-pinning and re-queuing notifications through the library, so nobody has to edit notification
+rows by hand to retry a failed send or move it onto a fixed template.
+
+* **`VintaSend.requeueNotification(id, { sendAfter? })`** puts a `FAILED` or `CANCELLED`
+  notification back into `PENDING_SEND` under the same ID and clears `sentAt`. When it is due it is
+  sent at once, as `createNotification` does. An omitted `sendAfter` keeps the notification's own,
+  and `null` means now. `PENDING_SEND`, `SENT` and `READ` are refused: use `resendNotification` for
+  a delivered notification.
+* **`VintaSend.repinNotification(id, { templateVersion? })`** sets `requestedTemplateVersion` on a
+  `PENDING_SEND`, `FAILED` or `CANCELLED` notification, by default to the version the renderer
+  reports as current. It sends nothing and leaves the status alone. Re-pinning to the version
+  already pinned writes nothing.
+* **Refusals throw `NotificationActionError`** before anything is written, with a `reason` of
+  `NOT_FOUND`, `INVALID_STATUS` or `NO_TEMPLATE_VERSION`. Use `isNotificationActionError` to
+  recognise one from another copy of the package. An invalid `templateVersion` is a `RangeError`.
+* **BREAKING — `BaseNotificationBackend.requeueNotification` is required.**
+  **Action:** a backend of your own must implement it. Move only `FAILED`/`CANCELLED`, atomically
+  where the store allows it. Set `PENDING_SEND`, clear `sentAt`, apply `sendAfter` only when the key
+  is present, and return the full notification with its attachments. See the README's
+  "Re-pinning and Re-queuing Notifications".
+  * `vintasend-prisma` implements it as one conditional `UPDATE`.
+  * `vintasend-medplum` implements it with `If-Match`. A cancelled notification is deleted there,
+    so only `FAILED` can be re-queued.
+* **New exports:** `NotificationActionError`, `isNotificationActionError`,
+  `NotificationActionErrorReason`, `NotificationAction`, `RequeueOptions`, `RepinOptions`,
+  `RequeueNotificationOptions`, `REQUEUEABLE_NOTIFICATION_STATUSES` and
+  `REPINNABLE_NOTIFICATION_STATUSES`.
+* **`vintasend-api`** adds `POST /api/v1/notifications/{id}/requeue` (body `{ sendAfter? }`) and
+  `POST /api/v1/notifications/{id}/repin` (body `{ templateVersion? }`). Both return the notification,
+  404 for an unknown ID and 409 for a refusal. `NotificationServicePort` gains
+  `requeueNotification` and `repinNotification`. **Action:** a host adapting its own service to the
+  port must provide them, which a 1.0.0-alpha10 `VintaSend` does.
+* **`vintasend-dashboard-core`** adds `useRequeueNotification` and `useRepinNotification`. Each
+  invalidates the lists and the notification's detail, and the generated client is regenerated.
+* **`vintasend-dashboard`** adds "Requeue" and "Repin template" to the row menu. Each is shown only
+  in the statuses the API accepts and asks for confirmation first.
+
 # Version 1.0.0-alpha9
 
 Fixes for the managed-template stack on Medplum, reported by a team running
