@@ -109,6 +109,24 @@ templates without building a fake notification. Each change replaces something t
   `StatusChangeOptions`, `TemplatePartResolution`, `TemplateComposerBackend`,
   `TemplateComposerBackendOptions`, `partResolver` and `standaloneNotification`.
 
+## `vintasend-prisma`
+
+* **Implements every optional action**, each as one conditional `UPDATE`.
+  `requeueNotification` writes `templateVersion` in the same `UPDATE`; the new
+  `repinNotification` refuses a delivered notification in its `WHERE` (so a worker sending in
+  between can no longer be overwritten by a re-pin) and skips one already on the version.
+  `expectedVersion` joins the `WHERE` as `updatedAt`; a notification written since it was listed is
+  refused with `NotificationActionError` `CHANGED`, and nothing is written.
+* **`filterNotificationVersions`** selects `id` and `updatedAt` only, ordered by ID; the version
+  token is `updatedAt` as an ISO string.
+* **`hasSendAfter` and `hasRequestedTemplateVersion`** filters (`IS NULL` / `IS NOT NULL`), negation
+  included.
+* **No schema change.** The token relies on `updatedAt` being `@updatedAt`, as in
+  `schema.prisma.example`. Two writes to one row within the same millisecond leave it unchanged, so
+  `expectedVersion` cannot tell them apart; the status condition still applies. **Action:** a
+  schema whose `updatedAt` is not `@updatedAt`, or that is written outside Prisma, must keep it
+  current itself.
+
 ## `vintasend-medplum-template-manager`
 
 * No code change. Tests cover the render check over FHIR (no `Provenance` and no status change when

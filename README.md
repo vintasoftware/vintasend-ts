@@ -323,7 +323,7 @@ await vintasend.filterNotifications(
 
 They are new vocabulary, so `fields.hasSendAfter`, `negation.hasSendAfter`,
 `fields.hasRequestedTemplateVersion` and `negation.hasRequestedTemplateVersion` default to `false`.
-`vintasend-medplum` supports all four.
+`vintasend-prisma` and `vintasend-medplum` support all four.
 
 ### Listing IDs and versions only
 
@@ -336,7 +336,7 @@ now; pass it as `expectedVersion` to act on it only if it has not changed (see
 
 It is optional on a backend; `getBackendSupportedActionCapabilities()` reports `versions.filter`,
 and the call throws on a backend without it. `vintasend-medplum` implements it with
-`_elements=id,meta`.
+`_elements=id,meta`, `vintasend-prisma` with `select: { id, updatedAt }`.
 
 ### Case sensitivity
 
@@ -933,7 +933,7 @@ const capabilities = await notificationService.getBackendSupportedActionCapabili
 // { 'repin.expectedVersion', 'requeue.expectedVersion', 'requeue.templateVersion', 'versions.filter' }
 ```
 
-Every key defaults to `false`. `vintasend-medplum` reports all four.
+Every key defaults to `false`. `vintasend-prisma` and `vintasend-medplum` report all four.
 
 ### What a backend has to do
 
@@ -960,8 +960,8 @@ The service passes `templateVersion` and `expectedVersion` only to a backend tha
 Without `repinNotification`, a re-pin goes through `persistNotificationUpdate` as before. Additional
 backends receive the writes unconditionally: a version token belongs to the primary backend.
 
-`vintasend-prisma` does the re-queue in one conditional `UPDATE` and reports none of the optional
-capabilities yet. `vintasend-medplum` writes with `If-Match` on the version it read, for both
+`vintasend-prisma` does every move in one conditional `UPDATE`, with the status, and
+`expectedVersion` as `updatedAt`, in its `WHERE`. `vintasend-medplum` writes with `If-Match` on the version it read, for both
 re-pin and re-queue. Medplum's `cancelNotification` deletes the `Communication`, so only failed
 notifications can be re-queued there.
 
