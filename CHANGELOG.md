@@ -1,10 +1,13 @@
 # Changelog
 
-# Unreleased
+# Version 1.0.0-alpha11
 
 Moving notifications onto a new template version safely, and previewing and publishing managed
 templates without building a fake notification. Each change replaces something the first app on
-1.0.0-alpha10 had to work around.
+1.0.0-alpha10 had to work around. Every other package moves to this version with no change.
+
+* **Pin this version exactly**, as with 1.0.0-alpha10: npm sorts `alpha11` below `alpha9`, so a
+  caret range does not install it. Depend on `"vintasend": "1.0.0-alpha11"`, with no `^`.
 
 ## `vintasend`
 
