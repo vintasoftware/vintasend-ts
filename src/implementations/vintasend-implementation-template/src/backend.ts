@@ -5,6 +5,7 @@ import type {
   BaseLogger,
   BaseNotificationBackend,
   BaseNotificationTypeConfig,
+  BulkNotificationWriteOptions,
   DatabaseNotification,
   DatabaseOneOffNotification,
   InputJsonValue,
@@ -12,6 +13,8 @@ import type {
   NotificationFilter,
   NotificationFilterCapabilities,
   NotificationOrderBy,
+  NotificationWriteOptions,
+  NotificationWriteResult,
   OneOffNotificationInput,
   RequeueNotificationOptions,
   StoredAttachment,
@@ -62,10 +65,17 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
     throw new Error('Method not implemented.');
   }
 
+  /**
+   * Every write that changes a notification records its version token (`notificationVersion`):
+   * without `options.notificationVersion` generate a new one (this backend is the primary), with
+   * it store that value as it is (this backend is a replica copying the primary). Return it on
+   * every read, and compare `expectedVersion` against it.
+   */
   async persistNotification(
     notification: Omit<Notification<Config>, 'id'> & {
       id?: Config['NotificationIdType'];
     },
+    options?: NotificationWriteOptions,
   ): Promise<DatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
@@ -83,6 +93,7 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
 
   async bulkPersistNotifications(
     notifications: Omit<AnyNotification<Config>, 'id'>[],
+    options?: BulkNotificationWriteOptions,
   ): Promise<Config['NotificationIdType'][]> {
     throw new Error('Method not implemented.');
   }
@@ -90,6 +101,7 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
   async persistNotificationUpdate(
     notificationId: Config['NotificationIdType'],
     notification: Partial<Omit<Notification<Config>, 'id'>>,
+    options?: NotificationWriteOptions,
   ): Promise<DatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
@@ -103,6 +115,7 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
   async markAsSent(
     notificationId: Config['NotificationIdType'],
     checkIsPending: boolean,
+    options?: NotificationWriteOptions,
   ): Promise<AnyDatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
@@ -110,6 +123,7 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
   async markAsFailed(
     notificationId: Config['NotificationIdType'],
     checkIsPending: boolean,
+    options?: NotificationWriteOptions,
   ): Promise<AnyDatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
@@ -117,11 +131,15 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
   async markAsRead(
     notificationId: Config['NotificationIdType'],
     checkIsSent: boolean,
+    options?: NotificationWriteOptions,
   ): Promise<DatabaseNotification<Config>> {
     throw new Error('Method not implemented.');
   }
 
-  async cancelNotification(notificationId: Config['NotificationIdType']): Promise<void> {
+  async cancelNotification(
+    notificationId: Config['NotificationIdType'],
+    options?: NotificationWriteOptions,
+  ): Promise<NotificationWriteResult> {
     throw new Error('Method not implemented.');
   }
 
@@ -168,7 +186,8 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
     notificationId: Config['NotificationIdType'],
     adapterKey: string,
     context: InputJsonValue,
-  ): Promise<void> {
+    options?: NotificationWriteOptions,
+  ): Promise<NotificationWriteResult> {
     throw new Error('Method not implemented.');
   }
 
@@ -188,7 +207,8 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
   async storeTemplateVersion(
     notificationId: Config['NotificationIdType'],
     templateVersion: number,
-  ): Promise<void> {
+    options?: NotificationWriteOptions,
+  ): Promise<NotificationWriteResult> {
     throw new Error('Method not implemented.');
   }
 
@@ -196,6 +216,7 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
     notification: Omit<OneOffNotificationInput<Config>, 'id'> & {
       id?: Config['NotificationIdType'];
     },
+    options?: NotificationWriteOptions,
   ): Promise<DatabaseOneOffNotification<Config>> {
     throw new Error('Method not implemented.');
   }
@@ -203,6 +224,7 @@ export class NotificationBackend<Config extends BaseNotificationTypeConfig>
   async persistOneOffNotificationUpdate(
     notificationId: Config['NotificationIdType'],
     notification: Partial<Omit<OneOffNotificationInput<Config>, 'id'>>,
+    options?: NotificationWriteOptions,
   ): Promise<DatabaseOneOffNotification<Config>> {
     throw new Error('Method not implemented.');
   }

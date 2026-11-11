@@ -39,6 +39,7 @@ export {
 } from './services/notification-adapters/base-notification-adapter.js';
 export type {
   BaseNotificationBackend,
+  BulkNotificationWriteOptions,
   DateRange,
   NotificationActionCapabilities,
   NotificationFilter,
@@ -48,6 +49,8 @@ export type {
   NotificationOrderByField,
   NotificationOrderDirection,
   NotificationVersion,
+  NotificationWriteOptions,
+  NotificationWriteResult,
   RepinNotificationOptions,
   RequeueNotificationOptions,
   StringFieldFilter,

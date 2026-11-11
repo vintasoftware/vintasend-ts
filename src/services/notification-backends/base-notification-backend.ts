@@ -242,6 +242,35 @@ export const REPINNABLE_NOTIFICATION_STATUSES: readonly NotificationStatus[] = [
 ];
 
 /**
+ * How a write records the notification's version token (`notificationVersion`).
+ *
+ * Without `notificationVersion` the backend is the primary: the write generates a new token and
+ * stores it. With it, the write replicates a write the primary already made, and the backend
+ * stores this token as it is instead of generating one, so every backend holds the same token for
+ * the same version of the notification. `VintaSend` passes it only to additional backends, taken
+ * from what the primary's write returned.
+ */
+export type NotificationWriteOptions = {
+  notificationVersion?: string;
+};
+
+/**
+ * What a write that returns no notification hands back: the token it recorded, so `VintaSend` can
+ * pass it on to the additional backends. A backend that keeps no tokens may return nothing.
+ */
+export type NotificationWriteResult = {
+  notificationVersion?: string;
+};
+
+/**
+ * `NotificationWriteOptions` for `bulkPersistNotifications`: one token per notification, in the
+ * order of the notifications.
+ */
+export type BulkNotificationWriteOptions = {
+  notificationVersions?: (string | undefined)[];
+};
+
+/**
  * What `BaseNotificationBackend.requeueNotification` is asked to change besides the status.
  *
  * `sendAfter` left out keeps the notification's own; `null` means "as soon as possible".
@@ -251,7 +280,7 @@ export const REPINNABLE_NOTIFICATION_STATUSES: readonly NotificationStatus[] = [
  * backend that reports them must honour them, and one that does not must throw if it is handed
  * them anyway, never ignore them.
  */
-export type RequeueNotificationOptions = {
+export type RequeueNotificationOptions = NotificationWriteOptions & {
   sendAfter?: Date | null;
   /**
    * Pin the notification to this template version in the same write that re-queues it, so it is
@@ -269,7 +298,7 @@ export type RequeueNotificationOptions = {
 /**
  * What `BaseNotificationBackend.repinNotification` is asked to check besides the status.
  */
-export type RepinNotificationOptions = {
+export type RepinNotificationOptions = NotificationWriteOptions & {
   /**
    * Write only if the notification is still at this version. Otherwise throw a
    * `NotificationActionError` with reason `CHANGED` and write nothing.
@@ -283,6 +312,11 @@ export type RepinNotificationOptions = {
  * The token changes whenever the notification is written, by anyone. Pass it back as
  * `expectedVersion` to act on the notification only if nothing has changed since it was listed.
  * Compare tokens for equality only: they are not ordered, and a backend may use any string.
+ *
+ * The primary backend generates the token and replication copies it (see
+ * `NotificationWriteOptions`), so a token listed from an additional backend can be passed to an
+ * action on the primary. It matches once the replica has caught up with the primary's last write;
+ * until then the action is refused with `CHANGED`.
  */
 export type NotificationVersion<Config extends BaseNotificationTypeConfig> = {
   id: Config['NotificationIdType'];
@@ -340,15 +374,18 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
   ): Promise<DatabaseNotification<Config>[]>;
   persistNotification(
     notification: Omit<Notification<Config>, 'id'> & { id?: Config['NotificationIdType'] },
+    options?: NotificationWriteOptions,
   ): Promise<DatabaseNotification<Config>>;
   getAllNotifications(): Promise<AnyDatabaseNotification<Config>[]>;
   getNotifications(page: number, pageSize: number): Promise<AnyDatabaseNotification<Config>[]>;
   bulkPersistNotifications(
     notifications: Omit<AnyNotification<Config>, 'id'>[],
+    options?: BulkNotificationWriteOptions,
   ): Promise<Config['NotificationIdType'][]>;
   persistNotificationUpdate(
     notificationId: Config['NotificationIdType'],
     notification: Partial<Omit<Notification<Config>, 'id'>>,
+    options?: NotificationWriteOptions,
   ): Promise<DatabaseNotification<Config>>;
   /**
    * Applies a replication snapshot only when the destination state is older.
@@ -356,6 +393,9 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
    * This is used to mitigate out-of-order async replication deliveries.
    * Implementations should return `applied: false` when the destination notification
    * is already newer or equal to the snapshot.
+   *
+   * The snapshot is read from the primary, so its `notificationVersion` is the primary's token:
+   * store it as it is, as a write given `NotificationWriteOptions.notificationVersion` does.
    */
   applyReplicationSnapshotIfNewer?(
     snapshot: AnyDatabaseNotification<Config>,
@@ -363,16 +403,23 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
   markAsSent(
     notificationId: Config['NotificationIdType'],
     checkIsPending: boolean,
+    options?: NotificationWriteOptions,
   ): Promise<AnyDatabaseNotification<Config>>;
   markAsFailed(
     notificationId: Config['NotificationIdType'],
     checkIsPending: boolean,
+    options?: NotificationWriteOptions,
   ): Promise<AnyDatabaseNotification<Config>>;
   markAsRead(
     notificationId: Config['NotificationIdType'],
     checkIsSent: boolean,
+    options?: NotificationWriteOptions,
   ): Promise<DatabaseNotification<Config>>;
-  cancelNotification(notificationId: Config['NotificationIdType']): Promise<void>;
+  cancelNotification(
+    notificationId: Config['NotificationIdType'],
+    options?: NotificationWriteOptions,
+    // biome-ignore lint/suspicious/noConfusingVoidType: `void` keeps backends written before tokens, which return `Promise<void>`, assignable.
+  ): Promise<NotificationWriteResult | void>;
   getNotification(
     notificationId: Config['NotificationIdType'],
     forUpdate: boolean,
@@ -392,7 +439,9 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     notificationId: Config['NotificationIdType'],
     adapterKey: string,
     context: InputJsonValue,
-  ): Promise<void>;
+    options?: NotificationWriteOptions,
+    // biome-ignore lint/suspicious/noConfusingVoidType: `void` keeps backends written before tokens, which return `Promise<void>`, assignable.
+  ): Promise<NotificationWriteResult | void>;
 
   /**
    * Persist which version of the template actually rendered this notification.
@@ -408,7 +457,9 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
   storeTemplateVersion?(
     notificationId: Config['NotificationIdType'],
     templateVersion: number,
-  ): Promise<void>;
+    options?: NotificationWriteOptions,
+    // biome-ignore lint/suspicious/noConfusingVoidType: `void` keeps backends written before tokens, which return `Promise<void>`, assignable.
+  ): Promise<NotificationWriteResult | void>;
 
   /**
    * Put a notification that did not go out back into `PENDING_SEND`, so it is sent again.
@@ -483,10 +534,12 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     notification: Omit<OneOffNotificationInput<Config>, 'id'> & {
       id?: Config['NotificationIdType'];
     },
+    options?: NotificationWriteOptions,
   ): Promise<DatabaseOneOffNotification<Config>>;
   persistOneOffNotificationUpdate(
     notificationId: Config['NotificationIdType'],
     notification: Partial<Omit<OneOffNotificationInput<Config>, 'id'>>,
+    options?: NotificationWriteOptions,
   ): Promise<DatabaseOneOffNotification<Config>>;
   getOneOffNotification(
     notificationId: Config['NotificationIdType'],
