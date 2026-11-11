@@ -1,5 +1,46 @@
 # Changelog
 
+# Unreleased
+
+Version tokens that work across backends. With additional backends, each backend generated its
+own `filterNotificationVersions` token, so a version listed from an additional backend never
+matched the primary, and `expectedVersion` refused every action taken on it with `CHANGED`. Now
+the primary generates the token and replication copies it.
+
+## `vintasend`
+
+* **Notifications carry `notificationVersion`**, the token `filterNotificationVersions` lists and
+  `expectedVersion` is compared against.
+* **BREAKING (backend interface) — every backend write takes `NotificationWriteOptions`** as its
+  last argument: `{ notificationVersion?: string }`. Without it the backend generates a new token,
+  as the primary; with it, it stores that token as given, as a replica. `bulkPersistNotifications`
+  takes `BulkNotificationWriteOptions` (`notificationVersions`, one per notification), and
+  `RequeueNotificationOptions` / `RepinNotificationOptions` carry `notificationVersion` too.
+  `cancelNotification`, `storeAdapterAndContextUsed` and `storeTemplateVersion` may return
+  `{ notificationVersion }` (`NotificationWriteResult`). **Action:** a custom backend keeps
+  compiling, but must honour the option for its tokens to match across backends.
+* **Replication passes the primary's token.** Every replicated write passes the token the
+  primary's write returned, a bulk create reads its tokens back from the primary, and snapshot
+  replication copies the snapshot's `notificationVersion`.
+
+## `vintasend-prisma`
+
+* **BREAKING (schema) — new nullable `notificationVersion` column** on `Notification`, holding the
+  token as a UUID. **Action:** add it before deploying (`ALTER TABLE "Notification" ADD COLUMN
+  "notificationVersion" TEXT;`), and do not backfill it: see the README's "Version tokens" section,
+  which has the rollback too. Rows not written since then keep their `updatedAt` token until their
+  next write.
+* `expectedVersion` is checked in the `UPDATE`'s own `WHERE`, so it stays atomic.
+
+## `vintasend-medplum`
+
+* **The token is a `Communication.identifier`** (`http://vintasend.com/fhir/notification-version`)
+  instead of `meta.versionId`. A Communication without it keeps `meta.versionId` as its token
+  until its next write. Updates still send `If-Match`, so a write that lands between the read
+  and the update is still refused with `CHANGED`.
+* `filterNotificationVersions` asks for `_elements=id,meta,identifier`.
+* A FHIR write made outside VintaSend that leaves the identifier alone no longer changes the token.
+
 # Version 1.0.0-alpha13
 
 A fix for pending notifications in `vintasend-medplum`. Every other package moves to this version

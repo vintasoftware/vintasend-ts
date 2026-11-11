@@ -286,10 +286,11 @@ describe('VintaSend multi-backend management (Phase 6)', () => {
 
     const result = await service.replicateNotification('notif-1');
 
-    expect(replicaCreate.persistNotification).toHaveBeenCalledWith(primaryNotification);
+    expect(replicaCreate.persistNotification).toHaveBeenCalledWith(primaryNotification, {});
     expect(replicaUpdate.persistNotificationUpdate).toHaveBeenCalledWith(
       'notif-1',
       primaryNotification,
+      {},
     );
     expect(result.successes).toEqual(['replica-create', 'replica-update']);
     expect(result.failures).toEqual([]);
@@ -369,8 +370,8 @@ describe('VintaSend multi-backend management (Phase 6)', () => {
 
     const result = await service.processReplication('notif-1');
 
-    expect(replicaA.persistNotification).toHaveBeenCalledWith(primaryNotification);
-    expect(replicaB.persistNotification).toHaveBeenCalledWith(primaryNotification);
+    expect(replicaA.persistNotification).toHaveBeenCalledWith(primaryNotification, {});
+    expect(replicaB.persistNotification).toHaveBeenCalledWith(primaryNotification, {});
     expect(result.successes).toEqual(['replica-a', 'replica-b']);
     expect(result.failures).toEqual([]);
   });
@@ -476,6 +477,7 @@ describe('VintaSend multi-backend management (Phase 6)', () => {
     expect(replicaExisting.persistNotificationUpdate).toHaveBeenCalledWith(
       'notif-1',
       primaryNotification,
+      {},
     );
     expect(result.successes).toEqual(['replica-existing']);
     expect(result.failures).toEqual([]);
@@ -508,6 +510,7 @@ describe('VintaSend multi-backend management (Phase 6)', () => {
     expect(replicaBackend.persistNotificationUpdate).toHaveBeenCalledWith(
       'notif-1',
       primaryNotification,
+      {},
     );
     expect(result.successes).toEqual(['replica']);
     expect(result.failures).toEqual([]);
@@ -567,7 +570,7 @@ describe('VintaSend multi-backend management (Phase 6)', () => {
     const result = await service.processReplication('notif-1', 'replica-b');
 
     expect(replicaA.persistNotification).not.toHaveBeenCalled();
-    expect(replicaB.persistNotification).toHaveBeenCalledWith(primaryNotification);
+    expect(replicaB.persistNotification).toHaveBeenCalledWith(primaryNotification, {});
     expect(result.successes).toEqual(['replica-b']);
     expect(result.failures).toEqual([]);
   });

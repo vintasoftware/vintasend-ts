@@ -139,6 +139,13 @@ export type DatabaseNotification<Config extends BaseNotificationTypeConfig> = {
    * keeps working; it simply stays absent on the records that backend holds.
    */
   usedTemplateVersion?: number | null;
+  /**
+   * The opaque token for this version of the notification: what `filterNotificationVersions`
+   * hands out and `expectedVersion` is compared against. The primary backend writes a new one on
+   * every write, and replication copies it to every other backend, so a token listed from any
+   * backend names the same version on the primary. Absent on a backend that keeps no tokens.
+   */
+  notificationVersion?: string;
   attachments?: StoredAttachment[];
 };
 

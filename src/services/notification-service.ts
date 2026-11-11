@@ -27,6 +27,8 @@ import {
   type NotificationFilterFields,
   type NotificationOrderBy,
   type NotificationVersion,
+  type NotificationWriteOptions,
+  type NotificationWriteResult,
   REPINNABLE_NOTIFICATION_STATUSES,
   REQUEUEABLE_NOTIFICATION_STATUSES,
   type RequeueNotificationOptions,
@@ -459,6 +461,19 @@ export class VintaSend<
     return this.backends.has(identifier);
   }
 
+  /**
+   * What an additional backend's copy of a write is given: the version token the primary's write
+   * recorded, so the replica stores that token instead of generating its own. Empty when the
+   * primary keeps no tokens, which leaves each replica to generate one as before.
+   */
+  private replicaWriteOptions(primaryResult: unknown): NotificationWriteOptions {
+    const notificationVersion =
+      primaryResult && typeof primaryResult === 'object'
+        ? (primaryResult as NotificationWriteResult).notificationVersion
+        : undefined;
+    return notificationVersion === undefined ? {} : { notificationVersion };
+  }
+
   private async executeMultiBackendWrite<T>(
     operation: string,
     primaryWrite: (backend: Backend) => Promise<T>,
@@ -644,8 +659,12 @@ export class VintaSend<
         async (backend) => {
           return backend.persistOneOffNotificationUpdate(notification.id, oneOffNotificationUpdate);
         },
-        async (backend) => {
-          await backend.persistOneOffNotificationUpdate(notification.id, oneOffNotificationUpdate);
+        async (backend, primaryResult) => {
+          await backend.persistOneOffNotificationUpdate(
+            notification.id,
+            oneOffNotificationUpdate,
+            this.replicaWriteOptions(primaryResult),
+          );
         },
         notification.id,
       );
@@ -660,8 +679,12 @@ export class VintaSend<
       async (backend) => {
         return backend.persistNotificationUpdate(notification.id, notificationUpdate);
       },
-      async (backend) => {
-        await backend.persistNotificationUpdate(notification.id, notificationUpdate);
+      async (backend, primaryResult) => {
+        await backend.persistNotificationUpdate(
+          notification.id,
+          notificationUpdate,
+          this.replicaWriteOptions(primaryResult),
+        );
       },
       notification.id,
     );
@@ -872,12 +895,16 @@ export class VintaSend<
         'storeTemplateVersion',
         async (backend) => {
           if (supportsTemplateVersions(backend)) {
-            await backend.storeTemplateVersion(notification.id, version);
+            return backend.storeTemplateVersion(notification.id, version);
           }
         },
-        async (backend) => {
+        async (backend, primaryResult) => {
           if (supportsTemplateVersions(backend)) {
-            await backend.storeTemplateVersion(notification.id, version);
+            await backend.storeTemplateVersion(
+              notification.id,
+              version,
+              this.replicaWriteOptions(primaryResult),
+            );
           }
         },
         notification.id,
@@ -986,8 +1013,12 @@ export class VintaSend<
             async (backend) => {
               return backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
             },
-            async (backend) => {
-              await backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
+            async (backend, primaryResult) => {
+              await backend.markAsFailed(
+                notificationWithExecutionGitCommitSha.id,
+                true,
+                this.replicaWriteOptions(primaryResult),
+              );
             },
             notificationWithExecutionGitCommitSha.id,
           );
@@ -1005,8 +1036,12 @@ export class VintaSend<
           async (backend) => {
             return backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
           },
-          async (backend) => {
-            await backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
+          async (backend, primaryResult) => {
+            await backend.markAsSent(
+              notificationWithExecutionGitCommitSha.id,
+              true,
+              this.replicaWriteOptions(primaryResult),
+            );
           },
           notificationWithExecutionGitCommitSha.id,
         );
@@ -1020,17 +1055,18 @@ export class VintaSend<
         await this.executeMultiBackendWrite(
           'storeAdapterAndContextUsed',
           async (backend) => {
-            await backend.storeAdapterAndContextUsed(
+            return backend.storeAdapterAndContextUsed(
               notificationWithExecutionGitCommitSha.id,
               adapter.key ?? 'unknown',
               context ?? {},
             );
           },
-          async (backend) => {
+          async (backend, primaryResult) => {
             await backend.storeAdapterAndContextUsed(
               notificationWithExecutionGitCommitSha.id,
               adapter.key ?? 'unknown',
               context ?? {},
+              this.replicaWriteOptions(primaryResult),
             );
           },
           notificationWithExecutionGitCommitSha.id,
@@ -1069,10 +1105,13 @@ export class VintaSend<
         return backend.persistNotification(notificationToPersist);
       },
       async (backend, primaryResult) => {
-        await backend.persistNotification({
-          ...notificationToPersist,
-          id: primaryResult.id,
-        });
+        await backend.persistNotification(
+          {
+            ...notificationToPersist,
+            id: primaryResult.id,
+          },
+          this.replicaWriteOptions(primaryResult),
+        );
       },
     );
     this.logger.info(log`Notification ${logId(createdNotification.id)} created`);
@@ -1125,8 +1164,12 @@ export class VintaSend<
       async (backend) => {
         return backend.persistNotificationUpdate(notificationId, notificationUpdate);
       },
-      async (backend) => {
-        await backend.persistNotificationUpdate(notificationId, notificationUpdate);
+      async (backend, primaryResult) => {
+        await backend.persistNotificationUpdate(
+          notificationId,
+          notificationUpdate,
+          this.replicaWriteOptions(primaryResult),
+        );
       },
       notificationId,
     );
@@ -1159,10 +1202,13 @@ export class VintaSend<
         return backend.persistOneOffNotification(notificationToPersist);
       },
       async (backend, primaryResult) => {
-        await backend.persistOneOffNotification({
-          ...notificationToPersist,
-          id: primaryResult.id,
-        });
+        await backend.persistOneOffNotification(
+          {
+            ...notificationToPersist,
+            id: primaryResult.id,
+          },
+          this.replicaWriteOptions(primaryResult),
+        );
       },
     );
     this.logger.info(log`One-off notification ${logId(createdNotification.id)} created`);
@@ -1216,8 +1262,12 @@ export class VintaSend<
       async (backend) => {
         return backend.persistOneOffNotificationUpdate(notificationId, notificationUpdate);
       },
-      async (backend) => {
-        await backend.persistOneOffNotificationUpdate(notificationId, notificationUpdate);
+      async (backend, primaryResult) => {
+        await backend.persistOneOffNotificationUpdate(
+          notificationId,
+          notificationUpdate,
+          this.replicaWriteOptions(primaryResult),
+        );
       },
       notificationId,
     );
@@ -1503,8 +1553,12 @@ export class VintaSend<
       async (backend) => {
         return backend.markAsRead(notificationId, checkIsSent);
       },
-      async (backend) => {
-        await backend.markAsRead(notificationId, checkIsSent);
+      async (backend, primaryResult) => {
+        await backend.markAsRead(
+          notificationId,
+          checkIsSent,
+          this.replicaWriteOptions(primaryResult),
+        );
       },
       notificationId,
     );
@@ -1523,10 +1577,10 @@ export class VintaSend<
     await this.executeMultiBackendWrite(
       'cancelNotification',
       async (backend) => {
-        await backend.cancelNotification(notificationId);
+        return backend.cancelNotification(notificationId);
       },
-      async (backend) => {
-        await backend.cancelNotification(notificationId);
+      async (backend, primaryResult) => {
+        await backend.cancelNotification(notificationId, this.replicaWriteOptions(primaryResult));
       },
       notificationId,
     );
@@ -1651,15 +1705,21 @@ export class VintaSend<
     const requeuedNotification = await this.executeMultiBackendWrite(
       'requeueNotification',
       async (backend) => backend.requeueNotification(notificationId, primaryOptions),
-      async (backend) => {
-        // A version token belongs to the primary backend, so a replica takes the write as it is.
+      async (backend, primaryResult) => {
+        // `expectedVersion` was checked on the primary, so a replica takes the write as it is, and
+        // stores the token the primary's write recorded.
+        const writeOptions = this.replicaWriteOptions(primaryResult);
         if (templateVersion === undefined) {
-          await backend.requeueNotification(notificationId, replicaOptions);
+          await backend.requeueNotification(notificationId, { ...replicaOptions, ...writeOptions });
         } else if (this.getActionCapabilities(backend)['requeue.templateVersion'] === true) {
-          await backend.requeueNotification(notificationId, { ...replicaOptions, templateVersion });
+          await backend.requeueNotification(notificationId, {
+            ...replicaOptions,
+            templateVersion,
+            ...writeOptions,
+          });
         } else {
-          await this.persistTemplatePin(backend, notification, templateVersion);
-          await backend.requeueNotification(notificationId, replicaOptions);
+          await this.persistTemplatePin(backend, notification, templateVersion, writeOptions);
+          await backend.requeueNotification(notificationId, { ...replicaOptions, ...writeOptions });
         }
       },
       notificationId,
@@ -1702,17 +1762,18 @@ export class VintaSend<
     backend: Backend,
     notification: AnyDatabaseNotification<Config>,
     version: number,
+    writeOptions: NotificationWriteOptions = {},
   ): Promise<AnyDatabaseNotification<Config>> {
     if (isOneOffNotification(notification)) {
       const update: Partial<Omit<OneOffNotificationInput<Config>, 'id'>> = {
         requestedTemplateVersion: version,
       };
-      return backend.persistOneOffNotificationUpdate(notification.id, update);
+      return backend.persistOneOffNotificationUpdate(notification.id, update, writeOptions);
     }
     const update: Partial<Omit<Notification<Config>, 'id'>> = {
       requestedTemplateVersion: version,
     };
-    return backend.persistNotificationUpdate(notification.id, update);
+    return backend.persistNotificationUpdate(notification.id, update, writeOptions);
   }
 
   /**
@@ -1811,9 +1872,15 @@ export class VintaSend<
         }
         return this.persistTemplatePin(backend, notification, version);
       },
-      async (backend) => {
-        // Replicas follow the primary, so they take the pin unconditionally, as they always have.
-        await this.persistTemplatePin(backend, notification, version);
+      async (backend, primaryResult) => {
+        // Replicas follow the primary, so they take the pin unconditionally, as they always have,
+        // and store the token the primary's write recorded.
+        await this.persistTemplatePin(
+          backend,
+          notification,
+          version,
+          this.replicaWriteOptions(primaryResult),
+        );
       },
       notificationId,
     );
@@ -1948,8 +2015,12 @@ export class VintaSend<
             async (backend) => {
               return backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
             },
-            async (backend) => {
-              await backend.markAsSent(notificationWithExecutionGitCommitSha.id, true);
+            async (backend, primaryResult) => {
+              await backend.markAsSent(
+                notificationWithExecutionGitCommitSha.id,
+                true,
+                this.replicaWriteOptions(primaryResult),
+              );
             },
             notificationWithExecutionGitCommitSha.id,
           );
@@ -1968,8 +2039,12 @@ export class VintaSend<
             async (backend) => {
               return backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
             },
-            async (backend) => {
-              await backend.markAsFailed(notificationWithExecutionGitCommitSha.id, true);
+            async (backend, primaryResult) => {
+              await backend.markAsFailed(
+                notificationWithExecutionGitCommitSha.id,
+                true,
+                this.replicaWriteOptions(primaryResult),
+              );
             },
             notificationWithExecutionGitCommitSha.id,
           );
@@ -1983,17 +2058,18 @@ export class VintaSend<
           await this.executeMultiBackendWrite(
             'storeAdapterAndContextUsed',
             async (backend) => {
-              await backend.storeAdapterAndContextUsed(
+              return backend.storeAdapterAndContextUsed(
                 notificationWithExecutionGitCommitSha.id,
                 lastAdapterKey,
                 context,
               );
             },
-            async (backend) => {
+            async (backend, primaryResult) => {
               await backend.storeAdapterAndContextUsed(
                 notificationWithExecutionGitCommitSha.id,
                 lastAdapterKey,
                 context,
+                this.replicaWriteOptions(primaryResult),
               );
             },
             notificationWithExecutionGitCommitSha.id,
@@ -2010,6 +2086,10 @@ export class VintaSend<
   async bulkPersistNotifications(
     notifications: Omit<AnyNotification<Config>, 'id'>[],
   ): Promise<Config['NotificationIdType'][]> {
+    // The bulk write returns IDs only, so the tokens it recorded are read back from the primary,
+    // once, for every additional backend to store.
+    let primaryVersions: Promise<(string | undefined)[]> | undefined;
+
     return this.executeMultiBackendWrite(
       'bulkPersistNotifications',
       async (backend) => {
@@ -2023,11 +2103,36 @@ export class VintaSend<
           };
         });
 
+        primaryVersions ??= this.readPrimaryNotificationVersions(createdIds);
+        const notificationVersions = await primaryVersions;
         await backend.bulkPersistNotifications(
           notificationsWithIds as unknown as Omit<AnyNotification<Config>, 'id'>[],
+          notificationVersions.some((version) => version !== undefined)
+            ? { notificationVersions }
+            : {},
         );
       },
     );
+  }
+
+  /**
+   * The version token the primary holds for each notification, in the same order, `undefined`
+   * where it keeps none. Read a few at a time so a large bulk write does not open a read per
+   * notification at once.
+   */
+  private async readPrimaryNotificationVersions(
+    notificationIds: Config['NotificationIdType'][],
+  ): Promise<(string | undefined)[]> {
+    const batchSize = 25;
+    const versions: (string | undefined)[] = [];
+    for (let start = 0; start < notificationIds.length; start += batchSize) {
+      const batch = notificationIds.slice(start, start + batchSize);
+      const notifications = await Promise.all(
+        batch.map((notificationId) => this.backend.getNotification(notificationId, false)),
+      );
+      versions.push(...notifications.map((notification) => notification?.notificationVersion));
+    }
+    return versions;
   }
 
   private normalizeValueForSyncComparison(value: unknown): string {
@@ -2264,11 +2369,13 @@ export class VintaSend<
           }
 
           const existingNotification = await backend.getNotification(notificationId, false);
+          const writeOptions = this.replicaWriteOptions(primaryNotification);
 
           if (existingNotification) {
             await backend.persistNotificationUpdate(
               notificationId,
               primaryNotification as unknown as Partial<Omit<Notification<Config>, 'id'>>,
+              writeOptions,
             );
           } else {
             try {
@@ -2276,6 +2383,7 @@ export class VintaSend<
                 primaryNotification as unknown as Omit<Notification<Config>, 'id'> & {
                   id?: Config['NotificationIdType'];
                 },
+                writeOptions,
               );
             } catch (createError) {
               if (!this.isLikelyDuplicateReplicationConflict(createError)) {
@@ -2289,6 +2397,7 @@ export class VintaSend<
               await backend.persistNotificationUpdate(
                 notificationId,
                 primaryNotification as unknown as Partial<Omit<Notification<Config>, 'id'>>,
+                writeOptions,
               );
             }
           }

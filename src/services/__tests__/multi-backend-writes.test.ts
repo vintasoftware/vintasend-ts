@@ -182,10 +182,13 @@ describe('VintaSend multi-backend writes (Phase 4)', () => {
 
     expect(result.id).toBe('notif-1');
     expect(primaryBackend.persistNotification).toHaveBeenCalledWith(baseNotificationInput);
-    expect(replicaBackend.persistNotification).toHaveBeenCalledWith({
-      ...baseNotificationInput,
-      id: 'notif-1',
-    });
+    expect(replicaBackend.persistNotification).toHaveBeenCalledWith(
+      {
+        ...baseNotificationInput,
+        id: 'notif-1',
+      },
+      {},
+    );
   });
 
   it('preserves inline replication behavior when replicationMode is inline', async () => {
@@ -225,10 +228,13 @@ describe('VintaSend multi-backend writes (Phase 4)', () => {
 
     await service.createNotification(baseNotificationInput);
 
-    expect(replicaBackend.persistNotification).toHaveBeenCalledWith({
-      ...baseNotificationInput,
-      id: 'notif-inline-1',
-    });
+    expect(replicaBackend.persistNotification).toHaveBeenCalledWith(
+      {
+        ...baseNotificationInput,
+        id: 'notif-inline-1',
+      },
+      {},
+    );
     expect(replicationQueueService.enqueueReplication).not.toHaveBeenCalled();
   });
 
@@ -311,10 +317,13 @@ describe('VintaSend multi-backend writes (Phase 4)', () => {
 
     await service.createNotification(baseNotificationInput);
 
-    expect(replicaBackend.persistNotification).toHaveBeenCalledWith({
-      ...baseNotificationInput,
-      id: 'notif-fallback-1',
-    });
+    expect(replicaBackend.persistNotification).toHaveBeenCalledWith(
+      {
+        ...baseNotificationInput,
+        id: 'notif-fallback-1',
+      },
+      {},
+    );
     expect(logger.warn).toHaveBeenCalledWith(
       logMessageMatching(expect.stringContaining('no replication queue service is registered')),
     );
@@ -359,7 +368,7 @@ describe('VintaSend multi-backend writes (Phase 4)', () => {
     await service.updateNotification('notif-1', updates);
 
     expect(primaryBackend.persistNotificationUpdate).toHaveBeenCalledWith('notif-1', updates);
-    expect(replicaBackend.persistNotificationUpdate).toHaveBeenCalledWith('notif-1', updates);
+    expect(replicaBackend.persistNotificationUpdate).toHaveBeenCalledWith('notif-1', updates, {});
   });
 
   it('replicates createOneOffNotification and updateOneOffNotification', async () => {
@@ -402,13 +411,18 @@ describe('VintaSend multi-backend writes (Phase 4)', () => {
     await service.createOneOffNotification(baseOneOffInput);
     await service.updateOneOffNotification('oneoff-1', { title: 'Updated OneOff' });
 
-    expect(replicaBackend.persistOneOffNotification).toHaveBeenCalledWith({
-      ...baseOneOffInput,
-      id: 'oneoff-1',
-    });
-    expect(replicaBackend.persistOneOffNotificationUpdate).toHaveBeenCalledWith('oneoff-1', {
-      title: 'Updated OneOff',
-    });
+    expect(replicaBackend.persistOneOffNotification).toHaveBeenCalledWith(
+      {
+        ...baseOneOffInput,
+        id: 'oneoff-1',
+      },
+      {},
+    );
+    expect(replicaBackend.persistOneOffNotificationUpdate).toHaveBeenCalledWith(
+      'oneoff-1',
+      { title: 'Updated OneOff' },
+      {},
+    );
   });
 
   it('replicates markRead and cancelNotification to additional backends', async () => {
@@ -451,9 +465,9 @@ describe('VintaSend multi-backend writes (Phase 4)', () => {
     await service.cancelNotification('notif-1');
 
     expect(primaryBackend.markAsRead).toHaveBeenCalledWith('notif-1', true);
-    expect(replicaBackend.markAsRead).toHaveBeenCalledWith('notif-1', true);
+    expect(replicaBackend.markAsRead).toHaveBeenCalledWith('notif-1', true, {});
     expect(primaryBackend.cancelNotification).toHaveBeenCalledWith('notif-1');
-    expect(replicaBackend.cancelNotification).toHaveBeenCalledWith('notif-1');
+    expect(replicaBackend.cancelNotification).toHaveBeenCalledWith('notif-1', {});
   });
 
   it('replicates bulkPersistNotifications to additional backends', async () => {
@@ -485,16 +499,19 @@ describe('VintaSend multi-backend writes (Phase 4)', () => {
     const result = await service.bulkPersistNotifications(bulkPayload);
 
     expect(result).toEqual(['n1', 'n2']);
-    expect(replicaBackend.bulkPersistNotifications).toHaveBeenCalledWith([
-      {
-        ...bulkPayload[0],
-        id: 'n1',
-      },
-      {
-        ...bulkPayload[1],
-        id: 'n2',
-      },
-    ]);
+    expect(replicaBackend.bulkPersistNotifications).toHaveBeenCalledWith(
+      [
+        {
+          ...bulkPayload[0],
+          id: 'n1',
+        },
+        {
+          ...bulkPayload[1],
+          id: 'n2',
+        },
+      ],
+      {},
+    );
   });
 
   it('does not replicate when primary createNotification fails', async () => {

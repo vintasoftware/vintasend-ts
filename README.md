@@ -212,6 +212,18 @@ applyReplicationSnapshotIfNewer?(snapshot): Promise<{ applied: boolean }>;
 
 Official backends `vintasend-prisma` and `vintasend-medplum` implement this conditional apply behavior.
 
+#### Version tokens
+
+Every backend write that changes a notification takes `NotificationWriteOptions` as its last
+argument (`bulkPersistNotifications` takes `BulkNotificationWriteOptions`, one token per
+notification). VintaSend calls the primary without a token, so it generates a new
+`notificationVersion`. It then passes that token to each additional backend's copy of the write,
+which stores it as given. The writes that return no notification (`cancelNotification`,
+`storeAdapterAndContextUsed`, `storeTemplateVersion`) return `{ notificationVersion }` so the token
+can be passed on. Snapshot replication (`replicateNotification`, `processReplication`) copies the
+snapshot's `notificationVersion` the same way. A backend that keeps no tokens can ignore the option;
+its notifications then have no `notificationVersion`.
+
 ### Failure Handling
 
 - Primary backend failures fail the operation.
@@ -336,7 +348,8 @@ now; pass it as `expectedVersion` to act on it only if it has not changed (see
 
 It is optional on a backend; `getBackendSupportedActionCapabilities()` reports `versions.filter`,
 and the call throws on a backend without it. `vintasend-medplum` implements it with
-`_elements=id,meta`, `vintasend-prisma` with `select: { id, updatedAt }`.
+`_elements=id,meta,identifier`, `vintasend-prisma` with
+`select: { id, notificationVersion, updatedAt }`.
 
 ### Case sensitivity
 
@@ -924,6 +937,21 @@ await notificationService.requeueNotification(entry.id, {
   expectedVersion: entry.version,
 });
 ```
+
+With additional backends, the token is the same on every backend: the primary generates it on
+each write, and replication stores that token on the additional backends instead of letting each
+one generate its own. So versions can be listed from an additional backend and acted on, as
+always, at the primary:
+
+```typescript
+const entries = await notificationService.filterNotificationVersions(filter, 0, 100, 'reporting');
+await notificationService.requeueNotification(entries[0].id, {
+  expectedVersion: entries[0].version,
+});
+```
+
+If the additional backend has not caught up with the primary's latest write, the token it listed
+is older, and the action is refused with `CHANGED`; it is never applied over a newer write.
 
 A backend that cannot check versions reports so, and the option is refused with `UNSUPPORTED`
 before anything is read or written. It is never ignored. Check first with:

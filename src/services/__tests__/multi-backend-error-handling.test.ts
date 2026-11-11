@@ -152,10 +152,13 @@ describe('VintaSend multi-backend error handling (Phase 4)', () => {
     const result = await service.createNotification(createNotificationInput);
 
     expect(result.id).toBe('notif-1');
-    expect(healthyReplica.persistNotification).toHaveBeenCalledWith({
-      ...createNotificationInput,
-      id: 'notif-1',
-    });
+    expect(healthyReplica.persistNotification).toHaveBeenCalledWith(
+      {
+        ...createNotificationInput,
+        id: 'notif-1',
+      },
+      {},
+    );
     expect(logger.error).toHaveBeenCalledWith(
       logMessageMatching(
         expect.stringContaining('Failed to replicate createNotification to backend replica-a'),
@@ -186,7 +189,7 @@ describe('VintaSend multi-backend error handling (Phase 4)', () => {
     await expect(service.send(databaseNotification)).resolves.toBeUndefined();
 
     expect(primaryBackend.markAsSent).toHaveBeenCalledWith('notif-1', true);
-    expect(failingReplica.markAsSent).toHaveBeenCalledWith('notif-1', true);
+    expect(failingReplica.markAsSent).toHaveBeenCalledWith('notif-1', true, {});
     expect(primaryBackend.storeAdapterAndContextUsed).toHaveBeenCalled();
     expect(failingReplica.storeAdapterAndContextUsed).toHaveBeenCalled();
     expect(logger.error).toHaveBeenCalledWith(

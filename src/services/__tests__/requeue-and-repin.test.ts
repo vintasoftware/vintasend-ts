@@ -405,9 +405,13 @@ describe('repinNotification', () => {
     const repinned = await service.repinNotification('notification-1');
 
     expect(renderer.getLatestTemplateVersion).toHaveBeenCalledWith('welcome');
-    expect(backend.persistNotificationUpdate).toHaveBeenCalledWith('notification-1', {
-      requestedTemplateVersion: 5,
-    });
+    expect(backend.persistNotificationUpdate).toHaveBeenCalledWith(
+      'notification-1',
+      {
+        requestedTemplateVersion: 5,
+      },
+      {},
+    );
     expect(repinned.requestedTemplateVersion).toBe(5);
   });
 
@@ -418,9 +422,13 @@ describe('repinNotification', () => {
     await service.repinNotification('notification-1', { templateVersion: 3 });
 
     expect(renderer.getLatestTemplateVersion).not.toHaveBeenCalled();
-    expect(backend.persistNotificationUpdate).toHaveBeenCalledWith('notification-1', {
-      requestedTemplateVersion: 3,
-    });
+    expect(backend.persistNotificationUpdate).toHaveBeenCalledWith(
+      'notification-1',
+      {
+        requestedTemplateVersion: 3,
+      },
+      {},
+    );
   });
 
   it('pins a notification that was not pinned before', async () => {
@@ -430,9 +438,13 @@ describe('repinNotification', () => {
 
     await service.repinNotification('notification-1');
 
-    expect(backend.persistNotificationUpdate).toHaveBeenCalledWith('notification-1', {
-      requestedTemplateVersion: 5,
-    });
+    expect(backend.persistNotificationUpdate).toHaveBeenCalledWith(
+      'notification-1',
+      {
+        requestedTemplateVersion: 5,
+      },
+      {},
+    );
   });
 
   it('writes nothing when the notification is already on that version', async () => {
@@ -461,9 +473,13 @@ describe('repinNotification', () => {
 
     await service.repinNotification('notification-1');
 
-    expect(backend.persistOneOffNotificationUpdate).toHaveBeenCalledWith('notification-1', {
-      requestedTemplateVersion: 5,
-    });
+    expect(backend.persistOneOffNotificationUpdate).toHaveBeenCalledWith(
+      'notification-1',
+      {
+        requestedTemplateVersion: 5,
+      },
+      {},
+    );
     expect(backend.persistNotificationUpdate).not.toHaveBeenCalled();
   });
 
@@ -530,9 +546,13 @@ describe('repinNotification', () => {
 
     await service.repinNotification('notification-1', { templateVersion: 0 });
 
-    expect(backend.persistNotificationUpdate).toHaveBeenCalledWith('notification-1', {
-      requestedTemplateVersion: 0,
-    });
+    expect(backend.persistNotificationUpdate).toHaveBeenCalledWith(
+      'notification-1',
+      {
+        requestedTemplateVersion: 0,
+      },
+      {},
+    );
   });
 
   it('replicates the new pin to additional backends', async () => {
@@ -543,9 +563,13 @@ describe('repinNotification', () => {
 
     await service.repinNotification('notification-1');
 
-    expect(additional.persistNotificationUpdate).toHaveBeenCalledWith('notification-1', {
-      requestedTemplateVersion: 5,
-    });
+    expect(additional.persistNotificationUpdate).toHaveBeenCalledWith(
+      'notification-1',
+      {
+        requestedTemplateVersion: 5,
+      },
+      {},
+    );
   });
 });
 
@@ -705,9 +729,13 @@ describe('requeueNotification with templateVersion', () => {
 
     await service.requeueNotification('notification-1', { templateVersion: 7 });
 
-    expect(replica.persistNotificationUpdate).toHaveBeenCalledWith('notification-1', {
-      requestedTemplateVersion: 7,
-    });
+    expect(replica.persistNotificationUpdate).toHaveBeenCalledWith(
+      'notification-1',
+      {
+        requestedTemplateVersion: 7,
+      },
+      {},
+    );
     expect(replica.requeueNotification).toHaveBeenCalledWith('notification-1', {});
   });
 
@@ -858,9 +886,13 @@ describe('repinNotification with expectedVersion', () => {
 
     expect(backend.repinNotification).toHaveBeenCalledWith('notification-1', 5, {});
     expect(backend.persistNotificationUpdate).not.toHaveBeenCalled();
-    expect(replica.persistNotificationUpdate).toHaveBeenCalledWith('notification-1', {
-      requestedTemplateVersion: 5,
-    });
+    expect(replica.persistNotificationUpdate).toHaveBeenCalledWith(
+      'notification-1',
+      {
+        requestedTemplateVersion: 5,
+      },
+      {},
+    );
   });
 });
 
@@ -874,9 +906,13 @@ describe('getCurrentTemplateVersion', () => {
     await service.repinNotification('notification-1');
 
     expect(spy).toHaveBeenCalledWith('EMAIL', 'welcome');
-    expect(backend.persistNotificationUpdate).toHaveBeenCalledWith('notification-1', {
-      requestedTemplateVersion: 9,
-    });
+    expect(backend.persistNotificationUpdate).toHaveBeenCalledWith(
+      'notification-1',
+      {
+        requestedTemplateVersion: 9,
+      },
+      {},
+    );
   });
 
   it('answers null for a type no adapter handles', async () => {
