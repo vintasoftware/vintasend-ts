@@ -1,5 +1,18 @@
 # Changelog
 
+# Version 1.0.0-alpha13
+
+A fix for pending notifications in `vintasend-medplum`. Every other package moves to this version
+with no change. Pin it exactly, as with alpha10 to alpha12: `"vintasend": "1.0.0-alpha13"`, no `^`.
+
+* **`vintasend-medplum`: fixed: pending notifications with no send time are sent.**
+  `getAllPendingNotifications` and `getPendingNotifications` searched `sent:le=<now>`, and a FHIR
+  date comparison never matches a `Communication` without `sent`. So a pending notification
+  created with `sendAfter: null` was never returned, and `sendPendingNotifications` never sent it.
+  Both now search with `_filter=sent pr false or sent le <now>`, one search that the Medplum
+  server filters and pages. **Action:** none. Notifications that were stuck in `PENDING_SEND`
+  with no send time are sent on the next `sendPendingNotifications` run after the upgrade.
+
 # Version 1.0.0-alpha12
 
 Complete types for the 1.0.0-alpha11 API. Every other package moves to this version with no
