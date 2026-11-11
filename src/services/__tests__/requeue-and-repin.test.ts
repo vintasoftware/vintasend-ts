@@ -59,36 +59,126 @@ function makeOneOff(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * A backend whose `requeueNotification` behaves like a real one: refuses the wrong status, clears
- * `sentAt`, and applies `sendAfter` only when the key is present.
+ * A backend that keeps one notification and behaves like a real one: `requeueNotification` clears
+ * `sentAt` and applies `sendAfter` only when the key is present, and `markAsSent` /
+ * `markAsFailed` move the stored status, so a read after a send sees its outcome.
+ *
+ * It implements none of the optional actions; `makeConditionalBackend` adds them.
  */
 function makeBackend(
   stored: DatabaseNotification<any> | null = makeNotification(),
   overrides: Partial<AnyBackend> = {},
 ): AnyBackend {
+  let current: DatabaseNotification<any> | null = stored === null ? null : { ...stored };
+  const write = (patch: object) => {
+    current = { ...(current as DatabaseNotification<any>), ...patch };
+    return { ...current };
+  };
   return {
-    getNotification: vi.fn().mockResolvedValue(stored),
+    getNotification: vi.fn().mockImplementation(async () => (current ? { ...current } : null)),
     getOneOffNotification: vi.fn().mockResolvedValue(null),
     persistNotificationUpdate: vi
       .fn()
-      .mockImplementation(async (_id: unknown, update: object) => ({ ...stored, ...update })),
+      .mockImplementation(async (_id: unknown, update: object) => write(update)),
     persistOneOffNotificationUpdate: vi
       .fn()
-      .mockImplementation(async (_id: unknown, update: object) => ({ ...stored, ...update })),
+      .mockImplementation(async (_id: unknown, update: object) => write(update)),
     requeueNotification: vi
       .fn()
-      .mockImplementation(async (_id: unknown, options: { sendAfter?: Date | null }) => ({
-        ...stored,
-        status: 'PENDING_SEND',
-        sentAt: null,
-        ...('sendAfter' in options ? { sendAfter: options.sendAfter } : {}),
-      })),
-    markAsSent: vi.fn().mockResolvedValue(makeNotification({ status: 'SENT' })),
-    markAsFailed: vi.fn().mockResolvedValue(makeNotification({ status: 'FAILED' })),
+      .mockImplementation(async (_id: unknown, options: { sendAfter?: Date | null }) =>
+        write({
+          status: 'PENDING_SEND',
+          sentAt: null,
+          ...('sendAfter' in options ? { sendAfter: options.sendAfter } : {}),
+        }),
+      ),
+    markAsSent: vi.fn().mockImplementation(async () => write({ status: 'SENT', sentAt: PAST })),
+    markAsFailed: vi.fn().mockImplementation(async () => write({ status: 'FAILED', sentAt: PAST })),
     storeAdapterAndContextUsed: vi.fn().mockResolvedValue(undefined),
     getBackendIdentifier: () => 'primary',
     ...overrides,
   } as unknown as AnyBackend;
+}
+
+/**
+ * `makeBackend` plus the optional actions, with a version token that every write bumps, the way
+ * `vintasend-medplum` uses `meta.versionId`. A write given a stale `expectedVersion` throws
+ * `CHANGED` and writes nothing.
+ */
+function makeConditionalBackend(
+  stored: DatabaseNotification<any> = makeNotification(),
+  overrides: Partial<AnyBackend> = {},
+): AnyBackend & { version: () => string } {
+  const base = makeBackend(stored);
+  let version = 1;
+  const bump = <T>(result: T): T => {
+    version += 1;
+    return result;
+  };
+  const check = (action: 'requeue' | 'repin', id: unknown, expectedVersion?: string) => {
+    if (expectedVersion !== undefined && expectedVersion !== String(version)) {
+      throw new NotificationActionError({
+        action,
+        reason: 'CHANGED',
+        notificationId: id,
+        message: `Notification ${String(id)} changed`,
+      });
+    }
+  };
+  const persistNotificationUpdate = base.persistNotificationUpdate;
+  const requeue = base.requeueNotification;
+  const markAsSent = base.markAsSent;
+  const markAsFailed = base.markAsFailed;
+  return {
+    ...base,
+    persistNotificationUpdate: vi
+      .fn()
+      .mockImplementation(async (...args: [any, any]) =>
+        bump(await persistNotificationUpdate(...args)),
+      ),
+    markAsSent: vi
+      .fn()
+      .mockImplementation(async (...args: [any, any]) => bump(await markAsSent(...args))),
+    markAsFailed: vi
+      .fn()
+      .mockImplementation(async (...args: [any, any]) => bump(await markAsFailed(...args))),
+    requeueNotification: vi
+      .fn()
+      .mockImplementation(
+        async (
+          id: unknown,
+          options: { sendAfter?: Date | null; templateVersion?: number; expectedVersion?: string },
+        ) => {
+          check('requeue', id, options.expectedVersion);
+          const { templateVersion, expectedVersion: _expected, ...rest } = options;
+          if (templateVersion !== undefined) {
+            await persistNotificationUpdate(id, { requestedTemplateVersion: templateVersion });
+          }
+          return bump(await requeue(id, rest));
+        },
+      ),
+    repinNotification: vi
+      .fn()
+      .mockImplementation(
+        async (id: unknown, templateVersion: number, options: { expectedVersion?: string }) => {
+          check('repin', id, options.expectedVersion);
+          return bump(
+            await persistNotificationUpdate(id, { requestedTemplateVersion: templateVersion }),
+          );
+        },
+      ),
+    filterNotificationVersions: vi
+      .fn()
+      .mockImplementation(async () => [{ id: 'notification-1', version: String(version) }]),
+    getActionCapabilities: () => ({
+      'repin.expectedVersion': true,
+      'requeue.expectedVersion': true,
+      'requeue.templateVersion': true,
+      'versions.filter': true,
+    }),
+    version: () => String(version),
+    ...overrides,
+  } as unknown as AnyBackend & { version: () => string };
 }
 
 function makeRenderer(latest: number | null = 5) {
@@ -126,6 +216,8 @@ function makeService(
     renderer?: Mocked<BaseEmailTemplateRenderer<any>>;
     enqueueNotifications?: boolean;
     queueService?: Mocked<BaseNotificationQueueService<any>>;
+    /** Build the service with no adapter at all, as a process that only re-queues would. */
+    withoutAdapters?: boolean;
   } = {},
 ) {
   const backend = options.backend ?? makeBackend();
@@ -133,7 +225,7 @@ function makeService(
   const adapter = makeAdapter(renderer, options.enqueueNotifications);
 
   const service = new VintaSendFactory<any>().create({
-    adapters: [adapter],
+    adapters: options.withoutAdapters ? [] : [adapter],
     backend,
     ...(options.additionalBackends ? { additionalBackends: options.additionalBackends } : {}),
     ...(options.queueService ? { queueService: options.queueService } : {}),
@@ -168,9 +260,10 @@ describe('requeueNotification', () => {
     const requeued = await service.requeueNotification('notification-1');
 
     expect(backend.requeueNotification).toHaveBeenCalledWith('notification-1', {});
-    expect(requeued).toMatchObject({ status: 'PENDING_SEND', sentAt: null });
     expect(adapter.send).toHaveBeenCalledTimes(1);
     expect(backend.markAsSent).toHaveBeenCalledWith('notification-1', true);
+    // The notification as it stands after the send, not as the requeue left it.
+    expect(requeued).toMatchObject({ status: 'SENT' });
   });
 
   it('requeues a cancelled notification too', async () => {
@@ -456,7 +549,405 @@ describe('repinNotification', () => {
   });
 });
 
+/** Nothing was written to `backend` by any write method. */
+function expectNothingWritten(backend: AnyBackend) {
+  expect(backend.requeueNotification).not.toHaveBeenCalled();
+  expect(backend.persistNotificationUpdate).not.toHaveBeenCalled();
+  expect(backend.persistOneOffNotificationUpdate).not.toHaveBeenCalled();
+  expect(backend.markAsSent).not.toHaveBeenCalled();
+  expect(backend.markAsFailed).not.toHaveBeenCalled();
+  if (backend.repinNotification) {
+    expect(backend.repinNotification).not.toHaveBeenCalled();
+  }
+}
+
+describe('requeueNotification outcome', () => {
+  it('returns FAILED when the adapter fails, with raiseErrorOnFailedSend false', async () => {
+    const { service, adapter } = makeService();
+    adapter.send.mockRejectedValue(new Error('smtp down'));
+
+    const requeued = await service.requeueNotification('notification-1');
+
+    expect(requeued.status).toBe('FAILED');
+  });
+
+  it('returns PENDING_SEND for a notification scheduled for later', async () => {
+    const { service } = makeService();
+
+    const requeued = await service.requeueNotification('notification-1', { sendAfter: FUTURE });
+
+    expect(requeued.status).toBe('PENDING_SEND');
+  });
+
+  it('returns PENDING_SEND for a notification handed to the queue service', async () => {
+    const queueService = { enqueueNotification: vi.fn().mockResolvedValue(undefined) };
+    const { service } = makeService({ enqueueNotifications: true, queueService });
+
+    const requeued = await service.requeueNotification('notification-1');
+
+    expect(queueService.enqueueNotification).toHaveBeenCalledWith('notification-1');
+    expect(requeued.status).toBe('PENDING_SEND');
+  });
+});
+
+describe('requeueNotification with send: false', () => {
+  it('leaves a due notification pending without sending it', async () => {
+    const { service, backend, adapter } = makeService();
+
+    const requeued = await service.requeueNotification('notification-1', {
+      sendAfter: null,
+      send: false,
+    });
+
+    expect(backend.requeueNotification).toHaveBeenCalledWith('notification-1', {
+      sendAfter: null,
+    });
+    expect(adapter.send).not.toHaveBeenCalled();
+    expect(backend.markAsSent).not.toHaveBeenCalled();
+    expect(requeued.status).toBe('PENDING_SEND');
+  });
+
+  it('works on a service built with no adapter at all', async () => {
+    const { service, backend } = makeService({ withoutAdapters: true });
+
+    const requeued = await service.requeueNotification('notification-1', { send: false });
+
+    expect(backend.requeueNotification).toHaveBeenCalledTimes(1);
+    expect(requeued.status).toBe('PENDING_SEND');
+  });
+
+  it('re-pins and re-queues in one write on a service with no adapter', async () => {
+    const backend = makeConditionalBackend();
+    const { service } = makeService({ backend, withoutAdapters: true });
+
+    const requeued = await service.requeueNotification('notification-1', {
+      templateVersion: 7,
+      send: false,
+    });
+
+    expect(requeued).toMatchObject({ status: 'PENDING_SEND', requestedTemplateVersion: 7 });
+  });
+});
+
+describe('requeueNotification with templateVersion', () => {
+  it('pins and re-queues in one backend write, then sends', async () => {
+    const backend = makeConditionalBackend();
+    const { service, adapter } = makeService({ backend });
+
+    const requeued = await service.requeueNotification('notification-1', { templateVersion: 7 });
+
+    expect(backend.requeueNotification).toHaveBeenCalledTimes(1);
+    expect(backend.requeueNotification).toHaveBeenCalledWith('notification-1', {
+      templateVersion: 7,
+    });
+    expect(backend.repinNotification).not.toHaveBeenCalled();
+    expect(adapter.send).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedTemplateVersion: 7, status: 'PENDING_SEND' }),
+      expect.anything(),
+    );
+    expect(requeued).toMatchObject({ status: 'SENT', requestedTemplateVersion: 7 });
+  });
+
+  it('keeps the send time unless one is given', async () => {
+    const backend = makeConditionalBackend(makeNotification({ sendAfter: FUTURE }));
+    const { service, adapter } = makeService({ backend });
+
+    const requeued = await service.requeueNotification('notification-1', { templateVersion: 7 });
+
+    expect(requeued.sendAfter).toEqual(FUTURE);
+    expect(adapter.send).not.toHaveBeenCalled();
+  });
+
+  it('refuses a backend that cannot pin in the same write, writing nothing', async () => {
+    const { service, backend, adapter } = makeService();
+
+    await expectActionError(
+      service.requeueNotification('notification-1', { templateVersion: 7 }),
+      'UNSUPPORTED',
+    );
+
+    expectNothingWritten(backend);
+    expect(adapter.send).not.toHaveBeenCalled();
+  });
+
+  it.each(['PENDING_SEND', 'SENT', 'READ'])(
+    'refuses a notification in %s, writing nothing',
+    async (status) => {
+      const backend = makeConditionalBackend(makeNotification({ status }));
+      const { service } = makeService({ backend });
+
+      await expectActionError(
+        service.requeueNotification('notification-1', { templateVersion: 7 }),
+        'INVALID_STATUS',
+      );
+
+      expectNothingWritten(backend);
+    },
+  );
+
+  it.each([-1, 1.5])('rejects templateVersion %s before reading', async (templateVersion) => {
+    const backend = makeConditionalBackend();
+    const { service } = makeService({ backend });
+
+    await expect(
+      service.requeueNotification('notification-1', { templateVersion }),
+    ).rejects.toThrow(RangeError);
+    expect(backend.getNotification).not.toHaveBeenCalled();
+    expectNothingWritten(backend);
+  });
+
+  it('pins a replica that cannot pin in the same write with an update, then re-queues it', async () => {
+    const replica = makeBackend(makeNotification(), { getBackendIdentifier: () => 'replica' });
+    const { service } = makeService({
+      backend: makeConditionalBackend(),
+      additionalBackends: [replica],
+    });
+
+    await service.requeueNotification('notification-1', { templateVersion: 7 });
+
+    expect(replica.persistNotificationUpdate).toHaveBeenCalledWith('notification-1', {
+      requestedTemplateVersion: 7,
+    });
+    expect(replica.requeueNotification).toHaveBeenCalledWith('notification-1', {});
+  });
+
+  it('pins a capable replica in its own single write, without the version token', async () => {
+    const replica = makeConditionalBackend(makeNotification(), {
+      getBackendIdentifier: () => 'replica',
+    });
+    const primary = makeConditionalBackend();
+    const { service } = makeService({ backend: primary, additionalBackends: [replica] });
+
+    await service.requeueNotification('notification-1', {
+      templateVersion: 7,
+      expectedVersion: primary.version(),
+      sendAfter: FUTURE,
+    });
+
+    expect(replica.requeueNotification).toHaveBeenCalledWith('notification-1', {
+      sendAfter: FUTURE,
+      templateVersion: 7,
+    });
+  });
+});
+
+describe('requeueNotification with expectedVersion', () => {
+  it('re-queues when the notification is still at that version', async () => {
+    const backend = makeConditionalBackend();
+    const { service } = makeService({ backend });
+
+    const requeued = await service.requeueNotification('notification-1', {
+      expectedVersion: backend.version(),
+      templateVersion: 7,
+    });
+
+    expect(requeued).toMatchObject({ status: 'SENT', requestedTemplateVersion: 7 });
+  });
+
+  it('refuses CHANGED when the notification moved on, writing and sending nothing', async () => {
+    const backend = makeConditionalBackend();
+    const replica = makeBackend(makeNotification(), { getBackendIdentifier: () => 'replica' });
+    const { service, adapter } = makeService({ backend, additionalBackends: [replica] });
+    const listed = backend.version();
+    await service.repinNotification('notification-1', { templateVersion: 3 });
+    vi.clearAllMocks();
+
+    const error = await expectActionError(
+      service.requeueNotification('notification-1', {
+        expectedVersion: listed,
+        templateVersion: 7,
+      }),
+      'CHANGED',
+    );
+
+    expect(error.action).toBe('requeue');
+    expect((await backend.getNotification('notification-1', false))?.status).toBe('FAILED');
+    expect(adapter.send).not.toHaveBeenCalled();
+    expectNothingWritten(replica);
+  });
+
+  it('refuses a backend that cannot check versions, writing nothing', async () => {
+    const { service, backend } = makeService();
+
+    await expectActionError(
+      service.requeueNotification('notification-1', { expectedVersion: '1' }),
+      'UNSUPPORTED',
+    );
+
+    expectNothingWritten(backend);
+  });
+});
+
+describe('repinNotification with expectedVersion', () => {
+  it('passes the version to the backend, which checks it', async () => {
+    const backend = makeConditionalBackend();
+    const { service } = makeService({ backend });
+
+    const repinned = await service.repinNotification('notification-1', {
+      templateVersion: 7,
+      expectedVersion: backend.version(),
+    });
+
+    expect(backend.repinNotification).toHaveBeenCalledWith('notification-1', 7, {
+      expectedVersion: '1',
+    });
+    expect(repinned.requestedTemplateVersion).toBe(7);
+  });
+
+  it('refuses CHANGED when the notification moved on, writing nothing', async () => {
+    const backend = makeConditionalBackend();
+    const { service } = makeService({ backend });
+    const listed = backend.version();
+    await service.requeueNotification('notification-1', { sendAfter: FUTURE });
+    const before = await backend.getNotification('notification-1', false);
+    vi.clearAllMocks();
+
+    await expectActionError(
+      service.repinNotification('notification-1', { templateVersion: 7, expectedVersion: listed }),
+      'CHANGED',
+    );
+
+    expect(await backend.getNotification('notification-1', false)).toEqual(before);
+    expect(backend.persistNotificationUpdate).not.toHaveBeenCalled();
+  });
+
+  it('asks the backend even when the pin already matches, so a change is still caught', async () => {
+    const backend = makeConditionalBackend(makeNotification({ requestedTemplateVersion: 7 }));
+    const { service } = makeService({ backend });
+
+    await expectActionError(
+      service.repinNotification('notification-1', { templateVersion: 7, expectedVersion: 'old' }),
+      'CHANGED',
+    );
+  });
+
+  it('refuses a backend without repinNotification, writing nothing', async () => {
+    const backend = makeBackend(makeNotification(), {
+      getActionCapabilities: () => ({ 'repin.expectedVersion': true }),
+    });
+    const { service } = makeService({ backend });
+
+    await expectActionError(
+      service.repinNotification('notification-1', { expectedVersion: '1' }),
+      'UNSUPPORTED',
+    );
+
+    expectNothingWritten(backend);
+  });
+
+  it('refuses a backend that does not report the capability, writing nothing', async () => {
+    const backend = makeConditionalBackend(makeNotification(), {
+      getActionCapabilities: () => ({}),
+    });
+    const { service } = makeService({ backend });
+
+    await expectActionError(
+      service.repinNotification('notification-1', { expectedVersion: backend.version() }),
+      'UNSUPPORTED',
+    );
+
+    expectNothingWritten(backend);
+  });
+
+  it('uses the backend repin without a version too, and replicates through an update', async () => {
+    const backend = makeConditionalBackend();
+    const replica = makeBackend(makeNotification(), { getBackendIdentifier: () => 'replica' });
+    const { service } = makeService({ backend, additionalBackends: [replica] });
+
+    await service.repinNotification('notification-1');
+
+    expect(backend.repinNotification).toHaveBeenCalledWith('notification-1', 5, {});
+    expect(backend.persistNotificationUpdate).not.toHaveBeenCalled();
+    expect(replica.persistNotificationUpdate).toHaveBeenCalledWith('notification-1', {
+      requestedTemplateVersion: 5,
+    });
+  });
+});
+
+describe('getCurrentTemplateVersion', () => {
+  it('answers what the renderer reports, and repin pins exactly that', async () => {
+    const renderer = makeRenderer(9);
+    const { service, backend } = makeService({ renderer });
+
+    expect(await service.getCurrentTemplateVersion('EMAIL', 'welcome')).toBe(9);
+    const spy = vi.spyOn(service, 'getCurrentTemplateVersion');
+    await service.repinNotification('notification-1');
+
+    expect(spy).toHaveBeenCalledWith('EMAIL', 'welcome');
+    expect(backend.persistNotificationUpdate).toHaveBeenCalledWith('notification-1', {
+      requestedTemplateVersion: 9,
+    });
+  });
+
+  it('answers null for a type no adapter handles', async () => {
+    const { service } = makeService();
+
+    expect(await service.getCurrentTemplateVersion('SMS', 'welcome')).toBeNull();
+  });
+});
+
+describe('filterNotificationVersions', () => {
+  it('passes the filter through and returns IDs and versions only', async () => {
+    const backend = makeConditionalBackend();
+    const { service } = makeService({ backend });
+    const filter = { or: [{ status: 'FAILED' as const }, { hasSendAfter: true }] };
+
+    const page = await service.filterNotificationVersions(filter, 0, 50);
+
+    expect(backend.filterNotificationVersions).toHaveBeenCalledWith(filter, 0, 50);
+    expect(page).toEqual([{ id: 'notification-1', version: '1' }]);
+    expect(backend.getNotification).not.toHaveBeenCalled();
+  });
+
+  it('throws for a backend that does not implement it', async () => {
+    const { service } = makeService();
+
+    await expect(service.filterNotificationVersions({}, 0, 50)).rejects.toThrow(
+      'does not support filterNotificationVersions',
+    );
+  });
+});
+
+describe('getBackendSupportedActionCapabilities', () => {
+  it('defaults every key to false', async () => {
+    const { service } = makeService();
+
+    expect(await service.getBackendSupportedActionCapabilities()).toEqual({
+      'repin.expectedVersion': false,
+      'requeue.expectedVersion': false,
+      'requeue.templateVersion': false,
+      'versions.filter': false,
+    });
+  });
+
+  it('reports what a capable backend reports', async () => {
+    const { service } = makeService({ backend: makeConditionalBackend() });
+
+    const capabilities = await service.getBackendSupportedActionCapabilities();
+
+    expect(Object.values(capabilities).every(Boolean)).toBe(true);
+  });
+
+  it('reads a claimed capability as false when its method is missing', async () => {
+    const backend = makeBackend(makeNotification(), {
+      getActionCapabilities: () => ({ 'repin.expectedVersion': true, 'versions.filter': true }),
+    });
+    const { service } = makeService({ backend });
+
+    const capabilities = await service.getBackendSupportedActionCapabilities();
+
+    expect(capabilities['repin.expectedVersion']).toBe(false);
+    expect(capabilities['versions.filter']).toBe(false);
+  });
+});
+
 describe('isNotificationActionError', () => {
+  it.each(['CHANGED', 'UNSUPPORTED'])('recognises the %s reason across copies', (reason) => {
+    const foreign = Object.assign(new Error('nope'), { name: 'NotificationActionError', reason });
+
+    expect(isNotificationActionError(foreign)).toBe(true);
+  });
+
   it('recognises an error from another copy of the package by its shape', () => {
     const foreign = Object.assign(new Error('nope'), {
       name: 'NotificationActionError',

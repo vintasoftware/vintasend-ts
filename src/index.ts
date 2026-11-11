@@ -40,17 +40,21 @@ export {
 export type {
   BaseNotificationBackend,
   DateRange,
+  NotificationActionCapabilities,
   NotificationFilter,
   NotificationFilterCapabilities,
   NotificationFilterFields,
   NotificationOrderBy,
   NotificationOrderByField,
   NotificationOrderDirection,
+  NotificationVersion,
+  RepinNotificationOptions,
   RequeueNotificationOptions,
   StringFieldFilter,
   StringFilterLookup,
 } from './services/notification-backends/base-notification-backend.js';
 export {
+  DEFAULT_BACKEND_ACTION_CAPABILITIES,
   isFieldFilter,
   REPINNABLE_NOTIFICATION_STATUSES,
   REQUEUEABLE_NOTIFICATION_STATUSES,

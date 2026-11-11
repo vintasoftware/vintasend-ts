@@ -20,9 +20,13 @@ import {
 } from './notification-adapters/base-notification-adapter.js';
 import {
   type BaseNotificationBackend,
+  DEFAULT_BACKEND_ACTION_CAPABILITIES,
   DEFAULT_BACKEND_FILTER_CAPABILITIES,
+  type NotificationActionCapabilities,
+  type NotificationFilter,
   type NotificationFilterFields,
   type NotificationOrderBy,
+  type NotificationVersion,
   REPINNABLE_NOTIFICATION_STATUSES,
   REQUEUEABLE_NOTIFICATION_STATUSES,
   type RequeueNotificationOptions,
@@ -73,19 +77,46 @@ export type TemplateVersionPinningOptions = {
 
 /**
  * Options for `VintaSend.requeueNotification`.
- *
- * `sendAfter` left out keeps the notification's own schedule. `null`, or a date in the past, sends
- * it right away; a future date leaves it pending until then.
  */
-export type RequeueOptions = RequeueNotificationOptions;
+export type RequeueOptions = {
+  /**
+   * Left out, the notification keeps its own schedule. `null`, or a date in the past, makes it due
+   * now; a future date leaves it pending until then.
+   */
+  sendAfter?: Date | null;
+  /**
+   * Pin the notification to this template version in the same backend write that re-queues it.
+   * Needs a primary backend reporting `requeue.templateVersion`. Not checked against the renderer,
+   * as with `repinNotification`.
+   */
+  templateVersion?: number;
+  /**
+   * Re-queue only if the notification is still at this version, the token
+   * `filterNotificationVersions` returned for it. Needs a primary backend reporting
+   * `requeue.expectedVersion`.
+   */
+  expectedVersion?: string;
+  /**
+   * `false` re-queues without sending, even when the notification is due. It is then left to
+   * whatever sends pending notifications (`sendPendingNotifications`, typically a scheduled job),
+   * and no adapter is used, so a service built only to re-queue needs no delivery credentials.
+   * Defaults to `true`.
+   */
+  send?: boolean;
+};
 
 /**
  * Options for `VintaSend.repinNotification`.
- *
- * `templateVersion` left out pins to the version the renderer reports as current right now.
  */
 export type RepinOptions = {
+  /** Left out, pins to `getCurrentTemplateVersion` for the notification's template. */
   templateVersion?: number;
+  /**
+   * Re-pin only if the notification is still at this version, the token
+   * `filterNotificationVersions` returned for it. Needs a primary backend reporting
+   * `repin.expectedVersion`.
+   */
+  expectedVersion?: string;
 };
 
 type RenderEmailTemplateContextInput<Config extends BaseNotificationTypeConfig> =
@@ -681,7 +712,25 @@ export class VintaSend<
     if (!this.shouldPinTemplateVersions(pinTemplateVersions)) {
       return null;
     }
+    return this.getCurrentTemplateVersion(notificationType, bodyTemplate);
+  }
 
+  /**
+   * The template version a notification of this type created now would be pinned to: what the
+   * renderer reports as current. For `vintasend-managed-templates` that is the key's newest active
+   * version, or `null` when nothing is published or the template is a base.
+   *
+   * `repinNotification` without a `templateVersion`, and `pinTemplateVersions`, both call this, so
+   * a caller that shows "the version new notifications get" agrees with what they pin.
+   *
+   * Asks each adapter of `notificationType` in turn and returns the first version reported.
+   * Best-effort: a renderer that does not version templates answers `null`, and one that throws is
+   * logged, by template key only, and treated the same way.
+   */
+  async getCurrentTemplateVersion(
+    notificationType: NotificationType,
+    templateKey: string,
+  ): Promise<number | null> {
     for (const adapter of this.adapters) {
       if (adapter.notificationType !== notificationType) {
         continue;
@@ -690,15 +739,13 @@ export class VintaSend<
         // Optional-chained: a renderer that never grew the method — anything written before
         // template versioning, or against the `implements` form of the seam — simply has no
         // version to offer, which is the same answer the default implementation gives.
-        const version = await adapter
-          .getTemplateRenderer()
-          .getLatestTemplateVersion?.(bodyTemplate);
+        const version = await adapter.getTemplateRenderer().getLatestTemplateVersion?.(templateKey);
         if (version !== null && version !== undefined) {
           return version;
         }
       } catch (resolveError) {
         this.logger.error(
-          log`Template renderer for adapter ${logLabel(adapter.key ?? 'unknown')} threw while resolving the current version of template "${logLabel(bodyTemplate)}"; leaving the notification unpinned: ${logError(resolveError)}`,
+          log`Template renderer for adapter ${logLabel(adapter.key ?? 'unknown')} threw while resolving the current version of template "${logLabel(templateKey)}"; treating it as having none: ${logError(resolveError)}`,
         );
       }
     }
@@ -1328,6 +1375,36 @@ export class VintaSend<
   }
 
   /**
+   * The ID and version token of every notification matching `filter`, a page at a time, from the
+   * primary backend by default or from a specific backend.
+   *
+   * Reads nothing else: no recipient, context, context parameters, rendered content or
+   * attachments, so it is the way to count or select notifications that must not be read. Pass a
+   * returned `version` as `expectedVersion` to `repinNotification` or `requeueNotification` to act
+   * only on a notification that has not changed since it was listed.
+   *
+   * Ordered by ID. A caller that re-pins or re-queues what it lists may change which notifications
+   * match, so it should list again from page 0 instead of moving on to the next page.
+   *
+   * @throws Error when the backend does not implement it (`versions.filter` is `false` in
+   *   `getBackendSupportedActionCapabilities`).
+   */
+  async filterNotificationVersions(
+    filter: NotificationFilter<Config>,
+    page: number,
+    pageSize: number,
+    backendIdentifier?: string,
+  ): Promise<NotificationVersion<Config>[]> {
+    const backend = this.getBackend(backendIdentifier);
+    if (typeof backend.filterNotificationVersions !== 'function') {
+      throw new Error(
+        `Backend ${this.getBackendIdentifier(backend)} does not support filterNotificationVersions`,
+      );
+    }
+    return backend.filterNotificationVersions(filter, page, pageSize);
+  }
+
+  /**
    * Returns the effective filter capabilities for the primary backend by default or for a specific backend.
    */
   async getBackendSupportedFilterCapabilities(backendIdentifier?: string) {
@@ -1335,6 +1412,70 @@ export class VintaSend<
       ...DEFAULT_BACKEND_FILTER_CAPABILITIES,
       ...(this.getBackend(backendIdentifier).getFilterCapabilities?.() ?? {}),
     };
+  }
+
+  /**
+   * Which optional notification actions the primary backend, or a specific one, supports. Every
+   * key defaults to `false`; see `NotificationActionCapabilities`.
+   *
+   * A key whose method the backend does not implement reads `false` whatever the backend reports.
+   */
+  async getBackendSupportedActionCapabilities(
+    backendIdentifier?: string,
+  ): Promise<NotificationActionCapabilities> {
+    return this.getActionCapabilities(this.getBackend(backendIdentifier));
+  }
+
+  private getActionCapabilities(backend: Backend): NotificationActionCapabilities {
+    const capabilities: NotificationActionCapabilities = {
+      ...DEFAULT_BACKEND_ACTION_CAPABILITIES,
+      ...(backend.getActionCapabilities?.() ?? {}),
+    };
+    if (typeof backend.repinNotification !== 'function') {
+      capabilities['repin.expectedVersion'] = false;
+    }
+    if (typeof backend.filterNotificationVersions !== 'function') {
+      capabilities['versions.filter'] = false;
+    }
+    return capabilities;
+  }
+
+  /**
+   * Refuse an option the primary backend would not honour, before anything is read or written.
+   */
+  private assertActionSupported(
+    notificationId: Config['NotificationIdType'],
+    action: 'requeue' | 'repin',
+    capability: string,
+    option: string,
+  ): void {
+    if (this.getActionCapabilities(this.backend)[capability] === true) {
+      return;
+    }
+    throw new NotificationActionError({
+      action,
+      reason: 'UNSUPPORTED',
+      notificationId,
+      message:
+        `Cannot ${action} notification ${String(notificationId)} with ${option}: ` +
+        `the primary backend ${this.primaryBackendIdentifier} does not report ${capability}`,
+    });
+  }
+
+  /** Reject a template version that is not a non-negative integer, before anything is read. */
+  private assertValidTemplateVersion(
+    notificationId: Config['NotificationIdType'],
+    action: 'requeue' | 'repin',
+    templateVersion: number | undefined,
+  ): void {
+    if (
+      templateVersion !== undefined &&
+      !(Number.isInteger(templateVersion) && templateVersion >= 0)
+    ) {
+      throw new RangeError(
+        `Cannot ${action} notification ${String(notificationId)}: templateVersion must be a non-negative integer`,
+      );
+    }
   }
 
   /**
@@ -1418,6 +1559,18 @@ export class VintaSend<
   }
 
   /**
+   * The notification as the primary backend holds it now, or `null` when it is gone.
+   */
+  private async readNotificationForAction(
+    notificationId: Config['NotificationIdType'],
+  ): Promise<AnyDatabaseNotification<Config> | null> {
+    return (
+      (await this.backend.getNotification(notificationId, false)) ??
+      (await this.backend.getOneOffNotification(notificationId, false))
+    );
+  }
+
+  /**
    * Put a failed or cancelled notification back into `PENDING_SEND`, so it is sent again.
    *
    * The notification keeps its ID, content and template pin: this retries the same notification,
@@ -1425,23 +1578,52 @@ export class VintaSend<
    * notification is pending again it is due when `sendAfter` is `null` or past, and then it is
    * sent at once, the same as `createNotification` does. A notification handled by an adapter with
    * `enqueueNotifications` goes back on the queue service. A future `sendAfter` leaves it for
-   * whatever sends pending notifications.
+   * whatever sends pending notifications. So does `send: false`, even for a due notification.
    *
    * The stored context is not regenerated. A notification created with `contextUsed`, or failed
    * through `delayedSend`, is sent with the context stored on it.
    *
-   * To change the template version as well, call `repinNotification` first: it leaves the status
-   * alone, so the order is safe.
+   * To change the template version as well, pass `templateVersion`: the pin and the status change
+   * in one backend write, so the notification is never left half-moved. That needs a backend
+   * reporting `requeue.templateVersion`. Calling `repinNotification` first and then this still
+   * works, in two writes.
    *
-   * @param options `sendAfter` left out keeps the notification's own. `null` means "now".
-   * @returns the notification as it stands after being re-queued, before any send that follows.
+   * @param options `sendAfter` left out keeps the notification's own, `null` means "now".
+   *   `templateVersion` pins in the same write. `expectedVersion` writes only if the notification
+   *   is still at that version. `send: false` re-queues without sending.
+   * @returns the notification as it stands after any send this call started, read again from the
+   *   primary backend: `SENT` when it went out, `FAILED` when the adapter failed, `PENDING_SEND`
+   *   when it is waiting (scheduled, `send: false`, handed to a queue, or the send stopped before
+   *   reaching an adapter). This holds with `raiseErrorOnFailedSend: false` too.
    * @throws NotificationActionError when the notification is not found (`NOT_FOUND`), is not
-   *   `FAILED` or `CANCELLED` (`INVALID_STATUS`). Nothing has been written in either case.
+   *   `FAILED` or `CANCELLED` (`INVALID_STATUS`), is no longer at `expectedVersion` (`CHANGED`), or
+   *   the primary backend cannot honour `expectedVersion` or `templateVersion` (`UNSUPPORTED`).
+   *   Nothing has been written in any of these cases.
+   * @throws RangeError when `templateVersion` is not a non-negative integer.
    */
   async requeueNotification(
     notificationId: Config['NotificationIdType'],
     options: RequeueOptions = {},
   ): Promise<AnyDatabaseNotification<Config>> {
+    const { templateVersion, expectedVersion } = options;
+    this.assertValidTemplateVersion(notificationId, 'requeue', templateVersion);
+    if (expectedVersion !== undefined) {
+      this.assertActionSupported(
+        notificationId,
+        'requeue',
+        'requeue.expectedVersion',
+        'expectedVersion',
+      );
+    }
+    if (templateVersion !== undefined) {
+      this.assertActionSupported(
+        notificationId,
+        'requeue',
+        'requeue.templateVersion',
+        'templateVersion',
+      );
+    }
+
     const notification = await this.getNotificationForAction(notificationId, 'requeue');
     if (!REQUEUEABLE_NOTIFICATION_STATUSES.includes(notification.status)) {
       throw new NotificationActionError({
@@ -1456,33 +1638,81 @@ export class VintaSend<
       });
     }
 
-    // Only the key the caller passed: an absent `sendAfter` means "keep it", and spreading
+    // Only the keys the caller passed: an absent `sendAfter` means "keep it", and spreading
     // `undefined` in would read as "set it to undefined" to a backend that checks with `in`.
-    const backendOptions: RequeueNotificationOptions =
+    const replicaOptions: RequeueNotificationOptions =
       options.sendAfter === undefined ? {} : { sendAfter: options.sendAfter };
+    const primaryOptions: RequeueNotificationOptions = {
+      ...replicaOptions,
+      ...(templateVersion === undefined ? {} : { templateVersion }),
+      ...(expectedVersion === undefined ? {} : { expectedVersion }),
+    };
 
     const requeuedNotification = await this.executeMultiBackendWrite(
       'requeueNotification',
-      async (backend) => backend.requeueNotification(notificationId, backendOptions),
+      async (backend) => backend.requeueNotification(notificationId, primaryOptions),
       async (backend) => {
-        await backend.requeueNotification(notificationId, backendOptions);
+        // A version token belongs to the primary backend, so a replica takes the write as it is.
+        if (templateVersion === undefined) {
+          await backend.requeueNotification(notificationId, replicaOptions);
+        } else if (this.getActionCapabilities(backend)['requeue.templateVersion'] === true) {
+          await backend.requeueNotification(notificationId, { ...replicaOptions, templateVersion });
+        } else {
+          await this.persistTemplatePin(backend, notification, templateVersion);
+          await backend.requeueNotification(notificationId, replicaOptions);
+        }
       },
       notificationId,
     );
-    this.logger.info(log`Notification ${logId(notificationId)} requeued`);
-
-    if (!requeuedNotification.sendAfter || requeuedNotification.sendAfter <= new Date()) {
-      this.logger.info(
-        log`Notification ${logId(notificationId)} sent after requeue because sendAfter is null or in the past`,
-      );
-      await this.send(requeuedNotification);
+    if (templateVersion === undefined) {
+      this.logger.info(log`Notification ${logId(notificationId)} requeued`);
     } else {
       this.logger.info(
-        log`Notification ${logId(notificationId)} requeued for ${logTimestamp(requeuedNotification.sendAfter)}`,
+        log`Notification ${logId(notificationId)} requeued on template version ${logCount(templateVersion)}`,
       );
     }
 
-    return requeuedNotification;
+    if (options.send === false) {
+      this.logger.info(
+        log`Notification ${logId(notificationId)} left for the pending sender because send is false`,
+      );
+      return requeuedNotification;
+    }
+
+    if (requeuedNotification.sendAfter && requeuedNotification.sendAfter > new Date()) {
+      this.logger.info(
+        log`Notification ${logId(notificationId)} requeued for ${logTimestamp(requeuedNotification.sendAfter)}`,
+      );
+      return requeuedNotification;
+    }
+
+    this.logger.info(
+      log`Notification ${logId(notificationId)} sent after requeue because sendAfter is null or in the past`,
+    );
+    await this.send(requeuedNotification);
+    // `send` reports nothing back, and with `raiseErrorOnFailedSend: false` swallows failures, so
+    // the record is the only place the outcome is written.
+    return (await this.readNotificationForAction(notificationId)) ?? requeuedNotification;
+  }
+
+  /**
+   * Write a template pin through the generic update, for a backend without `repinNotification`.
+   */
+  private async persistTemplatePin(
+    backend: Backend,
+    notification: AnyDatabaseNotification<Config>,
+    version: number,
+  ): Promise<AnyDatabaseNotification<Config>> {
+    if (isOneOffNotification(notification)) {
+      const update: Partial<Omit<OneOffNotificationInput<Config>, 'id'>> = {
+        requestedTemplateVersion: version,
+      };
+      return backend.persistOneOffNotificationUpdate(notification.id, update);
+    }
+    const update: Partial<Omit<Notification<Config>, 'id'>> = {
+      requestedTemplateVersion: version,
+    };
+    return backend.persistNotificationUpdate(notification.id, update);
   }
 
   /**
@@ -1493,30 +1723,39 @@ export class VintaSend<
    * changes, so it cannot do this.
    * Works the same whether the notification was pinned before or not, and for one-off
    * notifications too. It changes `requestedTemplateVersion` only. It sends nothing and leaves the
-   * status alone, so re-pin a failed notification, then `requeueNotification` it.
+   * status alone. To re-pin a failed notification and send it again, pass `templateVersion` to
+   * `requeueNotification`, which does both in one write.
+   *
+   * A backend that implements `repinNotification` does the write itself, checking the status and
+   * that the notification did not change since it read it. Otherwise it goes through
+   * `persistNotificationUpdate`.
    *
    * Re-pinning to the version already pinned writes nothing and returns the notification as it is.
    *
-   * @param options `templateVersion` pins that version instead of the current one. It is not
-   *   checked against the renderer: a version that does not exist fails when the notification is
-   *   rendered, as it does when passed to `createNotification`.
+   * @param options `templateVersion` pins that version instead of `getCurrentTemplateVersion`. It
+   *   is not checked against the renderer: a version that does not exist fails when the
+   *   notification is rendered, as it does when passed to `createNotification`. `expectedVersion`
+   *   writes only if the notification is still at that version.
    * @returns the notification with its new pin.
    * @throws NotificationActionError when the notification is not found (`NOT_FOUND`), was already
-   *   delivered (`INVALID_STATUS`), or no version was given and the renderer reports none
-   *   (`NO_TEMPLATE_VERSION`). Nothing has been written in any of those cases.
+   *   delivered (`INVALID_STATUS`), no version was given and the renderer reports none
+   *   (`NO_TEMPLATE_VERSION`), it is no longer at `expectedVersion` (`CHANGED`), or the primary
+   *   backend cannot check `expectedVersion` (`UNSUPPORTED`). Nothing has been written in any of
+   *   those cases.
    * @throws RangeError when `templateVersion` is not a non-negative integer.
    */
   async repinNotification(
     notificationId: Config['NotificationIdType'],
     options: RepinOptions = {},
   ): Promise<AnyDatabaseNotification<Config>> {
-    const { templateVersion } = options;
-    if (
-      templateVersion !== undefined &&
-      !(Number.isInteger(templateVersion) && templateVersion >= 0)
-    ) {
-      throw new RangeError(
-        `Cannot repin notification ${String(notificationId)}: templateVersion must be a non-negative integer`,
+    const { templateVersion, expectedVersion } = options;
+    this.assertValidTemplateVersion(notificationId, 'repin', templateVersion);
+    if (expectedVersion !== undefined) {
+      this.assertActionSupported(
+        notificationId,
+        'repin',
+        'repin.expectedVersion',
+        'expectedVersion',
       );
     }
 
@@ -1535,11 +1774,9 @@ export class VintaSend<
 
     const version =
       templateVersion ??
-      (await this.resolveTemplateVersionToPin(
+      (await this.getCurrentTemplateVersion(
         notification.notificationType,
         notification.bodyTemplate,
-        null,
-        true,
       ));
 
     if (version === null) {
@@ -1553,39 +1790,33 @@ export class VintaSend<
       });
     }
 
-    if (notification.requestedTemplateVersion === version) {
+    // With `expectedVersion` the backend has to look: the notification may already carry the pin
+    // and still have changed since the caller listed it.
+    if (expectedVersion === undefined && notification.requestedTemplateVersion === version) {
       this.logger.info(
         log`Notification ${logId(notificationId)} is already pinned to template version ${logCount(version)}`,
       );
       return notification;
     }
 
-    let repinnedNotification: AnyDatabaseNotification<Config>;
-    if (isOneOffNotification(notification)) {
-      const update: Partial<Omit<OneOffNotificationInput<Config>, 'id'>> = {
-        requestedTemplateVersion: version,
-      };
-      repinnedNotification = await this.executeMultiBackendWrite(
-        'repinOneOffNotification',
-        async (backend) => backend.persistOneOffNotificationUpdate(notificationId, update),
-        async (backend) => {
-          await backend.persistOneOffNotificationUpdate(notificationId, update);
-        },
-        notificationId,
-      );
-    } else {
-      const update: Partial<Omit<Notification<Config>, 'id'>> = {
-        requestedTemplateVersion: version,
-      };
-      repinnedNotification = await this.executeMultiBackendWrite(
-        'repinNotification',
-        async (backend) => backend.persistNotificationUpdate(notificationId, update),
-        async (backend) => {
-          await backend.persistNotificationUpdate(notificationId, update);
-        },
-        notificationId,
-      );
-    }
+    const repinnedNotification = await this.executeMultiBackendWrite(
+      'repinNotification',
+      async (backend) => {
+        if (typeof backend.repinNotification === 'function') {
+          return backend.repinNotification(
+            notificationId,
+            version,
+            expectedVersion === undefined ? {} : { expectedVersion },
+          );
+        }
+        return this.persistTemplatePin(backend, notification, version);
+      },
+      async (backend) => {
+        // Replicas follow the primary, so they take the pin unconditionally, as they always have.
+        await this.persistTemplatePin(backend, notification, version);
+      },
+      notificationId,
+    );
 
     this.logger.info(
       log`Notification ${logId(notificationId)} repinned to template version ${logCount(version)}`,
