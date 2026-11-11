@@ -127,6 +127,25 @@ templates without building a fake notification. Each change replaces something t
   schema whose `updatedAt` is not `@updatedAt`, or that is written outside Prisma, must keep it
   current itself.
 
+## `vintasend-api`
+
+* **`POST /api/v1/notifications/{id}/requeue`** takes `templateVersion`, `expectedVersion` and
+  `send`, and returns the notification after any send it started. **`repin`** takes
+  `expectedVersion`.
+* **`POST /api/v1/notifications/versions`** takes `{ filter, page, pageSize }`, with VintaSend's
+  composable filter as JSON (at most six levels, pages of up to 1000), and returns `{ id, version }`
+  rows. A filter the backend reports it cannot run is a 400 listing what it cannot do.
+* **Refusals carry `details.reason`** (`CHANGED`, `UNSUPPORTED`, `INVALID_STATUS`,
+  `NO_TEMPLATE_VERSION`, `NOT_FOUND`); the status codes are unchanged.
+* **`/api/v1/capabilities` includes the four action capabilities**, always explicit.
+* **`NotificationServicePort`** gains optional `filterNotificationVersions` and
+  `getBackendSupportedActionCapabilities`, and wider requeue/repin options. A host adapting a
+  service without them still satisfies the port; the API then reports the actions unsupported and
+  refuses the new options with 409 `UNSUPPORTED` instead of passing them to a service that would
+  ignore them. New contract types: `NotificationVersionEntry`, `NotificationSearchFilter`,
+  `NotificationSearchFilterFields`, `NotificationVersionsSearch`, `RequeueNotificationRequest` and
+  `RepinNotificationRequest`.
+
 ## `vintasend-medplum-template-manager`
 
 * No code change. Tests cover the render check over FHIR (no `Provenance` and no status change when
