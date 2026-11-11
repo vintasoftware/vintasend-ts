@@ -1,5 +1,157 @@
 # Changelog
 
+# Unreleased
+
+Moving notifications onto a new template version safely, and previewing and publishing managed
+templates without building a fake notification. Each change replaces something the first app on
+1.0.0-alpha10 had to work around.
+
+## `vintasend`
+
+* **Conditional re-pin and re-queue.** `repinNotification(id, { expectedVersion })` and
+  `requeueNotification(id, { expectedVersion })` write only if the notification is still at that
+  version, the opaque token `filterNotificationVersions` returns. Otherwise they throw
+  `NotificationActionError` with the new reason **`CHANGED`** and write nothing. Without the option
+  nothing changes.
+* **Re-pin and re-queue in one write.** `requeueNotification(id, { templateVersion })` pins a
+  `FAILED` or `CANCELLED` notification and puts it back in `PENDING_SEND` in one backend write. It
+  takes `expectedVersion` too, keeps the send time unless `sendAfter` is given, and sends a due
+  notification as before. `repinNotification` then `requeueNotification` still works.
+* **Options a backend cannot honour are refused, never ignored.** `expectedVersion`, and
+  `templateVersion` on a re-queue, are passed only to a primary backend that reports them in the new
+  `getActionCapabilities()`. Any other backend gets `NotificationActionError` with the new reason
+  **`UNSUPPORTED`** before anything is read or written. `VintaSend.getBackendSupportedActionCapabilities()`
+  returns the keys `repin.expectedVersion`, `requeue.expectedVersion`, `requeue.templateVersion`
+  and `versions.filter`, all `false` by default.
+* **BREAKING (behaviour) — `requeueNotification` returns the outcome.** It now returns the
+  notification as it stands after the send it started, read again from the primary backend:
+  `SENT`, `FAILED`, or `PENDING_SEND` when it is waiting. That holds with
+  `raiseErrorOnFailedSend: false`. Before, it returned the notification as re-queued, always
+  `PENDING_SEND`. **Action:** code that relied on the returned status being `PENDING_SEND` should
+  read `status`.
+* **`requeueNotification(id, { send: false })`** re-queues without sending, even a due
+  notification, which then waits for `sendPendingNotifications`. No adapter is used, so a process
+  that only re-queues can be built with `adapters: []` and needs no delivery credentials.
+* **`filterNotificationVersions(filter, page, pageSize, backendIdentifier?)`** returns
+  `{ id, version }` only, ordered by ID. A backend implementing it must not read recipients,
+  contexts, context parameters, rendered content or attachments. It throws on a backend without it.
+* **`hasSendAfter` and `hasRequestedTemplateVersion` filters** match notifications with or without
+  a send time or a template pin. "Pinned, but not to V" is
+  `{ and: [{ hasRequestedTemplateVersion: true }, { not: { requestedTemplateVersion: V } }] }`.
+  Their capability keys (`fields.*`, `negation.*`) default to `false`.
+* **`getCurrentTemplateVersion(notificationType, templateKey)`** is public. It is what
+  `repinNotification` without a version and `pinTemplateVersions` pin to, so a caller showing "the
+  version new notifications get" agrees with them.
+* **BREAKING (types) — `NotificationActionErrorReason` gains `CHANGED` and `UNSUPPORTED`.**
+  **Action:** an exhaustive `switch` on `reason` needs the two cases. `isNotificationActionError`
+  recognises both.
+* **Backend interface, all optional:** `repinNotification(id, templateVersion, { expectedVersion? })`,
+  `filterNotificationVersions(filter, page, pageSize)` and `getActionCapabilities()`.
+  `RequeueNotificationOptions` gains `templateVersion` and `expectedVersion`, which a backend
+  receives only when it reports them. A backend written for 1.0.0-alpha10 needs no change. See the
+  README's "What a backend has to do".
+* **New exports:** `DEFAULT_BACKEND_ACTION_CAPABILITIES`, `NotificationActionCapabilities`,
+  `NotificationVersion` and `RepinNotificationOptions`. `RequeueOptions` is now its own type, with
+  `templateVersion`, `expectedVersion` and `send`.
+
+## `vintasend-medplum`
+
+* **Implements every optional action.** `requeueNotification` and the new `repinNotification` write
+  with `If-Match` on the version they read, check `expectedVersion` against `meta.versionId`, and
+  re-queue with `templateVersion` in one update. **BREAKING (errors):** a notification that changes
+  between the read and the write now throws `NotificationActionError` `CHANGED` instead of
+  Medplum's `OperationOutcomeError`. Re-pinning through `VintaSend` uses the new method, so a
+  concurrent change refuses a re-pin too, where it was overwritten before.
+* **`filterNotificationVersions`** searches with `_elements=id,meta` and returns `meta.versionId`
+  as the version.
+* **OR filters work** (`logical.or: true`). FHIR search cannot express OR across parameters, so the
+  filter is rewritten as an OR of ANDs, each branch searched on its own, and the results merged by
+  ID, ordered by ID and paged in memory. A page costs up to `(page + 1) * pageSize` results per
+  branch, more than 16 branches is refused, and `orderBy` with an OR is refused rather than applied
+  to the merge.
+* **`hasSendAfter`** (`sent:missing`) and **`hasRequestedTemplateVersion`** (`identifier=<system>|`)
+  are supported, negation included.
+* **Fixed: two identifier-backed fields in one filter are ANDed.** `{ bodyTemplate: 'welcome',
+  requestedTemplateVersion: 3 }` was sent as one comma-separated `identifier` parameter, which FHIR
+  reads as OR, so it also matched every other template pinned to 3. Each field is now its own
+  parameter. Likewise an `and` whose branches set the same parameter is sent as repeated
+  parameters (AND) instead of throwing `Conflicting values for FHIR search parameter`.
+* **New exports:** `MEDPLUM_NOTIFICATION_IDENTIFIER_SYSTEMS`, `MEDPLUM_NOTIFICATION_TAG`,
+  `NOTIFICATION_STATUS_TO_COMMUNICATION_STATUS` and `communicationStatusToNotificationStatus`, for
+  callers that still search `Communication` resources themselves.
+
+## `vintasend-managed-templates`
+
+* **`renderStandalone(template, context, { parts })`** on the service and the renderer renders a
+  `ManagedTemplate` with no notification. `parts: 'latest'` resolves a part named without
+  `version=` to its newest version, drafts included (previews); `parts: 'published'` to its newest
+  active version (what a send renders). One service does both, so "preview with drafts, send with
+  published" needs no second composer.
+* **Publishing can check rendering.** `activate(key, version, changedBy, { checkRender: { context } })`
+  (and `setStatus` with the same option) renders the version as a send would first. On failure it
+  throws the new `ManagedTemplateRenderCheckError`, with the render error as `cause`, and writes no
+  status change and no history entry (no `Provenance` on Medplum). `checkRender` with a status other
+  than `active` is a `TypeError`.
+* **BREAKING (behaviour) — sends compose parts at their newest published version.** The renderer's
+  default composer now resolves a base or fragment named without `version=` to its newest
+  **active** version, the rule the notification's own key already followed. Before, it composed the
+  newest version whatever its status, so an unpublished edit to a base reached recipients. A part
+  with no active version now fails the send with `ManagedTemplateCompositionReferenceError`.
+  **Action:** activate your bases and fragments. To keep the old behaviour, pass
+  `composerOptions: { parts: 'latest' }` to the renderer. The service's own composer, used by
+  `getComposedTemplate` and `validateComposition`, still resolves `'latest'`.
+* **`getCurrentTemplateVersion(key)`** on the renderer and the service: the newest active version,
+  or `null` when nothing is published or that version is abstract. **BREAKING (behaviour):**
+  `getLatestTemplateVersion` now returns the same, so it answers `null` for a base where it returned
+  the base's version, and VintaSend no longer pins a notification to a base.
+* **Composer:** `TemplateComposer.fromBackend(backend, { parts })`, `composer.withResolver(resolver)`
+  and `partResolver(backend, parts)`. New exports: `ManagedTemplateRenderCheckError`,
+  `StatusChangeOptions`, `TemplatePartResolution`, `TemplateComposerBackend`,
+  `TemplateComposerBackendOptions`, `partResolver` and `standaloneNotification`.
+
+## `vintasend-prisma`
+
+* **Implements every optional action**, each as one conditional `UPDATE`.
+  `requeueNotification` writes `templateVersion` in the same `UPDATE`; the new
+  `repinNotification` refuses a delivered notification in its `WHERE` (so a worker sending in
+  between can no longer be overwritten by a re-pin) and skips one already on the version.
+  `expectedVersion` joins the `WHERE` as `updatedAt`; a notification written since it was listed is
+  refused with `NotificationActionError` `CHANGED`, and nothing is written.
+* **`filterNotificationVersions`** selects `id` and `updatedAt` only, ordered by ID; the version
+  token is `updatedAt` as an ISO string.
+* **`hasSendAfter` and `hasRequestedTemplateVersion`** filters (`IS NULL` / `IS NOT NULL`), negation
+  included.
+* **No schema change.** The token relies on `updatedAt` being `@updatedAt`, as in
+  `schema.prisma.example`. Two writes to one row within the same millisecond leave it unchanged, so
+  `expectedVersion` cannot tell them apart; the status condition still applies. **Action:** a
+  schema whose `updatedAt` is not `@updatedAt`, or that is written outside Prisma, must keep it
+  current itself.
+
+## `vintasend-api`
+
+* **`POST /api/v1/notifications/{id}/requeue`** takes `templateVersion`, `expectedVersion` and
+  `send`, and returns the notification after any send it started. **`repin`** takes
+  `expectedVersion`.
+* **`POST /api/v1/notifications/versions`** takes `{ filter, page, pageSize }`, with VintaSend's
+  composable filter as JSON (at most six levels, pages of up to 1000), and returns `{ id, version }`
+  rows. A filter the backend reports it cannot run is a 400 listing what it cannot do.
+* **Refusals carry `details.reason`** (`CHANGED`, `UNSUPPORTED`, `INVALID_STATUS`,
+  `NO_TEMPLATE_VERSION`, `NOT_FOUND`); the status codes are unchanged.
+* **`/api/v1/capabilities` includes the four action capabilities**, always explicit.
+* **`NotificationServicePort`** gains optional `filterNotificationVersions` and
+  `getBackendSupportedActionCapabilities`, and wider requeue/repin options. A host adapting a
+  service without them still satisfies the port; the API then reports the actions unsupported and
+  refuses the new options with 409 `UNSUPPORTED` instead of passing them to a service that would
+  ignore them. New contract types: `NotificationVersionEntry`, `NotificationSearchFilter`,
+  `NotificationSearchFilterFields`, `NotificationVersionsSearch`, `RequeueNotificationRequest` and
+  `RepinNotificationRequest`.
+
+## `vintasend-medplum-template-manager`
+
+* No code change. Tests cover the render check over FHIR (no `Provenance` and no status change when
+  it fails), draft previews against published sends, and `getCurrentTemplateVersion`. The README
+  documents both.
+
 # Version 1.0.0-alpha10
 
 Re-pinning and re-queuing notifications through the library, so nobody has to edit notification

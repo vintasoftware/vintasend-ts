@@ -129,6 +129,27 @@ export type NotificationFilterFields<Config extends BaseNotificationTypeConfig> 
    */
   requestedTemplateVersion?: number | number[];
   usedTemplateVersion?: number | number[];
+  /**
+   * Whether a notification has a send time: `true` matches one whose `sendAfter` is set, `false`
+   * one whose `sendAfter` is `null`.
+   *
+   * `sendAfterRange` cannot say this. A range with no bounds matches every notification on some
+   * backends and none on others, and a negated range is unsupported on several. Reported by
+   * `fields.hasSendAfter` and `negation.hasSendAfter`, both `false` by default. Negating it is the
+   * same as asking for the other value.
+   */
+  hasSendAfter?: boolean;
+  /**
+   * Whether a notification is pinned to a template version: `true` matches one whose
+   * `requestedTemplateVersion` is set, `false` one that renders whatever is current at send time.
+   *
+   * Combine it with a negated `requestedTemplateVersion` to ask for "pinned, but not to V":
+   * `{ and: [{ hasRequestedTemplateVersion: true }, { not: { requestedTemplateVersion: V } }] }`.
+   * A negated version alone also matches unpinned notifications, under the NULL semantics above.
+   * Reported by `fields.hasRequestedTemplateVersion` and `negation.hasRequestedTemplateVersion`,
+   * both `false` by default.
+   */
+  hasRequestedTemplateVersion?: boolean;
 };
 
 /**
@@ -175,6 +196,11 @@ export const DEFAULT_BACKEND_FILTER_CAPABILITIES = {
   'fields.usedTemplateVersion': false,
   'negation.requestedTemplateVersion': false,
   'negation.usedTemplateVersion': false,
+  // The presence filters are new vocabulary as well.
+  'fields.hasSendAfter': false,
+  'negation.hasSendAfter': false,
+  'fields.hasRequestedTemplateVersion': false,
+  'negation.hasRequestedTemplateVersion': false,
   'stringLookups.exact': true,
   'stringLookups.startsWith': true,
   'stringLookups.endsWith': true,
@@ -219,9 +245,70 @@ export const REPINNABLE_NOTIFICATION_STATUSES: readonly NotificationStatus[] = [
  * What `BaseNotificationBackend.requeueNotification` is asked to change besides the status.
  *
  * `sendAfter` left out keeps the notification's own; `null` means "as soon as possible".
+ *
+ * `templateVersion` and `expectedVersion` are only ever passed to a backend whose
+ * `getActionCapabilities()` reports `requeue.templateVersion` and `requeue.expectedVersion`. A
+ * backend that reports them must honour them, and one that does not must throw if it is handed
+ * them anyway, never ignore them.
  */
 export type RequeueNotificationOptions = {
   sendAfter?: Date | null;
+  /**
+   * Pin the notification to this template version in the same write that re-queues it, so it is
+   * never left pinned but not pending, or pending on the old pin.
+   */
+  templateVersion?: number;
+  /**
+   * Write only if the notification is still at this version, the opaque token
+   * `filterNotificationVersions` returned for it. Otherwise throw a `NotificationActionError` with
+   * reason `CHANGED` and write nothing.
+   */
+  expectedVersion?: string;
+};
+
+/**
+ * What `BaseNotificationBackend.repinNotification` is asked to check besides the status.
+ */
+export type RepinNotificationOptions = {
+  /**
+   * Write only if the notification is still at this version. Otherwise throw a
+   * `NotificationActionError` with reason `CHANGED` and write nothing.
+   */
+  expectedVersion?: string;
+};
+
+/**
+ * A notification's ID and the opaque token for the version of it a backend holds.
+ *
+ * The token changes whenever the notification is written, by anyone. Pass it back as
+ * `expectedVersion` to act on the notification only if nothing has changed since it was listed.
+ * Compare tokens for equality only: they are not ordered, and a backend may use any string.
+ */
+export type NotificationVersion<Config extends BaseNotificationTypeConfig> = {
+  id: Config['NotificationIdType'];
+  version: string;
+};
+
+/**
+ * Flat dotted keys describing which notification actions a backend supports beyond the required
+ * ones. Every key defaults to `false`: a backend that predates them, or does not implement
+ * `getActionCapabilities()`, supports none of them, and `VintaSend` refuses the option with
+ * `NotificationActionError` reason `UNSUPPORTED` rather than letting the backend ignore it.
+ *
+ * * `repin.expectedVersion`: `repinNotification` is implemented and checks `expectedVersion`.
+ * * `requeue.expectedVersion`: `requeueNotification` checks `expectedVersion`.
+ * * `requeue.templateVersion`: `requeueNotification` pins `templateVersion` in the same write.
+ * * `versions.filter`: `filterNotificationVersions` is implemented.
+ */
+export type NotificationActionCapabilities = {
+  [key: string]: boolean;
+};
+
+export const DEFAULT_BACKEND_ACTION_CAPABILITIES: Readonly<NotificationActionCapabilities> = {
+  'repin.expectedVersion': false,
+  'requeue.expectedVersion': false,
+  'requeue.templateVersion': false,
+  'versions.filter': false,
 };
 
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
@@ -347,6 +434,50 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     options: RequeueNotificationOptions,
   ): Promise<AnyDatabaseNotification<Config>>;
 
+  /**
+   * Pin a notification to a template version in one conditional write.
+   *
+   * Optional. Without it the service re-pins through `persistNotificationUpdate`, and cannot
+   * check `expectedVersion`. An implementation must:
+   * * only move a notification whose status is one of `REPINNABLE_NOTIFICATION_STATUSES`, and
+   *   throw a `NotificationActionError` with reason `INVALID_STATUS` for any other;
+   * * throw one with reason `CHANGED` when `options.expectedVersion` is given and the notification
+   *   is at another version, or when it changes between the read and the write;
+   * * write nothing in either case, and write nothing when the notification is already pinned to
+   *   `templateVersion`;
+   * * change `requestedTemplateVersion` only.
+   *
+   * Report `repin.expectedVersion` in `getActionCapabilities()` once it does all of that.
+   */
+  repinNotification?(
+    notificationId: Config['NotificationIdType'],
+    templateVersion: number,
+    options: RepinNotificationOptions,
+  ): Promise<AnyDatabaseNotification<Config>>;
+
+  /**
+   * The ID and version token of every notification matching `filter`, a page at a time.
+   *
+   * For counting and selecting notifications without reading them. An implementation must not
+   * read recipients, contexts, context parameters, rendered content or attachments to answer it,
+   * and must return nothing but `{ id, version }`. Results are ordered by ID, so pages are stable
+   * while nothing is written; a caller that changes what it lists as it goes should list again
+   * from page 0 rather than move on to the next page.
+   *
+   * Optional. Report `versions.filter` in `getActionCapabilities()` when it is implemented.
+   */
+  filterNotificationVersions?(
+    filter: NotificationFilter<Config>,
+    page: number,
+    pageSize: number,
+  ): Promise<NotificationVersion<Config>[]>;
+
+  /**
+   * Which optional notification actions this backend supports. See
+   * `NotificationActionCapabilities`. Missing keys are `false`.
+   */
+  getActionCapabilities?(): NotificationActionCapabilities;
+
   // One-off notification methods
   persistOneOffNotification(
     notification: Omit<OneOffNotificationInput<Config>, 'id'> & {
@@ -394,7 +525,7 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
    * - `fields.status`, `fields.notificationType`, `fields.adapterUsed`, `fields.userId`,
    *   `fields.bodyTemplate`, `fields.subjectTemplate`, `fields.contextName`,
    *   `fields.sendAfterRange`, `fields.createdAtRange`, `fields.sentAtRange`,
-   *   `fields.readAtRange`
+   *   `fields.readAtRange`, `fields.hasSendAfter`, `fields.hasRequestedTemplateVersion`
    * - `negation.sendAfterRange`, `negation.createdAtRange`, `negation.sentAtRange`,
    *   `negation.readAtRange`
    * - `stringLookups.exact`, `stringLookups.startsWith`, `stringLookups.endsWith`,

@@ -252,7 +252,7 @@ describe('pinning on create', () => {
       'requestedTemplateVersion',
     );
     expect(logger.error).toHaveBeenCalledWith(
-      logMessageMatching(expect.stringContaining('leaving the notification unpinned')),
+      logMessageMatching(expect.stringContaining('treating it as having none')),
     );
   });
 

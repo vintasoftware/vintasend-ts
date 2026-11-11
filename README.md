@@ -307,6 +307,37 @@ await vintasend.filterNotifications({ usedTemplateVersion: [1, 2] }, 0, 25);
 Both are opt-in per backend for the same reason `readAtRange` is, and their capability keys
 default to `false`. See [Template Version Pinning](#template-version-pinning).
 
+### Filtering on whether a field is set
+
+`hasSendAfter` and `hasRequestedTemplateVersion` match notifications with (`true`) or without
+(`false`) a send time or a template pin, which a range or a version list cannot say. "Pinned, but
+not to V" is the pin combined with a negated version:
+
+```typescript
+await vintasend.filterNotifications(
+  { and: [{ hasRequestedTemplateVersion: true }, { not: { requestedTemplateVersion: 4 } }] },
+  0,
+  25,
+);
+```
+
+They are new vocabulary, so `fields.hasSendAfter`, `negation.hasSendAfter`,
+`fields.hasRequestedTemplateVersion` and `negation.hasRequestedTemplateVersion` default to `false`.
+`vintasend-prisma` and `vintasend-medplum` support all four.
+
+### Listing IDs and versions only
+
+`filterNotificationVersions(filter, page, pageSize)` returns `{ id, version }` for each match and
+nothing else. A backend implementing it must not read recipients, contexts, context parameters,
+rendered content or attachments to answer, so it is how to count or select notifications that must
+not be read. Results are ordered by ID. `version` is an opaque token for the notification as it is
+now; pass it as `expectedVersion` to act on it only if it has not changed (see
+[Re-pinning and Re-queuing Notifications](#re-pinning-and-re-queuing-notifications)).
+
+It is optional on a backend; `getBackendSupportedActionCapabilities()` reports `versions.filter`,
+and the call throws on a backend without it. `vintasend-medplum` implements it with
+`_elements=id,meta`, `vintasend-prisma` with `select: { id, updatedAt }`.
+
 ### Case sensitivity
 
 `stringLookups.caseSensitive` and `stringLookups.caseInsensitive` are separate
@@ -804,8 +835,15 @@ exactly as it did.
 
 Two service methods change an existing notification, so the database never has to be edited by
 hand. Both work on regular and one-off notifications, write to every configured backend, and refuse
-with a `NotificationActionError` before writing anything. Its `reason` is `NOT_FOUND`,
-`INVALID_STATUS` or `NO_TEMPLATE_VERSION`.
+with a `NotificationActionError` before writing anything. Its `reason` is one of:
+
+| `reason` | Meaning |
+| --- | --- |
+| `NOT_FOUND` | No notification has that ID in the primary backend. |
+| `INVALID_STATUS` | The status does not allow the action; `status` says which. |
+| `NO_TEMPLATE_VERSION` | A re-pin with no version found none: the renderer does not version templates. |
+| `CHANGED` | The notification is no longer at `expectedVersion`, or changed between the backend's read and its write. |
+| `UNSUPPORTED` | The primary backend cannot honour an option given (`expectedVersion`, or `templateVersion` on a re-queue). |
 
 ### `repinNotification`
 
@@ -822,6 +860,10 @@ await notificationService.repinNotification(notificationId, { templateVersion: 4
 * **Changes `requestedTemplateVersion` only.** It neither sends nor changes the status, and works
   whether the notification was pinned before or not. Re-pinning to the pinned version writes
   nothing.
+* **"The current version" is `getCurrentTemplateVersion(notificationType, templateKey)`**, which is
+  public: show it as "the version new notifications get" and it cannot disagree with what a re-pin
+  or `pinTemplateVersions` pins. With `vintasend-managed-templates` it is the key's newest active
+  version, or `null` when nothing is published or that version is a base.
 * **`NO_TEMPLATE_VERSION`** means no version was named and the renderer for that notification type
   reports none. A file-based renderer always answers this way.
 * Unlike `updateNotification`, it moves the pin without changing `bodyTemplate`.
@@ -836,26 +878,62 @@ delivered.
 await notificationService.requeueNotification(notificationId);                     // keep its sendAfter
 await notificationService.requeueNotification(notificationId, { sendAfter: null }); // send now
 await notificationService.requeueNotification(notificationId, { sendAfter: tomorrow });
+await notificationService.requeueNotification(notificationId, { templateVersion: 4 }); // re-pin too, in one write
+await notificationService.requeueNotification(notificationId, { send: false });     // leave it to the pending sender
 ```
 
 * **Sends when due.** Once pending again, a notification whose `sendAfter` is `null` or past is
   sent at once, as `createNotification` does. An adapter with `enqueueNotifications` puts it back
   on the queue service. A future `sendAfter` leaves it for `sendPendingNotifications`.
-* **Keeps everything else.** The template pin, stored `contextUsed` and attachments are unchanged;
-  `sentAt`, which `markAsFailed` sets to the failure time, is cleared.
+* **Returns the outcome.** The notification comes back as it stands after any send the call
+  started, read again from the primary backend: `SENT` when it went out, `FAILED` when the adapter
+  failed, `PENDING_SEND` when it is waiting (scheduled, queued, `send: false`, or the send stopped
+  before an adapter). This holds with `raiseErrorOnFailedSend: false`, so there is no need to read
+  it again yourself.
+* **`send: false`** re-queues without sending, even a due notification: it waits for whatever runs
+  `sendPendingNotifications`. No adapter is used, so a process that only re-queues can be built with
+  `adapters: []` and needs no delivery credentials.
+* **`templateVersion`** pins the notification and re-queues it in **one backend write**, so it is
+  never left half-moved. It needs a backend reporting `requeue.templateVersion`; elsewhere it is
+  refused with `UNSUPPORTED`. The send time is kept unless `sendAfter` is given, and a due
+  notification is sent as above. `repinNotification` followed by `requeueNotification` still works,
+  in two writes.
+* **Keeps everything else.** Stored `contextUsed` and attachments are unchanged; `sentAt`, which
+  `markAsFailed` sets to the failure time, is cleared.
 * **`PENDING_SEND`, `SENT` and `READ` are refused.** A pending notification is already queued, and
   re-queuing a delivered one would deliver it twice under one record.
 
-To retry a notification that failed on a broken template, publish the fix, then re-pin and re-queue.
-`repinNotification` leaves the status alone, so it goes first:
-
-```typescript
-await notificationService.repinNotification(notificationId);
-await notificationService.requeueNotification(notificationId);
-```
-
 `vintasend-api` exposes both as `POST /api/v1/notifications/{id}/repin` and `/requeue`;
 `vintasend-dashboard-core` wraps them as `useRepinNotification` and `useRequeueNotification`.
+
+### Acting only on a notification that has not changed
+
+Both methods take `expectedVersion`, the token `filterNotificationVersions` returned for the
+notification. The backend then writes only if the notification is still at that version, and
+otherwise refuses with `CHANGED`, writing nothing. So a notification counted and confirmed by an
+admin is not moved if a worker sent it, or someone edited it, in between:
+
+```typescript
+const [entry] = await notificationService.filterNotificationVersions(
+  { bodyTemplate: 'welcome', status: 'FAILED' },
+  0,
+  100,
+);
+await notificationService.requeueNotification(entry.id, {
+  templateVersion: 4,
+  expectedVersion: entry.version,
+});
+```
+
+A backend that cannot check versions reports so, and the option is refused with `UNSUPPORTED`
+before anything is read or written. It is never ignored. Check first with:
+
+```typescript
+const capabilities = await notificationService.getBackendSupportedActionCapabilities();
+// { 'repin.expectedVersion', 'requeue.expectedVersion', 'requeue.templateVersion', 'versions.filter' }
+```
+
+Every key defaults to `false`. `vintasend-prisma` and `vintasend-medplum` report all four.
 
 ### What a backend has to do
 
@@ -869,10 +947,23 @@ from 1.0.0-alpha10. It must:
 * return the notification as `getNotification` would, attachments included, because the service
   sends what it returns.
 
-`vintasend-prisma` does it in one conditional `UPDATE`. `vintasend-medplum` sends `If-Match` on the
-version it read. Medplum's `cancelNotification` deletes the `Communication`, so only failed
-notifications can be re-queued there. Re-pinning needs nothing new from a backend: it goes through
-`persistNotificationUpdate`.
+Everything else is optional, and announced through `getActionCapabilities()`:
+
+| Capability | What the backend does |
+| --- | --- |
+| `requeue.templateVersion` | `requeueNotification` sets `requestedTemplateVersion` from `options.templateVersion` in the same write. |
+| `requeue.expectedVersion` | `requeueNotification` throws `NotificationActionError` `CHANGED`, writing nothing, unless the notification is at `options.expectedVersion`. |
+| `repin.expectedVersion` | Implements `repinNotification(id, templateVersion, { expectedVersion? })`: refuses a delivered notification (`INVALID_STATUS`) and a changed one (`CHANGED`), writes nothing when the pin already matches, and changes only the pin. |
+| `versions.filter` | Implements `filterNotificationVersions(filter, page, pageSize)`, returning `{ id, version }` ordered by ID without reading content. |
+
+The service passes `templateVersion` and `expectedVersion` only to a backend that reports them.
+Without `repinNotification`, a re-pin goes through `persistNotificationUpdate` as before. Additional
+backends receive the writes unconditionally: a version token belongs to the primary backend.
+
+`vintasend-prisma` does every move in one conditional `UPDATE`, with the status, and
+`expectedVersion` as `updatedAt`, in its `WHERE`. `vintasend-medplum` writes with `If-Match` on the version it read, for both
+re-pin and re-queue. Medplum's `cancelNotification` deletes the `Communication`, so only failed
+notifications can be re-queued there.
 
 ## Glossary
 

@@ -5,8 +5,19 @@
  * * `INVALID_STATUS`: the notification's status does not allow the action. `status` says which.
  * * `NO_TEMPLATE_VERSION`: a re-pin to the current version found none, because the renderer for
  *   the notification's type does not version templates, or failed to answer.
+ * * `CHANGED`: the notification is no longer at the version the caller expected
+ *   (`expectedVersion`), or it changed between the backend's read and its write. Read it again and
+ *   decide afresh.
+ * * `UNSUPPORTED`: the primary backend cannot do what was asked, such as checking `expectedVersion`
+ *   or pinning and re-queuing in one write. It reports that in
+ *   `VintaSend.getBackendSupportedActionCapabilities()`.
  */
-export type NotificationActionErrorReason = 'NOT_FOUND' | 'INVALID_STATUS' | 'NO_TEMPLATE_VERSION';
+export type NotificationActionErrorReason =
+  | 'NOT_FOUND'
+  | 'INVALID_STATUS'
+  | 'NO_TEMPLATE_VERSION'
+  | 'CHANGED'
+  | 'UNSUPPORTED';
 
 export type NotificationAction = 'requeue' | 'repin';
 
@@ -41,7 +52,13 @@ export class NotificationActionError extends Error {
   }
 }
 
-const REASONS: readonly string[] = ['NOT_FOUND', 'INVALID_STATUS', 'NO_TEMPLATE_VERSION'];
+const REASONS: readonly string[] = [
+  'NOT_FOUND',
+  'INVALID_STATUS',
+  'NO_TEMPLATE_VERSION',
+  'CHANGED',
+  'UNSUPPORTED',
+];
 
 /**
  * Whether `error` is a `NotificationActionError`, from this copy of the package or another one.
