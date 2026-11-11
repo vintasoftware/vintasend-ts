@@ -1,5 +1,28 @@
 # Changelog
 
+# Version 1.0.0-alpha12
+
+Complete types for the 1.0.0-alpha11 API. Every other package moves to this version with no
+change. Pin it exactly, as with alpha10 and alpha11: `"vintasend": "1.0.0-alpha12"`, no `^`.
+
+* **`vintasend-dashboard-core`: the generated client matches the 1.0.0-alpha11 API.**
+  1.0.0-alpha11 shipped the client generated from the alpha10 contract, so it had no types for
+  `POST /api/v1/notifications/versions`, the new requeue and repin options, the search filter, or
+  `details.reason`. The requeue and repin hooks take their bodies from that client, so they now
+  accept `templateVersion`, `expectedVersion` and `send`.
+  * New type exports, all derived from the generated schema: `NotificationVersionsSearch`,
+    `NotificationSearchFilter`, `NotificationSearchFilterFields`, `DateRange`,
+    `NotificationVersionsPage`, `NotificationVersionEntry`, `RequeueNotificationBody` and
+    `RepinNotificationBody`; and `NotificationActionCapability` and
+    `NotificationActionRefusalReason`.
+  * **`getActionRefusalReason(error)`** reads `details.reason` off a refused requeue, repin or
+    search.
+  * **Fixed: `supportsCapability` reads a missing action key as unsupported.** It answered `true`
+    for any missing key, so against an API older than 1.0.0-alpha11, which sends no action keys,
+    it offered actions the API could not do.
+* **`vintasend-api`** exports `NotificationActionCapability` and
+  `NotificationActionRefusalReason` with its contract types.
+
 # Version 1.0.0-alpha11
 
 Moving notifications onto a new template version safely, and previewing and publishing managed
