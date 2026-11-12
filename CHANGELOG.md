@@ -1,8 +1,9 @@
 # Changelog
 
-# Unreleased
+# Version 1.0.0-alpha16
 
-Moving notifications in batches without reading each one.
+Moving notifications in batches without reading each one. Every package moves to this version,
+the others with no change. Pin it exactly: `"vintasend": "1.0.0-alpha16"`, no `^`.
 
 ## `vintasend`
 
