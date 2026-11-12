@@ -177,6 +177,15 @@ async function main() {
       process.exit(1);
     }
 
+    // --bump=alpha-iteration skips the menu, so take the next iteration here as option 5 does.
+    if (selectedBumpType === 'alpha-iteration') {
+      if (!isCurrentAlpha) {
+        logError('Cannot bump alpha iteration: current version is not an alpha version');
+        process.exit(1);
+      }
+      alphaIteration = parseInt(currentAlphaMatch[2], 10) + 1;
+    }
+
     // If --bump=alpha was passed and current version is already alpha, ask if user wants to increment
     if (selectedBumpType === 'alpha' && isCurrentAlpha) {
       console.log('\nCurrent version is already an alpha. What would you like to do?');
