@@ -1,10 +1,10 @@
 # Changelog
 
-# Unreleased
+# Version 1.0.0-alpha15
 
 The backend half of version tokens: `vintasend-prisma` and `vintasend-medplum` honour
-`NotificationWriteOptions`, so their tokens match across backends. They need
-`vintasend@1.0.0-alpha14`.
+`NotificationWriteOptions`, so their tokens match across backends. Every package moves to this
+version, the others with no change. Pin it exactly: `"vintasend": "1.0.0-alpha15"`, no `^`.
 
 ## `vintasend-prisma`
 
