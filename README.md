@@ -391,7 +391,8 @@ each written target, as for the single actions.
 
 Backends report `repin.bulk` and `requeue.bulk`. `vintasend-medplum` does it with one search
 (`_elements=id,meta,identifier,status,sent`) and one batch of `If-Match` JSON Patch updates per
-100 targets; `vintasend-prisma` with one conditional `UPDATE` per target.
+`bulkActionBatchSize` targets (a backend option, 100 by default); `vintasend-prisma` with one
+conditional `UPDATE` per target.
 
 ### Case sensitivity
 

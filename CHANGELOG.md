@@ -17,8 +17,10 @@ Moving notifications in batches without reading each one.
 ## `vintasend-medplum`
 
 * `fields.id` as `_id`. Its negation is not supported.
-* Bulk actions: per 100 targets, one search asking for `_elements=id,meta,identifier,status,sent`
-  and one batch of JSON Patch updates sent with `If-Match`.
+* Bulk actions: per `bulkActionBatchSize` targets (a new backend option, default
+  `DEFAULT_BULK_ACTION_BATCH_SIZE`, 100), one search asking for
+  `_elements=id,meta,identifier,status,sent` and one batch of JSON Patch updates sent with
+  `If-Match`.
 
 ## `vintasend-prisma`
 
