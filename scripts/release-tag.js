@@ -26,6 +26,12 @@
  *     publish nothing (no publish.yml). They are committed and pushed after
  *     every published package is live.
  *
+ * A repository that commits a `package-lock.json` has it regenerated in its
+ * wave, right before its release commit (`npm install --package-lock-only`).
+ * The publish workflow runs `npm ci`, which refuses a lockfile still locked at
+ * the previous release, and the lockfile can't be regenerated any earlier: the
+ * packages it has to resolve are only on npm once the waves before it are live.
+ *
  * It is safe to re-run: packages already published at the release version are
  * skipped, and repositories with nothing to commit are left alone, so an
  * interrupted release resumes where it stopped.
@@ -43,6 +49,10 @@ import {
   buildDependencyGraph,
   buildWaves
 } from './utils/workspace-packages.js';
+import { LOCKFILE, isNotYetPublishedError, readLockfileDrift } from './utils/lockfile-sync.js';
+
+/** How many times to run `npm install --package-lock-only` while npm catches up with a wave. */
+const LOCKFILE_SYNC_ATTEMPTS = 5;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -112,6 +122,7 @@ Options:
   --no-push-commit    Create the --commit commits but don't push them (implies --allow-unpushed)
   --no-companions     Don't commit/push the repositories that publish nothing
   --no-submodule-sync Don't make the final submodule-pointer commit in the root repo
+  --no-lockfile-sync  Don't regenerate package-lock.json before each --commit release commit
   --timeout=<sec>     How long to wait for a package to appear on npm (default 1800)
   --poll=<sec>        Seconds between npm checks (default 15)
   --settle=<sec>      Pause after a wave is live, before pushing the next (default 20)
@@ -134,6 +145,7 @@ function parseArgs(argv) {
     pushCommit: true,
     companions: true,
     submoduleSync: true,
+    lockfileSync: true,
     timeoutSeconds: 1800,
     pollSeconds: 15,
     settleSeconds: 20,
@@ -165,7 +177,8 @@ function parseArgs(argv) {
     '--no-verify': () => { options.noVerify = true; },
     '--no-push-commit': () => { options.pushCommit = false; },
     '--no-companions': () => { options.companions = false; },
-    '--no-submodule-sync': () => { options.submoduleSync = false; }
+    '--no-submodule-sync': () => { options.submoduleSync = false; },
+    '--no-lockfile-sync': () => { options.lockfileSync = false; }
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -531,6 +544,89 @@ function commitAndPush(pkg, options) {
   return { committed, pushed };
 }
 
+// ---------------------------------------------------------------------------
+// Lockfiles
+// ---------------------------------------------------------------------------
+
+/** Whether the repository commits a package-lock.json, which its publish workflow's `npm ci` reads. */
+function tracksLockfile(dir) {
+  return tryRun(`git ls-files --error-unmatch -- ${LOCKFILE}`, dir).success;
+}
+
+/** What the lockfile of `pkg` has to agree with. */
+function lockfileRelease(pkg, options) {
+  return { version: pkg.version, internalNames: options.internalNames, registry: options.registry };
+}
+
+/**
+ * Where a repository's committed lockfile disagrees with the release, or an
+ * empty list when it agrees or the repository commits none.
+ */
+function lockfileDriftOf(pkg, options) {
+  if (!pkg.isGitRoot || !tracksLockfile(pkg.dir)) return [];
+  return readLockfileDrift(pkg.dir, lockfileRelease(pkg, options)) || [];
+}
+
+/**
+ * Regenerate a repository's lockfile against the registry, so its release
+ * commit carries one that `npm ci` accepts.
+ *
+ * Runs in the repository's wave, once every package it depends on is live. The
+ * registry can still lag a little behind `npm view`, so a "no such version"
+ * failure is retried a few times before giving up. The result is checked again
+ * afterwards: a lockfile npm left behind the release stops the run here rather
+ * than in the publish workflow.
+ *
+ * @returns {Promise<boolean>} true when the lockfile was rewritten
+ */
+async function syncLockfile(pkg, options) {
+  if (!options.lockfileSync) return false;
+  const drift = lockfileDriftOf(pkg, options);
+  if (drift.length === 0) return false;
+
+  if (options.dryRun) {
+    logInfo(`[dry-run] would regenerate ${path.join(pkg.relPath, LOCKFILE)}:`);
+    drift.forEach(problem => logDetail(problem));
+    return false;
+  }
+
+  const command =
+    `npm install --package-lock-only --ignore-scripts --no-audit --no-fund --registry=${shellQuote(options.registry)}`;
+  for (let attempt = 1; ; attempt++) {
+    const result = tryRun(command, pkg.dir);
+    if (result.success) break;
+
+    const output = `${result.stderr}\n${result.output}`.trim();
+    if (attempt >= LOCKFILE_SYNC_ATTEMPTS || !isNotYetPublishedError(output)) {
+      throw new Error(`${pkg.name}: regenerating ${LOCKFILE} failed\n${output}`);
+    }
+    logDetail(
+      `${pkg.name}: npm does not serve a dependency yet, retrying in ${options.pollSeconds}s ` +
+        `(${attempt}/${LOCKFILE_SYNC_ATTEMPTS})`
+    );
+    await sleep(options.pollSeconds * 1000);
+  }
+
+  const remaining = readLockfileDrift(pkg.dir, lockfileRelease(pkg, options)) || [];
+  if (remaining.length > 0) {
+    throw new Error(
+      `${pkg.name}: ${LOCKFILE} still disagrees with the release after npm install:\n  ${remaining.join('\n  ')}`
+    );
+  }
+  logSuccess(`${pkg.name}: regenerated ${LOCKFILE} for ${pkg.version}`);
+  return true;
+}
+
+/**
+ * Sync every lockfile in a group before committing any of them, so a failure
+ * stops the group with nothing pushed.
+ */
+async function syncLockfiles(packages, options) {
+  for (const pkg of packages) {
+    await syncLockfile(pkg, options);
+  }
+}
+
 /**
  * Record the submodule commits made during this release in the root repository.
  *
@@ -843,6 +939,7 @@ async function main() {
     const workspace = discoverPackages();
     const internalNames = internalPackageNames(workspace);
     buildDependencyGraph(workspace, internalNames);
+    options.internalNames = internalNames;
 
     const discovered = workspace.filter(pkg => pkg.publishable);
     const allCompanions = workspace.filter(pkg => !pkg.publishable && !pkg.isTemplate && pkg.isGitRoot);
@@ -963,6 +1060,21 @@ async function main() {
       logWarning(warning);
     }
 
+    // A lockfile still locked at the previous release fails `npm ci` in the
+    // publish workflow. Under --commit each one is regenerated in its wave; it
+    // can't be fixed up front, because what it has to resolve isn't on npm yet.
+    for (const pkg of [...selected, ...companions]) {
+      pkg.lockfileDrift = lockfileDriftOf(pkg, options);
+      if (pkg.lockfileDrift.length === 0) continue;
+      const more = pkg.lockfileDrift.length > 1 ? `, and ${pkg.lockfileDrift.length - 1} more` : '';
+      const summary = `${LOCKFILE} is behind the release (${pkg.lockfileDrift[0]}${more})`;
+      if (options.commit && options.lockfileSync) {
+        logDetail(`${pkg.name}: ${summary} — regenerated in its wave`);
+      } else {
+        logWarning(`${pkg.name}: ${summary} — its publish workflow's npm ci will refuse it`);
+      }
+    }
+
     // Under --commit every repository has to be on a branch that the release is
     // allowed to push to; a detached HEAD fails much later otherwise.
     if (options.commit) {
@@ -994,8 +1106,16 @@ async function main() {
     const pointerWork = options.commit && options.submoduleSync && rootPkg
       ? submodulePointerEntries(rootPkg)
       : [];
+    const lockfileWork = options.commit && options.lockfileSync
+      ? [...selected, ...companions].filter(pkg => pkg.lockfileDrift.length > 0)
+      : [];
 
-    if (pending.length === 0 && uncommitted.length === 0 && pointerWork.length === 0) {
+    if (
+      pending.length === 0 &&
+      uncommitted.length === 0 &&
+      pointerWork.length === 0 &&
+      lockfileWork.length === 0
+    ) {
       log('');
       logSuccess('Every selected package is already published — nothing to do');
       return;
@@ -1017,6 +1137,9 @@ async function main() {
       log(`  Wave ${index + 1}`, 'bright');
       for (const pkg of todo) {
         const steps = [];
+        if (options.commit && options.lockfileSync && pkg.lockfileDrift.length > 0) {
+          steps.push(`sync ${LOCKFILE}`);
+        }
         if (options.commit) steps.push('commit', options.pushCommit ? 'push' : 'commit only');
         if (!pkg.alreadyPublished) steps.push(`tag ${pkg.tag}`, 'wait for npm');
         else steps.push('already published');
@@ -1025,7 +1148,10 @@ async function main() {
     });
     if (options.commit && companions.length > 0) {
       log('  Once every wave is live', 'bright');
-      for (const pkg of companions) logDetail(`${pkg.name}: commit → push (never tagged)`);
+      for (const pkg of companions) {
+        const sync = options.lockfileSync && pkg.lockfileDrift.length > 0 ? `sync ${LOCKFILE} → ` : '';
+        logDetail(`${pkg.name}: ${sync}commit → push (never tagged)`);
+      }
     }
     if (options.commit && options.submoduleSync && rootPkg) {
       log('  Finally', 'bright');
@@ -1059,6 +1185,7 @@ async function main() {
       // Commit and push first: this is the point where the repository's CI run
       // starts, and by now every package it depends on is already on npm.
       if (options.commit) {
+        await syncLockfiles(wave, options);
         for (const pkg of wave) {
           commitAndPush(pkg, options);
         }
@@ -1134,6 +1261,7 @@ async function main() {
       log(`\n${'─'.repeat(60)}`, 'cyan');
       log(`Repositories that publish nothing: ${companions.map(pkg => pkg.name).join(', ')}`, 'bright');
       log('─'.repeat(60), 'cyan');
+      await syncLockfiles(companions, options);
       for (const pkg of companions) {
         commitAndPush(pkg, options);
       }

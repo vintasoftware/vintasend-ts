@@ -85,18 +85,37 @@ npm run release:tag                         # tags only: you committed and pushe
 
 For each dependency wave, in order:
 
-1. `git add -A` and commit every repository in the wave
-2. push the branch — **this is the step whose timing matters** (see below)
-3. re-run the preflight checks against the commit that was just made
-4. push `v<version>`, which starts `publish.yml`
-5. poll npm until every package in the wave is live (watching the workflow run
+1. regenerate the `package-lock.json` of every repository in the wave that
+   commits one and is behind the release (see below)
+2. `git add -A` and commit every repository in the wave
+3. push the branch — **this is the step whose timing matters** (see below)
+4. re-run the preflight checks against the commit that was just made
+5. push `v<version>`, which starts `publish.yml`
+6. poll npm until every package in the wave is live (watching the workflow run
    through the `gh` CLI, so a failed run fails fast instead of timing out)
 
 Then, once every wave is published:
 
-6. commit and push the repositories that carry the version but publish nothing
-   (`vintasend-dashboard`, `vintasend-templates-management-dashboard`)
-7. commit and push the **submodule pointers** in the root repository
+7. regenerate the lockfiles of, then commit and push, the repositories that
+   carry the version but publish nothing (`vintasend-dashboard`,
+   `vintasend-templates-management-dashboard`)
+8. commit and push the **submodule pointers** in the root repository
+
+### Lockfiles
+
+Several `publish.yml` workflows install with `npm ci`, which refuses a
+`package-lock.json` that still locks a workspace package at the previous
+release. The bump can't fix that: the lockfile can only resolve the new version
+once that version is on npm, and for every wave after the first it isn't yet.
+
+So each repository's lockfile is regenerated in its own wave, right before its
+release commit, with `npm install --package-lock-only` against the registry.
+By then everything it depends on is live. A lockfile counts as behind when its
+own version, or any workspace package in it, is not at the release version, or
+when a workspace package is linked from disk (`file:`) instead of installed from
+the registry. A version npm doesn't serve yet is retried a few times; a
+lockfile still behind afterwards stops the wave before anything in it is
+pushed. Pass `--no-lockfile-sync` to skip all of this.
 
 ### Why the waves matter
 
@@ -153,6 +172,7 @@ working-tree check runs with `--ignore-submodules=all`.
 | `--no-push-commit` | Commit but don't push (implies `--allow-unpushed`) |
 | `--no-companions` | Don't commit/push the repositories that publish nothing |
 | `--no-submodule-sync` | Skip the final submodule-pointer commit |
+| `--no-lockfile-sync` | Don't regenerate `package-lock.json` before each release commit |
 | `--timeout=<sec>` | How long to wait for npm (default 1800) |
 | `--poll=<sec>` | Seconds between npm checks (default 15) |
 | `--settle=<sec>` | Pause after a wave goes live (default 20) |
@@ -213,8 +233,12 @@ Some package still points at the previous line. Re-run `release:bump` (it
 rewrites every internal range) or fix the range by hand.
 
 **The publish workflow fails on `npm ci` / lockfile sync**
-Lockfiles are not touched by the release scripts. See the notes in
-`scripts/README.md` and regenerate the lockfile from a clean install.
+`release:tag --commit` regenerates each lockfile in its wave (see
+[Lockfiles](#lockfiles)), so this means the release ran with
+`--no-lockfile-sync`, or without `--commit`. Run `npm install
+--package-lock-only` in that repository, commit the lockfile, and since its tag
+now points at a commit `npm ci` refuses, move the tag to the new commit — it
+published nothing — before re-running.
 
 ---
 

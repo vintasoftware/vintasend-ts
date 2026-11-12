@@ -28,6 +28,7 @@ repository's `publish.yml`, which publishes to npm through GitHub Actions.
 4. ✓ Saves `.release-state.json`
 
 **Step 3 — `release-tag.js --commit`**, per dependency wave:
+0. ✓ Regenerates each repository's `package-lock.json` (`npm ci` refuses one locked at the last release)
 1. ✓ Commits every repository in the wave
 2. ✓ Pushes the branch — only now, because everything it depends on is already on npm
 3. ✓ Re-runs preflight against the new commit
@@ -59,6 +60,7 @@ them. The tag stays on the release commit.
 | `--yes` | No confirmation prompt |
 | `--only=a,b` / `--skip=a,b` | Pick packages (`root` = the root package) |
 | `--no-verify` | Skip husky hooks on the release commits |
+| `--no-lockfile-sync` | Don't regenerate `package-lock.json` in each wave |
 | `--settle=<sec>` | Pause after a wave goes live (default 20) |
 | `--timeout=<sec>` / `--poll=<sec>` | npm wait tuning |
 

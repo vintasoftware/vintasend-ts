@@ -109,8 +109,8 @@ npm run release:tag                         # tags only
 
 Useful flags: `--commit`, `--commit-message=`, `--no-verify`, `--only=`,
 `--skip=`, `--timeout=<sec>`, `--poll=<sec>`, `--settle=<sec>`, `--no-watch`,
-`--no-companions`, `--no-submodule-sync`, `--allow-dirty`, `--allow-unpushed`,
-`--yes`. Run with `--help` for the full list.
+`--no-companions`, `--no-submodule-sync`, `--no-lockfile-sync`, `--allow-dirty`,
+`--allow-unpushed`, `--yes`. Run with `--help` for the full list.
 
 ### `release.js` / `release-publish.js`
 The older flow that published from a developer machine with npm 2FA. Kept for
@@ -201,6 +201,7 @@ trusted publishing — no `NPM_TOKEN`, no 2FA prompt on your machine.
   It is still version-bumped, so packages generated from it start current.
 - The APIs and dashboards under `src/tools` have no `publish.yml`. They are
   bumped, committed and pushed, but never tagged or published.
-- Lockfiles are not touched by the release scripts. If a publish workflow fails
-  on `npm ci` being out of sync, regenerate the lockfile from a clean install
-  and commit it before releasing.
+- `release-bump.js` leaves lockfiles alone. `release-tag.js --commit`
+  regenerates each repository's `package-lock.json` in its wave, before the
+  release commit, once what it depends on is on npm (`--no-lockfile-sync` to
+  skip). The drift check lives in `scripts/utils/lockfile-sync.js`.
