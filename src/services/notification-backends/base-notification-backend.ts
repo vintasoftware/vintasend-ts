@@ -107,6 +107,15 @@ export type NotificationFilterCapabilities = {
  * `{ not: { readAtRange } }`.
  */
 export type NotificationFilterFields<Config extends BaseNotificationTypeConfig> = {
+  /**
+   * The notification's ID, or one of several.
+   *
+   * AND it with another filter to ask about just these notifications:
+   * `{ and: [filter, { id: ids }] }` counts which of a batch still match `filter`, without listing
+   * everything else that does. An empty array matches nothing. Reported by `fields.id` and
+   * `negation.id`, both `false` by default.
+   */
+  id?: Config['NotificationIdType'] | Config['NotificationIdType'][];
   status?: NotificationStatus | NotificationStatus[];
   notificationType?: NotificationType | NotificationType[];
   adapterUsed?: string | string[];
@@ -201,6 +210,9 @@ export const DEFAULT_BACKEND_FILTER_CAPABILITIES = {
   'negation.hasSendAfter': false,
   'fields.hasRequestedTemplateVersion': false,
   'negation.hasRequestedTemplateVersion': false,
+  // So is `id`: a backend that predates it would ignore it and act on every match.
+  'fields.id': false,
+  'negation.id': false,
   'stringLookups.exact': true,
   'stringLookups.startsWith': true,
   'stringLookups.endsWith': true,
@@ -324,6 +336,63 @@ export type NotificationVersion<Config extends BaseNotificationTypeConfig> = {
 };
 
 /**
+ * Options shared by the bulk actions, `repinNotifications` and `requeueNotifications`.
+ */
+export type BulkNotificationActionOptions<Config extends BaseNotificationTypeConfig> = {
+  /**
+   * Act only on the notifications that still match this filter, evaluated by the backend in the
+   * same pass that checks the versions. Typically the filter the targets were listed with. The
+   * backend must support every field it uses, as for `filterNotificationVersions`.
+   */
+  filter?: NotificationFilter<Config>;
+};
+
+/**
+ * What `BaseNotificationBackend.requeueNotifications` is asked to change besides the status. The
+ * same as `RequeueNotificationOptions`, for every target alike, without `expectedVersion`, which
+ * each target carries.
+ */
+export type BulkRequeueNotificationOptions<Config extends BaseNotificationTypeConfig> =
+  BulkNotificationActionOptions<Config> & {
+    sendAfter?: Date | null;
+    templateVersion?: number;
+  };
+
+/**
+ * What a bulk action did with one target.
+ *
+ * * `WRITTEN`: the notification was moved. `version` is its new token.
+ * * `UNCHANGED`: a re-pin found it already on the version and wrote nothing. `version` is its
+ *   token, the one the caller expected.
+ * * `CHANGED`: it is no longer at the version the caller expected, or it changed while being
+ *   written. Nothing was written.
+ * * `INVALID_STATUS`: its status does not allow the action. `status` says which. Nothing was
+ *   written.
+ * * `NOT_MATCHED`: it no longer exists, or no longer matches `filter`. Nothing was written.
+ * * `FAILED`: the backend refused the write for another reason, such as a permission error from
+ *   the store. Nothing was written for this one; the others are unaffected.
+ */
+export type BulkNotificationActionOutcome =
+  | 'WRITTEN'
+  | 'UNCHANGED'
+  | 'CHANGED'
+  | 'INVALID_STATUS'
+  | 'NOT_MATCHED'
+  | 'FAILED';
+
+/**
+ * One target's result from a bulk action. Results come back in the order of the targets.
+ */
+export type BulkNotificationActionResult<Config extends BaseNotificationTypeConfig> = {
+  id: Config['NotificationIdType'];
+  outcome: BulkNotificationActionOutcome;
+  /** The token the notification is at now, for `WRITTEN` and `UNCHANGED`. */
+  version?: string;
+  /** For `INVALID_STATUS`. */
+  status?: NotificationStatus;
+};
+
+/**
  * Flat dotted keys describing which notification actions a backend supports beyond the required
  * ones. Every key defaults to `false`: a backend that predates them, or does not implement
  * `getActionCapabilities()`, supports none of them, and `VintaSend` refuses the option with
@@ -333,6 +402,8 @@ export type NotificationVersion<Config extends BaseNotificationTypeConfig> = {
  * * `requeue.expectedVersion`: `requeueNotification` checks `expectedVersion`.
  * * `requeue.templateVersion`: `requeueNotification` pins `templateVersion` in the same write.
  * * `versions.filter`: `filterNotificationVersions` is implemented.
+ * * `repin.bulk`: `repinNotifications` is implemented.
+ * * `requeue.bulk`: `requeueNotifications` is implemented, `templateVersion` included.
  */
 export type NotificationActionCapabilities = {
   [key: string]: boolean;
@@ -343,6 +414,8 @@ export const DEFAULT_BACKEND_ACTION_CAPABILITIES: Readonly<NotificationActionCap
   'requeue.expectedVersion': false,
   'requeue.templateVersion': false,
   'versions.filter': false,
+  'repin.bulk': false,
+  'requeue.bulk': false,
 };
 
 export interface BaseNotificationBackend<Config extends BaseNotificationTypeConfig> {
@@ -522,6 +595,45 @@ export interface BaseNotificationBackend<Config extends BaseNotificationTypeConf
     page: number,
     pageSize: number,
   ): Promise<NotificationVersion<Config>[]>;
+
+  /**
+   * Pin several notifications to `templateVersion`, each only if it is still at the version its
+   * target names, still in one of `REPINNABLE_NOTIFICATION_STATUSES`, and still matches
+   * `options.filter` when one is given.
+   *
+   * The point is to skip reading each notification before writing it: the caller already holds
+   * the tokens, from `filterNotificationVersions`. An implementation must:
+   * * check the token, the status and the filter in the write itself, or against a read of the
+   *   IDs, tokens and statuses alone, and make the write conditional on nothing having changed
+   *   since;
+   * * never read recipients, contexts, context parameters, rendered content or attachments;
+   * * write nothing for a target that fails a check, and report why in its result, rather than
+   *   throwing, so one changed notification does not stop the rest;
+   * * change `requestedTemplateVersion` and the token only, and write nothing for a notification
+   *   already pinned to `templateVersion` (`UNCHANGED`).
+   *
+   * Targets are distinct IDs. Return one result per target, in their order. Report `repin.bulk`
+   * in `getActionCapabilities()` once it does all of that.
+   */
+  repinNotifications?(
+    targets: NotificationVersion<Config>[],
+    templateVersion: number,
+    options: BulkNotificationActionOptions<Config>,
+  ): Promise<BulkNotificationActionResult<Config>[]>;
+
+  /**
+   * Put several notifications back into `PENDING_SEND`, each only if it is still at the version
+   * its target names, still in one of `REQUEUEABLE_NOTIFICATION_STATUSES`, and still matches
+   * `options.filter` when one is given.
+   *
+   * The same rules as `repinNotifications`, and each write changes what `requeueNotification`
+   * changes: the status, `sentAt`, `sendAfter` when the key is present, the template pin when
+   * `templateVersion` is given, and the token. Report `requeue.bulk` once it does all of that.
+   */
+  requeueNotifications?(
+    targets: NotificationVersion<Config>[],
+    options: BulkRequeueNotificationOptions<Config>,
+  ): Promise<BulkNotificationActionResult<Config>[]>;
 
   /**
    * Which optional notification actions this backend supports. See

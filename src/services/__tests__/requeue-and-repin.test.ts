@@ -953,6 +953,8 @@ describe('getBackendSupportedActionCapabilities', () => {
       'requeue.expectedVersion': false,
       'requeue.templateVersion': false,
       'versions.filter': false,
+      'repin.bulk': false,
+      'requeue.bulk': false,
     });
   });
 
@@ -961,7 +963,15 @@ describe('getBackendSupportedActionCapabilities', () => {
 
     const capabilities = await service.getBackendSupportedActionCapabilities();
 
-    expect(Object.values(capabilities).every(Boolean)).toBe(true);
+    // The bulk actions are covered in bulk-actions.test.ts; this backend implements the rest.
+    expect(capabilities).toEqual({
+      'repin.expectedVersion': true,
+      'requeue.expectedVersion': true,
+      'requeue.templateVersion': true,
+      'versions.filter': true,
+      'repin.bulk': false,
+      'requeue.bulk': false,
+    });
   });
 
   it('reads a claimed capability as false when its method is missing', async () => {

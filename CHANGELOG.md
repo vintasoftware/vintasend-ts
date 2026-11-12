@@ -1,5 +1,31 @@
 # Changelog
 
+# Unreleased
+
+Moving notifications in batches without reading each one.
+
+## `vintasend`
+
+* **`id` filter field**, one ID or a list. `{ and: [filter, { id: ids }] }` recounts just a batch.
+  New vocabulary: `fields.id` and `negation.id` default to `false`.
+* **`repinNotifications` and `requeueNotifications`**, which take the `{ id, version }` pairs from
+  `filterNotificationVersions` and an optional `filter`, and return one outcome per target
+  (`WRITTEN`, `UNCHANGED`, `CHANGED`, `INVALID_STATUS`, `NOT_MATCHED`, `FAILED`) instead of
+  throwing. `requeueNotifications` sends nothing. Optional on a backend, reported as `repin.bulk`
+  and `requeue.bulk`.
+
+## `vintasend-medplum`
+
+* `fields.id` as `_id`. Its negation is not supported.
+* Bulk actions: per 100 targets, one search asking for `_elements=id,meta,identifier,status,sent`
+  and one batch of JSON Patch updates sent with `If-Match`.
+
+## `vintasend-prisma`
+
+* `fields.id` and `negation.id`.
+* Bulk actions: one conditional `UPDATE` per target, selecting `id` only, plus one lookup of the
+  targets that matched nothing, to say why.
+
 # Version 1.0.0-alpha15
 
 The backend half of version tokens: `vintasend-prisma` and `vintasend-medplum` honour

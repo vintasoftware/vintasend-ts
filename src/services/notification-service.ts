@@ -20,6 +20,9 @@ import {
 } from './notification-adapters/base-notification-adapter.js';
 import {
   type BaseNotificationBackend,
+  type BulkNotificationActionOutcome,
+  type BulkNotificationActionResult,
+  type BulkRequeueNotificationOptions,
   DEFAULT_BACKEND_ACTION_CAPABILITIES,
   DEFAULT_BACKEND_FILTER_CAPABILITIES,
   type NotificationActionCapabilities,
@@ -119,6 +122,35 @@ export type RepinOptions = {
    * `repin.expectedVersion`.
    */
   expectedVersion?: string;
+};
+
+/**
+ * Options for `VintaSend.repinNotifications`.
+ */
+export type BulkRepinOptions<Config extends BaseNotificationTypeConfig> = {
+  /**
+   * The version to pin every target to. Required: resolving the current version per notification
+   * would mean reading each one, which is what the bulk action exists to avoid. Get it once with
+   * `getCurrentTemplateVersion`.
+   */
+  templateVersion: number;
+  /**
+   * Re-pin only the targets that still match this filter, typically the one they were listed
+   * with. Evaluated by the backend in the same pass that checks the versions.
+   */
+  filter?: NotificationFilter<Config>;
+};
+
+/**
+ * Options for `VintaSend.requeueNotifications`.
+ */
+export type BulkRequeueOptions<Config extends BaseNotificationTypeConfig> = {
+  /** As for `requeueNotification`: left out keeps each notification's own, `null` means now. */
+  sendAfter?: Date | null;
+  /** Pin every target to this template version in the same write that re-queues it. */
+  templateVersion?: number;
+  /** As for `repinNotifications`. */
+  filter?: NotificationFilter<Config>;
 };
 
 type RenderEmailTemplateContextInput<Config extends BaseNotificationTypeConfig> =
@@ -1487,6 +1519,12 @@ export class VintaSend<
     if (typeof backend.filterNotificationVersions !== 'function') {
       capabilities['versions.filter'] = false;
     }
+    if (typeof backend.repinNotifications !== 'function') {
+      capabilities['repin.bulk'] = false;
+    }
+    if (typeof backend.requeueNotifications !== 'function') {
+      capabilities['requeue.bulk'] = false;
+    }
     return capabilities;
   }
 
@@ -1706,21 +1744,14 @@ export class VintaSend<
       'requeueNotification',
       async (backend) => backend.requeueNotification(notificationId, primaryOptions),
       async (backend, primaryResult) => {
-        // `expectedVersion` was checked on the primary, so a replica takes the write as it is, and
-        // stores the token the primary's write recorded.
-        const writeOptions = this.replicaWriteOptions(primaryResult);
-        if (templateVersion === undefined) {
-          await backend.requeueNotification(notificationId, { ...replicaOptions, ...writeOptions });
-        } else if (this.getActionCapabilities(backend)['requeue.templateVersion'] === true) {
-          await backend.requeueNotification(notificationId, {
-            ...replicaOptions,
-            templateVersion,
-            ...writeOptions,
-          });
-        } else {
-          await this.persistTemplatePin(backend, notification, templateVersion, writeOptions);
-          await backend.requeueNotification(notificationId, { ...replicaOptions, ...writeOptions });
-        }
+        await this.replicateRequeue(
+          backend,
+          notificationId,
+          replicaOptions,
+          templateVersion,
+          this.replicaWriteOptions(primaryResult),
+          notification,
+        );
       },
       notificationId,
     );
@@ -1753,6 +1784,57 @@ export class VintaSend<
     // `send` reports nothing back, and with `raiseErrorOnFailedSend: false` swallows failures, so
     // the record is the only place the outcome is written.
     return (await this.readNotificationForAction(notificationId)) ?? requeuedNotification;
+  }
+
+  /**
+   * Copy a re-queue the primary made onto an additional backend.
+   *
+   * `expectedVersion` was checked on the primary, so a replica takes the write as it is, and
+   * stores the token the primary's write recorded. A replica that cannot pin in the same write is
+   * pinned first through the generic update, which needs the notification: the primary's copy when
+   * the caller has it, or the replica's own.
+   */
+  private async replicateRequeue(
+    backend: Backend,
+    notificationId: Config['NotificationIdType'],
+    replicaOptions: RequeueNotificationOptions,
+    templateVersion: number | undefined,
+    writeOptions: NotificationWriteOptions,
+    notification?: AnyDatabaseNotification<Config>,
+  ): Promise<void> {
+    if (templateVersion === undefined) {
+      await backend.requeueNotification(notificationId, { ...replicaOptions, ...writeOptions });
+    } else if (this.getActionCapabilities(backend)['requeue.templateVersion'] === true) {
+      await backend.requeueNotification(notificationId, {
+        ...replicaOptions,
+        templateVersion,
+        ...writeOptions,
+      });
+    } else {
+      await this.persistTemplatePin(
+        backend,
+        notification ?? (await this.readReplicaNotification(backend, notificationId)),
+        templateVersion,
+        writeOptions,
+      );
+      await backend.requeueNotification(notificationId, { ...replicaOptions, ...writeOptions });
+    }
+  }
+
+  /** An additional backend's copy of a notification, regular or one-off. */
+  private async readReplicaNotification(
+    backend: Backend,
+    notificationId: Config['NotificationIdType'],
+  ): Promise<AnyDatabaseNotification<Config>> {
+    const notification =
+      (await backend.getNotification(notificationId, false)) ??
+      (await backend.getOneOffNotification(notificationId, false));
+    if (!notification) {
+      throw new Error(
+        `Notification ${String(notificationId)} not found in backend ${this.getBackendIdentifier(backend)}`,
+      );
+    }
+    return notification;
   }
 
   /**
@@ -1889,6 +1971,183 @@ export class VintaSend<
       log`Notification ${logId(notificationId)} repinned to template version ${logCount(version)}`,
     );
     return repinnedNotification;
+  }
+
+  /**
+   * Pin several notifications to `templateVersion` at once, each only if it has not changed since
+   * it was listed.
+   *
+   * Pass the `{ id, version }` pairs `filterNotificationVersions` returned, and the filter they
+   * were listed with: the primary backend checks every target's token, status and the filter in
+   * one pass and writes the ones that pass, without reading any of them in full first. Where
+   * `repinNotification` reads each notification before and inside its write, this costs the
+   * backend about one lookup and one write per batch.
+   *
+   * A target that fails a check is skipped, not thrown for, and its result says why: see
+   * `BulkNotificationActionOutcome`. One already on `templateVersion` is `UNCHANGED`. Additional
+   * backends take each `WRITTEN` pin, as they do for `repinNotification`.
+   *
+   * @returns one result per target, in their order.
+   * @throws Error when the primary backend does not implement it (`repin.bulk`), or targets repeat
+   *   an ID. Nothing has been written then.
+   * @throws RangeError when `templateVersion` is not a non-negative integer.
+   */
+  async repinNotifications(
+    targets: NotificationVersion<Config>[],
+    options: BulkRepinOptions<Config>,
+  ): Promise<BulkNotificationActionResult<Config>[]> {
+    const { templateVersion, filter } = options;
+    this.assertValidBulkTemplateVersion('repin', templateVersion);
+    this.assertBulkActionSupported('repinNotifications', 'repin.bulk');
+    this.assertDistinctTargets('repin', targets);
+    if (targets.length === 0) {
+      return [];
+    }
+
+    const results = await (
+      this.backend.repinNotifications as NonNullable<Backend['repinNotifications']>
+    ).call(this.backend, targets, templateVersion, filter === undefined ? {} : { filter });
+
+    await this.replicateBulkWrites('repinNotifications', results, async (backend, result) => {
+      await this.persistTemplatePin(
+        backend,
+        await this.readReplicaNotification(backend, result.id),
+        templateVersion,
+        this.replicaWriteOptions({ notificationVersion: result.version }),
+      );
+    });
+
+    this.logBulkOutcomes('repinned', targets.length, results);
+    return results;
+  }
+
+  /**
+   * Put several failed or cancelled notifications back into `PENDING_SEND` at once, each only if
+   * it has not changed since it was listed.
+   *
+   * Checks and writes as `repinNotifications` does, and changes what `requeueNotification`
+   * changes. It sends nothing, whether the notifications are due or not: they are left pending for
+   * whatever sends pending notifications, as `requeueNotification` does with `send: false`.
+   *
+   * @returns one result per target, in their order.
+   * @throws Error when the primary backend does not implement it (`requeue.bulk`), or targets
+   *   repeat an ID. Nothing has been written then.
+   * @throws RangeError when `templateVersion` is not a non-negative integer.
+   */
+  async requeueNotifications(
+    targets: NotificationVersion<Config>[],
+    options: BulkRequeueOptions<Config> = {},
+  ): Promise<BulkNotificationActionResult<Config>[]> {
+    const { templateVersion, filter } = options;
+    if (templateVersion !== undefined) {
+      this.assertValidBulkTemplateVersion('requeue', templateVersion);
+    }
+    this.assertBulkActionSupported('requeueNotifications', 'requeue.bulk');
+    this.assertDistinctTargets('requeue', targets);
+    if (targets.length === 0) {
+      return [];
+    }
+
+    // Only the keys the caller passed, as in `requeueNotification`.
+    const replicaOptions: RequeueNotificationOptions =
+      options.sendAfter === undefined ? {} : { sendAfter: options.sendAfter };
+    const primaryOptions: BulkRequeueNotificationOptions<Config> = {
+      ...replicaOptions,
+      ...(templateVersion === undefined ? {} : { templateVersion }),
+      ...(filter === undefined ? {} : { filter }),
+    };
+
+    const results = await (
+      this.backend.requeueNotifications as NonNullable<Backend['requeueNotifications']>
+    ).call(this.backend, targets, primaryOptions);
+
+    await this.replicateBulkWrites('requeueNotifications', results, async (backend, result) => {
+      await this.replicateRequeue(
+        backend,
+        result.id,
+        replicaOptions,
+        templateVersion,
+        this.replicaWriteOptions({ notificationVersion: result.version }),
+      );
+    });
+
+    this.logBulkOutcomes('requeued', targets.length, results);
+    return results;
+  }
+
+  private assertValidBulkTemplateVersion(action: 'requeue' | 'repin', templateVersion: number) {
+    if (!(Number.isInteger(templateVersion) && templateVersion >= 0)) {
+      throw new RangeError(
+        `Cannot ${action} notifications: templateVersion must be a non-negative integer`,
+      );
+    }
+  }
+
+  private assertBulkActionSupported(method: string, capability: string): void {
+    if (this.getActionCapabilities(this.backend)[capability] !== true) {
+      throw new Error(
+        `Backend ${this.primaryBackendIdentifier} does not support ${method} (${capability})`,
+      );
+    }
+  }
+
+  private assertDistinctTargets(
+    action: 'requeue' | 'repin',
+    targets: NotificationVersion<Config>[],
+  ): void {
+    const ids = new Set(targets.map((target) => String(target.id)));
+    if (ids.size !== targets.length) {
+      throw new Error(`Cannot ${action} notifications: the targets repeat a notification ID`);
+    }
+  }
+
+  /**
+   * Replicate each write a bulk action made on the primary, one notification at a time, through
+   * the same inline or queued replication single writes use.
+   */
+  private async replicateBulkWrites(
+    operation: string,
+    results: BulkNotificationActionResult<Config>[],
+    additionalWrite: (
+      backend: Backend,
+      result: BulkNotificationActionResult<Config>,
+    ) => Promise<void>,
+  ): Promise<void> {
+    if (this.getAdditionalBackends().length === 0) {
+      return;
+    }
+    for (const result of results) {
+      if (result.outcome !== 'WRITTEN') {
+        continue;
+      }
+      await this.executeMultiBackendWrite(
+        operation,
+        async () => result,
+        additionalWrite,
+        result.id,
+      );
+    }
+  }
+
+  /** Log how many targets ended in each outcome. Counts only: the IDs are in the results. */
+  private logBulkOutcomes(
+    verb: string,
+    total: number,
+    results: BulkNotificationActionResult<Config>[],
+  ): void {
+    const counts = new Map<BulkNotificationActionOutcome, number>();
+    for (const result of results) {
+      counts.set(result.outcome, (counts.get(result.outcome) ?? 0) + 1);
+    }
+    this.logger.info(
+      log`${logCount(counts.get('WRITTEN') ?? 0)} of ${logCount(total)} notifications ${logLabel(verb)}`,
+    );
+    const skipped = total - (counts.get('WRITTEN') ?? 0);
+    if (skipped > 0) {
+      this.logger.info(
+        log`Skipped: ${logCount(counts.get('UNCHANGED') ?? 0)} unchanged, ${logCount(counts.get('CHANGED') ?? 0)} changed, ${logCount(counts.get('INVALID_STATUS') ?? 0)} in another status, ${logCount(counts.get('NOT_MATCHED') ?? 0)} not matched, ${logCount(counts.get('FAILED') ?? 0)} failed`,
+      );
+    }
   }
 
   async resendNotification(

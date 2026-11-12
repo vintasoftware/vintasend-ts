@@ -39,7 +39,11 @@ export {
 } from './services/notification-adapters/base-notification-adapter.js';
 export type {
   BaseNotificationBackend,
+  BulkNotificationActionOptions,
+  BulkNotificationActionOutcome,
+  BulkNotificationActionResult,
   BulkNotificationWriteOptions,
+  BulkRequeueNotificationOptions,
   DateRange,
   NotificationActionCapabilities,
   NotificationFilter,
@@ -67,6 +71,8 @@ export {
 export type { BaseNotificationQueueService } from './services/notification-queue-service/base-notification-queue-service.js';
 export type { BaseNotificationReplicationQueueService } from './services/notification-queue-service/base-notification-replication-queue-service.js';
 export type {
+  BulkRepinOptions,
+  BulkRequeueOptions,
   RepinOptions,
   RequeueOptions,
   TemplateVersionPinningOptions,

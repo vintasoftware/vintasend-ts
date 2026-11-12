@@ -351,6 +351,48 @@ and the call throws on a backend without it. `vintasend-medplum` implements it w
 `_elements=id,meta,identifier`, `vintasend-prisma` with
 `select: { id, notificationVersion, updatedAt }`.
 
+### Filtering by ID
+
+`id` takes one ID or a list. AND it with another filter to recount a batch you already hold,
+without listing everything else that matches:
+
+```ts
+const stillMatching = await vintaSend.filterNotificationVersions(
+  { and: [filter, { id: batch.map((entry) => entry.id) }] },
+  0,
+  batch.length,
+);
+```
+
+An empty list matches nothing. `fields.id` and `negation.id` default to `false`;
+`vintasend-prisma` supports both, `vintasend-medplum` supports `fields.id` (as `_id`) only.
+
+### Moving many notifications at once
+
+`repinNotifications(targets, { templateVersion, filter })` and
+`requeueNotifications(targets, { sendAfter, templateVersion, filter })` take the `{ id, version }`
+pairs `filterNotificationVersions` returned and act on each one only if it is still at that
+version, still in a status the action allows, and still matches `filter`. The backend checks all
+of that in one pass, so no notification is read before it is written:
+
+```ts
+const filter = { bodyTemplate: 'welcome', status: ['PENDING_SEND', 'FAILED'] };
+const templateVersion = await vintaSend.getCurrentTemplateVersion('EMAIL', 'welcome');
+if (templateVersion === null) throw new Error('welcome is not versioned');
+const batch = await vintaSend.filterNotificationVersions(filter, 0, 50);
+const results = await vintaSend.repinNotifications(batch, { templateVersion, filter });
+```
+
+A target that fails a check is skipped rather than thrown for, and its result says why:
+`WRITTEN`, `UNCHANGED` (already on the version), `CHANGED`, `INVALID_STATUS`, `NOT_MATCHED` (gone,
+or no longer matches `filter`) or `FAILED`. `requeueNotifications` sends nothing: it leaves the
+notifications pending, as `requeueNotification` does with `send: false`. Additional backends take
+each written target, as for the single actions.
+
+Backends report `repin.bulk` and `requeue.bulk`. `vintasend-medplum` does it with one search
+(`_elements=id,meta,identifier,status,sent`) and one batch of `If-Match` JSON Patch updates per
+100 targets; `vintasend-prisma` with one conditional `UPDATE` per target.
+
 ### Case sensitivity
 
 `stringLookups.caseSensitive` and `stringLookups.caseInsensitive` are separate
